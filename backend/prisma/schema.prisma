@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MoodType {
+  FELIZ
+  TRISTE
+  ANSIOSO
+  CALMADO
+  ENOJADO
+  NEUTRO
+}
+
+model User {
+  id           Int          @id @default(autoincrement())
+  nombre       String
+  email        String       @unique
+  passwordHash String
+  qrCode       String       @unique @default(uuid())
+  createdAt    DateTime     @default(now())
+
+  moodEntries  MoodEntry[]
+  friendsAdded Friendship[] @relation("FriendshipUser")
+  friendsOf    Friendship[] @relation("FriendshipFriend")
+}
+
+model MoodEntry {
+  id        Int        @id @default(autoincrement())
+  userId    Int
+  moodType  MoodType
+  nota      String?
+  createdAt DateTime   @default(now())
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  suggestions Suggestion[]
+}
+
+model Activity {
+  id          Int    @id @default(autoincrement())
+  nombre      String
+  descripcion String
+  categoria   String
+
+  moodActivities MoodActivity[]
+  suggestions    Suggestion[]
+}
+
+model MoodActivity {
+  moodType   MoodType
+  activityId Int
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@id([moodType, activityId])
+}
+
+model Suggestion {
+  id          Int      @id @default(autoincrement())
+  moodEntryId Int
+  activityId  Int
+  createdAt   DateTime @default(now())
+
+  moodEntry MoodEntry @relation(fields: [moodEntryId], references: [id], onDelete: Cascade)
+  activity  Activity  @relation(fields: [activityId], references: [id])
+}
+
+model Friendship {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  friendId  Int
+  createdAt DateTime @default(now())
+
+  user   User @relation("FriendshipUser",   fields: [userId],   references: [id], onDelete: Cascade)
+  friend User @relation("FriendshipFriend", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+}

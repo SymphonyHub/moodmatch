@@ -1,0 +1,61 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_URL } from '../config';
+
+const getToken = () => AsyncStorage.getItem('token');
+
+const authHeaders = async () => {
+  const token = await getToken();
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
+};
+
+export const apiLogin = (email, password) =>
+  fetch(`${API_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  }).then((r) => r.json());
+
+export const apiRegister = (nombre, email, password) =>
+  fetch(`${API_URL}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nombre, email, password }),
+  }).then((r) => r.json());
+
+export const apiGetMe = async () => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/users/me`, { headers }).then((r) => r.json());
+};
+
+export const apiCreateMoodEntry = async (moodType, nota = null) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/mood-entries`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ moodType, nota }),
+  }).then((r) => r.json());
+};
+
+export const apiGetFriendships = async () => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/friendships`, { headers }).then((r) => r.json());
+};
+
+export const apiGetRandomActivity = async (moodType, excludeId = null) => {
+  const headers = await authHeaders();
+  const params = new URLSearchParams({ mood: moodType });
+  if (excludeId != null) params.append('exclude', String(excludeId));
+  return fetch(`${API_URL}/api/activities/random?${params}`, { headers }).then((r) => r.json());
+};
+
+export const apiAddFriend = async (qrCode) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/friendships`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ qrCode }),
+  }).then((r) => r.json());
+};

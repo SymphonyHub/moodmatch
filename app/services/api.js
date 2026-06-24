@@ -39,16 +39,10 @@ export const apiCreateMoodEntry = async (moodType, nota = null) => {
   }).then((r) => r.json());
 };
 
+
 export const apiGetFriendships = async () => {
   const headers = await authHeaders();
   return fetch(`${API_URL}/api/friendships`, { headers }).then((r) => r.json());
-};
-
-export const apiGetRandomActivity = async (moodType, excludeId = null) => {
-  const headers = await authHeaders();
-  const params = new URLSearchParams({ mood: moodType });
-  if (excludeId != null) params.append('exclude', String(excludeId));
-  return fetch(`${API_URL}/api/activities/random?${params}`, { headers }).then((r) => r.json());
 };
 
 export const apiAddFriend = async (qrCode) => {
@@ -58,4 +52,23 @@ export const apiAddFriend = async (qrCode) => {
     headers,
     body: JSON.stringify({ qrCode }),
   }).then((r) => r.json());
+};
+
+export const apiSendCheer = async (friendId, message) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/friendships/${friendId}/cheer`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ message }),
+  }).then((r) => r.json());
+};
+
+export const apiGetCheers = async () => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/cheers`, { headers }).then((r) => r.json());
+};
+
+export const apiGetSocialActivities = async () => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/activities?categoria=social`, { headers }).then((r) => r.json());
 };

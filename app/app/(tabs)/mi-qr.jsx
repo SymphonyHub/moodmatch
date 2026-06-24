@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Alert, Modal,
+  ScrollView, ActivityIndicator, Alert, Modal, Animated,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -18,6 +18,8 @@ export default function MiQrScreen() {
   const [scanned, setScanned] = useState(false);
   const [mensaje, setMensaje] = useState(null);
   const [permission, requestPermission] = useCameraPermissions();
+  const scaleEscanear = useRef(new Animated.Value(1)).current;
+  const scaleSalir = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     apiGetMe()
@@ -93,13 +95,29 @@ export default function MiQrScreen() {
         </View>
       )}
 
-      <TouchableOpacity style={styles.btn} onPress={abrirCamara}>
-        <Text style={styles.btnText}>📷  Escanear QR de un amigo</Text>
-      </TouchableOpacity>
+      <Animated.View style={{ width: '100%', transform: [{ scale: scaleEscanear }] }}>
+        <TouchableOpacity
+          style={styles.btn}
+          onPress={abrirCamara}
+          onPressIn={() => Animated.spring(scaleEscanear, { toValue: 0.97, useNativeDriver: true }).start()}
+          onPressOut={() => Animated.spring(scaleEscanear, { toValue: 1, useNativeDriver: true }).start()}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.btnText}>📷  Escanear QR de un amigo</Text>
+        </TouchableOpacity>
+      </Animated.View>
 
-      <TouchableOpacity style={styles.btnSalir} onPress={handleCerrarSesion}>
-        <Text style={styles.btnSalirText}>Cerrar sesión</Text>
-      </TouchableOpacity>
+      <Animated.View style={{ width: '100%', transform: [{ scale: scaleSalir }] }}>
+        <TouchableOpacity
+          style={styles.btnSalir}
+          onPress={handleCerrarSesion}
+          onPressIn={() => Animated.spring(scaleSalir, { toValue: 0.97, useNativeDriver: true }).start()}
+          onPressOut={() => Animated.spring(scaleSalir, { toValue: 1, useNativeDriver: true }).start()}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.btnSalirText}>Cerrar sesión</Text>
+        </TouchableOpacity>
+      </Animated.View>
 
       <Modal visible={scanning} animationType="slide" onRequestClose={() => setScanning(false)}>
         <View style={styles.cameraContainer}>

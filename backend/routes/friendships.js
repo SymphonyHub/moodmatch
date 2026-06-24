@@ -2,6 +2,15 @@ const router = require('express').Router();
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
 
+const VALID_CHEERS = [
+  '💚 Pensando en ti',
+  '✨ Espero que tengas un buen día',
+  '🤗 Aquí estoy si me necesitas',
+  '🌟 Eres más fuerte de lo que crees',
+  '☕ ¿Una pausa te vendría bien?',
+  '🙌 ¡Vas muy bien, sigue así!',
+];
+
 // POST /api/friendships
 router.post('/', requireAuth, async (req, res) => {
   const { qrCode } = req.body;
@@ -65,6 +74,29 @@ router.get('/', requireAuth, async (req, res) => {
   }));
 
   res.json({ amigos });
+});
+
+// POST /api/friendships/:friendId/cheer
+router.post('/:friendId/cheer', requireAuth, async (req, res) => {
+  const friendId = parseInt(req.params.friendId, 10);
+  const { message } = req.body;
+
+  if (!VALID_CHEERS.includes(message)) {
+    return res.status(400).json({ error: 'Mensaje no válido' });
+  }
+
+  const friendship = await prisma.friendship.findUnique({
+    where: { userId_friendId: { userId: req.user.userId, friendId } },
+  });
+  if (!friendship) {
+    return res.status(403).json({ error: 'No son amigos' });
+  }
+
+  const cheer = await prisma.cheer.create({
+    data: { fromUserId: req.user.userId, toUserId: friendId, message },
+  });
+
+  res.status(201).json({ cheer });
 });
 
 module.exports = router;

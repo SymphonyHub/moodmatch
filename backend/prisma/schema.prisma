@@ -24,9 +24,11 @@ model User {
   qrCode       String       @unique @default(uuid())
   createdAt    DateTime     @default(now())
 
-  moodEntries  MoodEntry[]
-  friendsAdded Friendship[] @relation("FriendshipUser")
-  friendsOf    Friendship[] @relation("FriendshipFriend")
+  moodEntries    MoodEntry[]
+  friendsAdded   Friendship[] @relation("FriendshipUser")
+  friendsOf      Friendship[] @relation("FriendshipFriend")
+  cheersSent     Cheer[]      @relation("CheerFrom")
+  cheersReceived Cheer[]      @relation("CheerTo")
 }
 
 model MoodEntry {
@@ -79,4 +81,16 @@ model Friendship {
   friend User @relation("FriendshipFriend", fields: [friendId], references: [id], onDelete: Cascade)
 
   @@unique([userId, friendId])
+}
+
+model Cheer {
+  id         Int      @id @default(autoincrement())
+  fromUserId Int
+  toUserId   Int
+  message    String
+  seen       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  fromUser User @relation("CheerFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User @relation("CheerTo",   fields: [toUserId],   references: [id], onDelete: Cascade)
 }

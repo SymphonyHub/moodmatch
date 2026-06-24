@@ -13,6 +13,7 @@ export default function TabsLayout() {
         headerStyle: { backgroundColor: GREEN },
         headerTintColor: '#fff',
         headerTitleStyle: { fontWeight: 'bold' },
+        animation: 'shift',
       }}
     >
       <Tabs.Screen

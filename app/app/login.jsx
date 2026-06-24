@@ -10,29 +10,58 @@ import { apiLogin, apiRegister } from '../services/api';
 
 const GREEN = '#2e7d32';
 
+const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
+
 export default function LoginScreen() {
   const [modo, setModo] = useState('login');
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+
+  const [errNombre, setErrNombre] = useState('');
+  const [errEmail, setErrEmail] = useState('');
+  const [errPassword, setErrPassword] = useState('');
+  const [errGeneral, setErrGeneral] = useState('');
 
   const cambiarModo = (nuevoModo) => {
     setModo(nuevoModo);
-    setError('');
+    setErrNombre('');
+    setErrEmail('');
+    setErrPassword('');
+    setErrGeneral('');
+  };
+
+  const validar = () => {
+    let ok = true;
+    setErrNombre('');
+    setErrEmail('');
+    setErrPassword('');
+    setErrGeneral('');
+
+    if (modo === 'register' && !nombre.trim()) {
+      setErrNombre('El nombre es requerido');
+      ok = false;
+    }
+    if (!email.trim()) {
+      setErrEmail('El email es requerido');
+      ok = false;
+    } else if (!isValidEmail(email)) {
+      setErrEmail('Ingresa un email válido');
+      ok = false;
+    }
+    if (!password) {
+      setErrPassword('La contraseña es requerida');
+      ok = false;
+    } else if (password.length < 6) {
+      setErrPassword('Mínimo 6 caracteres');
+      ok = false;
+    }
+    return ok;
   };
 
   const handleSubmit = async () => {
-    setError('');
-    if (!email.trim() || !password.trim()) {
-      setError('Email y contraseña son requeridos');
-      return;
-    }
-    if (modo === 'register' && !nombre.trim()) {
-      setError('El nombre es requerido');
-      return;
-    }
+    if (!validar()) return;
 
     setLoading(true);
     try {
@@ -42,14 +71,14 @@ export default function LoginScreen() {
           : await apiRegister(nombre.trim(), email.trim(), password);
 
       if (data.error) {
-        setError(data.error);
+        setErrGeneral(data.error);
         return;
       }
 
       await AsyncStorage.setItem('token', data.token);
       router.replace('/(tabs)/home');
     } catch {
-      setError('Error de conexión. Verifica la IP en config.js');
+      setErrGeneral('Error de conexión. Verifica la IP en config.js');
     } finally {
       setLoading(false);
     }
@@ -84,37 +113,42 @@ export default function LoginScreen() {
         </View>
 
         {modo === 'register' && (
-          <TextInput
-            style={styles.input}
-            placeholder="Nombre"
-            placeholderTextColor="#aaa"
-            value={nombre}
-            onChangeText={setNombre}
-            autoCapitalize="words"
-          />
+          <>
+            <TextInput
+              style={[styles.input, !!errNombre && styles.inputError]}
+              placeholder="Nombre"
+              placeholderTextColor="#aaa"
+              value={nombre}
+              onChangeText={(v) => { setNombre(v); setErrNombre(''); }}
+              autoCapitalize="words"
+            />
+            {!!errNombre && <Text style={styles.fieldError}>{errNombre}</Text>}
+          </>
         )}
 
         <TextInput
-          style={styles.input}
+          style={[styles.input, !!errEmail && styles.inputError]}
           placeholder="Email"
           placeholderTextColor="#aaa"
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(v) => { setEmail(v); setErrEmail(''); }}
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
         />
+        {!!errEmail && <Text style={styles.fieldError}>{errEmail}</Text>}
 
         <TextInput
-          style={styles.input}
+          style={[styles.input, !!errPassword && styles.inputError]}
           placeholder="Contraseña"
           placeholderTextColor="#aaa"
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(v) => { setPassword(v); setErrPassword(''); }}
           secureTextEntry
         />
+        {!!errPassword && <Text style={styles.fieldError}>{errPassword}</Text>}
 
-        {!!error && <Text style={styles.error}>{error}</Text>}
+        {!!errGeneral && <Text style={styles.errorGeneral}>{errGeneral}</Text>}
 
         <TouchableOpacity
           style={[styles.btn, loading && styles.btnDisabled]}
@@ -136,24 +170,9 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: '#f5f5f5' },
-  container: {
-    flexGrow: 1,
-    padding: 28,
-    justifyContent: 'center',
-  },
-  titulo: {
-    fontSize: 34,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: GREEN,
-    marginBottom: 6,
-  },
-  subtitulo: {
-    fontSize: 14,
-    color: '#888',
-    textAlign: 'center',
-    marginBottom: 36,
-  },
+  container: { flexGrow: 1, padding: 28, justifyContent: 'center' },
+  titulo: { fontSize: 34, fontWeight: 'bold', textAlign: 'center', color: GREEN, marginBottom: 6 },
+  subtitulo: { fontSize: 14, color: '#888', textAlign: 'center', marginBottom: 36 },
   toggle: {
     flexDirection: 'row',
     backgroundColor: '#e0e0e0',
@@ -161,12 +180,7 @@ const styles = StyleSheet.create({
     padding: 4,
     marginBottom: 24,
   },
-  toggleBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
+  toggleBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
   toggleActive: { backgroundColor: '#fff' },
   toggleText: { color: '#888', fontWeight: '600', fontSize: 15 },
   toggleTextActive: { color: GREEN },
@@ -176,23 +190,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 13,
     fontSize: 16,
-    marginBottom: 12,
+    marginBottom: 4,
     borderWidth: 1,
     borderColor: '#e0e0e0',
     color: '#222',
   },
-  error: {
-    color: '#c62828',
-    marginBottom: 12,
-    textAlign: 'center',
-    fontSize: 14,
-  },
+  inputError: { borderColor: '#c62828' },
+  fieldError: { color: '#c62828', fontSize: 12, marginBottom: 10, marginLeft: 4 },
+  errorGeneral: { color: '#c62828', marginBottom: 12, textAlign: 'center', fontSize: 14, marginTop: 4 },
   btn: {
     backgroundColor: GREEN,
     borderRadius: 10,
     paddingVertical: 15,
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 8,
   },
   btnDisabled: { backgroundColor: '#a5d6a7' },
   btnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },

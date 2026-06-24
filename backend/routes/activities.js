@@ -4,32 +4,17 @@ const { requireAuth } = require('../middleware/auth');
 
 const VALID_MOODS = ['FELIZ', 'TRISTE', 'ANSIOSO', 'CALMADO', 'ENOJADO', 'NEUTRO'];
 
-// GET /api/activities/random?mood=FELIZ&exclude=3
-router.get('/random', requireAuth, async (req, res) => {
-  const { mood, exclude } = req.query;
+// GET /api/activities?categoria=social
+router.get('/', requireAuth, async (req, res) => {
+  const { categoria } = req.query;
+  const where = categoria ? { categoria } : {};
 
-  if (!mood || !VALID_MOODS.includes(mood)) {
-    return res.status(400).json({ error: `mood debe ser uno de: ${VALID_MOODS.join(', ')}` });
-  }
-
-  const excludeId = exclude ? parseInt(exclude, 10) : null;
-
-  const where = { moodType: mood };
-  if (excludeId && !isNaN(excludeId)) {
-    where.activityId = { not: excludeId };
-  }
-
-  const moodActivities = await prisma.moodActivity.findMany({
+  const activities = await prisma.activity.findMany({
     where,
-    include: { activity: true },
+    orderBy: { id: 'asc' },
   });
 
-  if (moodActivities.length === 0) {
-    return res.json({ activity: null });
-  }
-
-  const random = moodActivities[Math.floor(Math.random() * moodActivities.length)];
-  res.json({ activity: random.activity });
+  res.json({ activities });
 });
 
 module.exports = router;

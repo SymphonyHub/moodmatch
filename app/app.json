@@ -6,7 +6,7 @@
     "scheme": "moodmatch",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -37,7 +37,8 @@
         {
           "cameraPermission": "MoodMatch usa la cámara para escanear el código QR de tus amigos."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

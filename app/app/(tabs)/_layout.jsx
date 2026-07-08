@@ -1,10 +1,27 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../../theme/ThemeContext';
+
+const TAB_ICONS = {
+  home: { outline: 'home-outline', filled: 'home' },
+  amigos: { outline: 'people-outline', filled: 'people' },
+  'mi-qr': { outline: 'qr-code-outline', filled: 'qr-code' },
+  ajustes: { outline: 'settings-outline', filled: 'settings' },
+};
+
+// Variante según tema: los temas "outline" rellenan solo la tab activa;
+// los temas "filled" (Fiesta) usan íconos rellenos siempre.
+const tabIcon = (route, variant) =>
+  function TabIcon({ color, size, focused }) {
+    const icons = TAB_ICONS[route];
+    const name = variant === 'filled' || focused ? icons.filled : icons.outline;
+    return <Ionicons name={name} size={size ?? 22} color={color} />;
+  };
 
 export default function TabsLayout() {
   const { theme } = useTheme();
+  const variant = theme.icons.variant;
 
   return (
     <>
@@ -29,7 +46,7 @@ export default function TabsLayout() {
           options={{
             title: 'Estado de ánimo',
             tabBarLabel: 'Inicio',
-            tabBarIcon: () => <Text style={{ fontSize: 20 }}>🏠</Text>,
+            tabBarIcon: tabIcon('home', variant),
           }}
         />
         <Tabs.Screen
@@ -37,7 +54,7 @@ export default function TabsLayout() {
           options={{
             title: 'Amigos',
             tabBarLabel: 'Amigos',
-            tabBarIcon: () => <Text style={{ fontSize: 20 }}>👥</Text>,
+            tabBarIcon: tabIcon('amigos', variant),
           }}
         />
         <Tabs.Screen
@@ -45,7 +62,7 @@ export default function TabsLayout() {
           options={{
             title: 'Mi QR',
             tabBarLabel: 'Mi QR',
-            tabBarIcon: () => <Text style={{ fontSize: 20 }}>📱</Text>,
+            tabBarIcon: tabIcon('mi-qr', variant),
           }}
         />
         <Tabs.Screen
@@ -53,7 +70,7 @@ export default function TabsLayout() {
           options={{
             title: 'Ajustes',
             tabBarLabel: 'Ajustes',
-            tabBarIcon: () => <Text style={{ fontSize: 20 }}>⚙️</Text>,
+            tabBarIcon: tabIcon('ajustes', variant),
           }}
         />
       </Tabs>

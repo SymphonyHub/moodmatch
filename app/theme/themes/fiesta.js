@@ -1,6 +1,5 @@
 // Fiesta — playful: violeta vivo, esquinas bien redondeadas, sombras con tinte
-// de color e íconos rellenos. La tipografía redondeada (Baloo 2) se activa al
-// cargar las fuentes; hasta entonces usa la del sistema.
+// de color, íconos rellenos y tipografía redondeada (Baloo 2).
 
 const fiesta = {
   id: 'fiesta',
@@ -53,10 +52,10 @@ const fiesta = {
   typography: {
     scale: 1,
     fonts: {
-      regular: { fontWeight: '400' },
-      medium: { fontWeight: '500' },
-      semibold: { fontWeight: '600' },
-      bold: { fontWeight: '700' },
+      regular: { fontFamily: 'Baloo2_400Regular' },
+      medium: { fontFamily: 'Baloo2_500Medium' },
+      semibold: { fontFamily: 'Baloo2_600SemiBold' },
+      bold: { fontFamily: 'Baloo2_700Bold' },
     },
   },
   shape: {

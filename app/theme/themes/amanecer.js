@@ -1,6 +1,5 @@
-// Amanecer — pastel cálido: cremas, durazno y terracota. Header suave (no saturado)
-// y sombras con tinte cálido. La tipografía redondeada (Nunito) se activa al
-// cargar las fuentes; hasta entonces usa la del sistema.
+// Amanecer — pastel cálido: cremas, durazno y terracota. Header suave (no saturado),
+// sombras con tinte cálido y tipografía redondeada (Nunito).
 
 const amanecer = {
   id: 'amanecer',
@@ -53,10 +52,10 @@ const amanecer = {
   typography: {
     scale: 1,
     fonts: {
-      regular: { fontWeight: '400' },
-      medium: { fontWeight: '500' },
-      semibold: { fontWeight: '600' },
-      bold: { fontWeight: '700' },
+      regular: { fontFamily: 'Nunito_400Regular' },
+      medium: { fontFamily: 'Nunito_500Medium' },
+      semibold: { fontFamily: 'Nunito_600SemiBold' },
+      bold: { fontFamily: 'Nunito_700Bold' },
     },
   },
   shape: {

@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, useColorScheme } from 'react-native';
+import { View, Text, ScrollView, useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { THEMES, AUTO_THEME_ID, resolveThemeId } from '../../theme/themes';
 import { useTheme, makeThemedStyles, ThemeScope } from '../../theme/ThemeContext';
 import { MOODS } from '../../constants/moods';
+import Tappable from '../../components/Tappable';
 
 const THEME_OPTIONS = [
   { id: AUTO_THEME_ID, name: 'Automático', tagline: 'Sigue el modo del sistema' },
@@ -53,7 +54,7 @@ function ThemeOptionRow({ option, selected, onPress }) {
   const swatchTheme = option.id === AUTO_THEME_ID ? null : THEMES[option.id];
 
   return (
-    <TouchableOpacity
+    <Tappable
       style={[styles.optionRow, selected && styles.optionRowSelected]}
       onPress={onPress}
       accessibilityRole="radio"
@@ -101,7 +102,7 @@ function ThemeOptionRow({ option, selected, onPress }) {
           </>
         )}
       </View>
-    </TouchableOpacity>
+    </Tappable>
   );
 }
 
@@ -142,25 +143,20 @@ export default function AjustesScreen() {
         ))}
       </View>
 
-      <TouchableOpacity
+      <Tappable
         style={[styles.btnAplicar, (!isDirty || isApplying) && styles.btnAplicarDisabled]}
         onPress={() => applyThemeChoice(candidate)}
         disabled={!isDirty || isApplying}
-        accessibilityRole="button"
       >
         <Text style={styles.btnAplicarTxt}>
           {isDirty ? `Aplicar tema ${candidateName}` : 'Este es tu tema actual'}
         </Text>
-      </TouchableOpacity>
+      </Tappable>
 
       <Text style={[styles.seccion, styles.seccionCuenta]}>Cuenta</Text>
-      <TouchableOpacity
-        style={styles.btnSalir}
-        onPress={handleCerrarSesion}
-        accessibilityRole="button"
-      >
+      <Tappable style={styles.btnSalir} onPress={handleCerrarSesion} haptic={false}>
         <Text style={styles.btnSalirTxt}>Cerrar sesión</Text>
-      </TouchableOpacity>
+      </Tappable>
     </ScrollView>
   );
 }

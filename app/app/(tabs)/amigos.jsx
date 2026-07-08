@@ -1,12 +1,13 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity,
-  ScrollView, ActivityIndicator, Modal, Animated,
+  View, Text, ScrollView, ActivityIndicator, Modal,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { apiGetFriendships, apiSendCheer, apiGetSocialActivities } from '../../services/api';
 import { MOOD_INFO } from '../../constants/moods';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
+import Tappable from '../../components/Tappable';
+import Entrance from '../../components/Entrance';
 
 const CHEERS = [
   '💚 Pensando en ti',
@@ -17,43 +18,16 @@ const CHEERS = [
   '🙌 ¡Vas muy bien, sigue así!',
 ];
 
-function ScaleBtn({ wrapperStyle, style, onPress, children, disabled }) {
-  const scale = useRef(new Animated.Value(1)).current;
-  return (
-    <Animated.View style={[wrapperStyle, { transform: [{ scale }] }]}>
-      <TouchableOpacity
-        style={style}
-        onPress={onPress}
-        onPressIn={() => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true }).start()}
-        onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start()}
-        disabled={disabled}
-        activeOpacity={0.9}
-      >
-        {children}
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
-
 function FriendCard({ amigo, onAnimo, index }) {
   const { theme } = useTheme();
   const styles = useStyles();
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(16)).current;
   const mood = amigo.moodReciente ? MOOD_INFO[amigo.moodReciente] : null;
   const moodColor = amigo.moodReciente
     ? theme.colors.moods[amigo.moodReciente]?.color ?? theme.colors.textMuted
     : null;
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 300, delay: index * 60, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 300, delay: index * 60, useNativeDriver: true }),
-    ]).start();
-  }, []);
-
   return (
-    <Animated.View style={[styles.card, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+    <Entrance index={index} style={styles.card}>
       <View style={styles.avatar}>
         <Text style={styles.avatarTxt}>{amigo.nombre.charAt(0).toUpperCase()}</Text>
       </View>
@@ -65,10 +39,10 @@ function FriendCard({ amigo, onAnimo, index }) {
           <Text style={styles.moodNulo}>Sin registrar aún</Text>
         )}
       </View>
-      <ScaleBtn style={styles.btnAnimo} onPress={() => onAnimo(amigo)}>
+      <Tappable style={styles.btnAnimo} onPress={() => onAnimo(amigo)}>
         <Text style={styles.btnAnimoText}>💚 Ánimo</Text>
-      </ScaleBtn>
-    </Animated.View>
+      </Tappable>
+    </Entrance>
   );
 }
 
@@ -83,20 +57,6 @@ export default function AmigosScreen() {
   const [cheerTarget, setCheerTarget] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [cheerOk, setCheerOk] = useState('');
-
-  const modalFade = useRef(new Animated.Value(0)).current;
-  const modalSlide = useRef(new Animated.Value(50)).current;
-
-  useEffect(() => {
-    if (cheerTarget) {
-      modalFade.setValue(0);
-      modalSlide.setValue(50);
-      Animated.parallel([
-        Animated.timing(modalFade, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.timing(modalSlide, { toValue: 0, duration: 300, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [cheerTarget]);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -145,26 +105,26 @@ export default function AmigosScreen() {
         animationType="none"
         onRequestClose={() => setCheerTarget(null)}
       >
-        <Animated.View style={[styles.modalOverlay, { opacity: modalFade }]}>
-          <Animated.View style={[styles.modalBox, { transform: [{ translateY: modalSlide }] }]}>
+        <Entrance distance={0} style={styles.modalOverlay}>
+          <Entrance distance={50} style={styles.modalBox}>
             <Text style={styles.modalTitle}>
               Envía un ánimo a {cheerTarget?.nombre}
             </Text>
             {CHEERS.map((msg) => (
-              <ScaleBtn
+              <Tappable
                 key={msg}
                 style={[styles.cheerOption, enviando && styles.cheerOptionDisabled]}
                 onPress={() => enviarCheer(msg)}
                 disabled={enviando}
               >
                 <Text style={styles.cheerOptionText}>{msg}</Text>
-              </ScaleBtn>
+              </Tappable>
             ))}
-            <ScaleBtn style={styles.modalCancelar} onPress={() => setCheerTarget(null)}>
+            <Tappable style={styles.modalCancelar} onPress={() => setCheerTarget(null)} haptic={false}>
               <Text style={styles.modalCancelarText}>Cancelar</Text>
-            </ScaleBtn>
-          </Animated.View>
-        </Animated.View>
+            </Tappable>
+          </Entrance>
+        </Entrance>
       </Modal>
 
       <ScrollView contentContainerStyle={styles.container}>
@@ -174,21 +134,23 @@ export default function AmigosScreen() {
         </Text>
 
         {!!cheerOk && (
-          <View style={styles.bannerOk}>
-            <Text style={styles.bannerOkText}>{cheerOk}</Text>
-          </View>
+          <Entrance distance={8}>
+            <View style={styles.bannerOk}>
+              <Text style={styles.bannerOkText}>{cheerOk}</Text>
+            </View>
+          </Entrance>
         )}
 
         {loading ? (
           <ActivityIndicator size="large" color={theme.colors.primary} style={styles.spinner} />
         ) : amigos.length === 0 ? (
-          <View style={styles.vacioCont}>
+          <Entrance style={styles.vacioCont}>
             <Text style={styles.vacioEmoji}>👥</Text>
             <Text style={styles.vacioTxt}>Aún no tienes amigos agregados</Text>
             <Text style={styles.vacioHint}>
               Ve a la pestaña "Mi QR" y escanea el código de alguien para empezar.
             </Text>
-          </View>
+          </Entrance>
         ) : (
           <>
             {amigos.map((amigo, i) => (
@@ -200,22 +162,23 @@ export default function AmigosScreen() {
               />
             ))}
 
-            <ScaleBtn
+            <Tappable
               wrapperStyle={{ alignSelf: 'center', marginTop: 8, marginBottom: 24 }}
               style={styles.btnRecargar}
               onPress={cargar}
+              haptic={false}
             >
               <Text style={styles.btnRecargarTxt}>Actualizar</Text>
-            </ScaleBtn>
+            </Tappable>
 
             {actividades.length > 0 && (
               <View style={styles.socialSection}>
                 <Text style={styles.socialTitulo}>Para hacer con amigos</Text>
-                {actividades.map((act) => (
-                  <View key={act.id} style={styles.actCard}>
+                {actividades.map((act, i) => (
+                  <Entrance key={act.id} index={i} style={styles.actCard}>
                     <Text style={styles.actNombre}>{act.nombre}</Text>
                     <Text style={styles.actDesc}>{act.descripcion}</Text>
-                  </View>
+                  </Entrance>
                 ))}
               </View>
             )}

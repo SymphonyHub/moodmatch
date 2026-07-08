@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity,
-  ScrollView, ActivityIndicator, Alert, Modal, Animated,
+  ScrollView, ActivityIndicator, Alert, Modal,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { apiGetMe, apiAddFriend } from '../../services/api';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
+import Tappable from '../../components/Tappable';
 
 export default function MiQrScreen() {
   const { theme } = useTheme();
@@ -18,7 +19,6 @@ export default function MiQrScreen() {
   const [scanned, setScanned] = useState(false);
   const [mensaje, setMensaje] = useState(null);
   const [permission, requestPermission] = useCameraPermissions();
-  const scaleEscanear = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     apiGetMe()
@@ -91,17 +91,9 @@ export default function MiQrScreen() {
         </View>
       )}
 
-      <Animated.View style={{ width: '100%', transform: [{ scale: scaleEscanear }] }}>
-        <TouchableOpacity
-          style={styles.btn}
-          onPress={abrirCamara}
-          onPressIn={() => Animated.spring(scaleEscanear, { toValue: 0.97, useNativeDriver: true }).start()}
-          onPressOut={() => Animated.spring(scaleEscanear, { toValue: 1, useNativeDriver: true }).start()}
-          activeOpacity={0.9}
-        >
-          <Text style={styles.btnText}>📷  Escanear QR de un amigo</Text>
-        </TouchableOpacity>
-      </Animated.View>
+      <Tappable wrapperStyle={{ width: '100%' }} style={styles.btn} onPress={abrirCamara}>
+        <Text style={styles.btnText}>📷  Escanear QR de un amigo</Text>
+      </Tappable>
 
       <Modal visible={scanning} animationType="slide" onRequestClose={() => setScanning(false)}>
         {/* La UI de la cámara va sobre video en vivo: colores fijos, independientes del tema. */}

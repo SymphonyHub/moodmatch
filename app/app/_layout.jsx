@@ -60,6 +60,7 @@ function ThemedStack() {
       <Stack
         screenOptions={{
           headerShown: false,
+          animation: 'fade',
           contentStyle: { backgroundColor: theme.colors.background },
         }}
       >

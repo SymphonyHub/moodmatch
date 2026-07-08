@@ -1,12 +1,13 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity,
-  ScrollView, ActivityIndicator, Animated, Modal,
+  View, Text, ScrollView, ActivityIndicator, Modal,
 } from 'react-native';
 import { apiCreateMoodEntry, apiGetCheers } from '../../services/api';
 import { MOODS } from '../../constants/moods';
 import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../../constants/categories';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
+import Tappable from '../../components/Tappable';
+import Entrance from '../../components/Entrance';
 
 export default function HomeScreen() {
   const { theme } = useTheme();
@@ -17,13 +18,6 @@ export default function HomeScreen() {
   const [loadingOtra, setLoadingOtra] = useState(false);
   const [actividad, setActividad] = useState(null);
   const [error, setError] = useState('');
-
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
-  const cheerFadeAnim = useRef(new Animated.Value(0)).current;
-  const cheerSlideAnim = useRef(new Animated.Value(20)).current;
-  const scaleVer = useRef(new Animated.Value(1)).current;
-  const scaleOtra = useRef(new Animated.Value(1)).current;
 
   const [cheers, setCheers] = useState([]);
   const [cheerIdx, setCheerIdx] = useState(0);
@@ -41,33 +35,12 @@ export default function HomeScreen() {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (showCheerModal) {
-      cheerFadeAnim.setValue(0);
-      cheerSlideAnim.setValue(20);
-      Animated.parallel([
-        Animated.timing(cheerFadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.timing(cheerSlideAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [showCheerModal]);
-
   const cerrarCheerModal = () => {
     if (cheerIdx < cheers.length - 1) {
       setCheerIdx((i) => i + 1);
     } else {
       setShowCheerModal(false);
     }
-  };
-
-  const mostrarConFade = (nuevaActividad) => {
-    fadeAnim.setValue(0);
-    slideAnim.setValue(20);
-    setActividad(nuevaActividad);
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
-    ]).start();
   };
 
   const seleccionarMood = (value) => {
@@ -83,7 +56,7 @@ export default function HomeScreen() {
     try {
       const data = await apiCreateMoodEntry(selectedMood);
       if (data.error) { setError(data.error); return; }
-      mostrarConFade(data.actividadSugerida);
+      setActividad(data.actividadSugerida);
     } catch {
       setError('No pudimos conectar. Revisa tu conexión e intenta de nuevo.');
     } finally {
@@ -96,7 +69,7 @@ export default function HomeScreen() {
     setLoadingOtra(true);
     try {
       const data = await apiCreateMoodEntry(selectedMood);
-      if (data.actividadSugerida) mostrarConFade(data.actividadSugerida);
+      if (data.actividadSugerida) setActividad(data.actividadSugerida);
     } catch {
       // falla silenciosamente
     } finally {
@@ -115,8 +88,8 @@ export default function HomeScreen() {
   return (
     <View style={{ flex: 1 }}>
       <Modal visible={showCheerModal} transparent animationType="none">
-        <Animated.View style={[styles.cheerOverlay, { opacity: cheerFadeAnim }]}>
-          <Animated.View style={[styles.cheerBox, { transform: [{ translateY: cheerSlideAnim }] }]}>
+        <Entrance distance={0} style={styles.cheerOverlay}>
+          <Entrance distance={20} style={styles.cheerBox}>
             <Text style={styles.cheerTitle}>Tienes un mensaje</Text>
             {cheerActual && (
               <View>
@@ -127,13 +100,13 @@ export default function HomeScreen() {
             {cheers.length > 1 && (
               <Text style={styles.cheerCount}>{cheerIdx + 1} / {cheers.length}</Text>
             )}
-            <TouchableOpacity style={styles.cheerBtn} onPress={cerrarCheerModal}>
+            <Tappable style={styles.cheerBtn} onPress={cerrarCheerModal}>
               <Text style={styles.cheerBtnText}>
                 {cheerIdx < cheers.length - 1 ? 'Siguiente' : 'Gracias'}
               </Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </Animated.View>
+            </Tappable>
+          </Entrance>
+        </Entrance>
       </Modal>
 
       <ScrollView contentContainerStyle={styles.container}>
@@ -141,8 +114,9 @@ export default function HomeScreen() {
 
         <View style={styles.grid}>
           {MOODS.map((mood) => (
-            <TouchableOpacity
+            <Tappable
               key={mood.value}
+              wrapperStyle={styles.moodBtnWrapper}
               style={[styles.moodBtn, selectedMood === mood.value && styles.moodBtnActive]}
               onPress={() => seleccionarMood(mood.value)}
               activeOpacity={0.7}
@@ -151,50 +125,44 @@ export default function HomeScreen() {
               <Text style={[styles.moodLabel, selectedMood === mood.value && styles.moodLabelActive]}>
                 {mood.label}
               </Text>
-            </TouchableOpacity>
+            </Tappable>
           ))}
         </View>
 
         {!!error && <Text style={styles.error}>{error}</Text>}
 
         {!actividad ? (
-          <Animated.View style={{ transform: [{ scale: scaleVer }] }}>
-            <TouchableOpacity
-              style={[styles.btn, (!selectedMood || loading) && styles.btnDisabled]}
-              onPress={handleRegistrar}
-              onPressIn={() => Animated.spring(scaleVer, { toValue: 0.97, useNativeDriver: true }).start()}
-              onPressOut={() => Animated.spring(scaleVer, { toValue: 1, useNativeDriver: true }).start()}
-              disabled={loading || !selectedMood}
-              activeOpacity={0.9}
-            >
-              {loading
-                ? <ActivityIndicator color={theme.colors.onPrimary} />
-                : <Text style={styles.btnText}>Ver actividad sugerida</Text>}
-            </TouchableOpacity>
-          </Animated.View>
+          <Tappable
+            style={[styles.btn, (!selectedMood || loading) && styles.btnDisabled]}
+            onPress={handleRegistrar}
+            disabled={loading || !selectedMood}
+          >
+            {loading
+              ? <ActivityIndicator color={theme.colors.onPrimary} />
+              : <Text style={styles.btnText}>Ver actividad sugerida</Text>}
+          </Tappable>
         ) : (
-          <Animated.View style={[styles.card, { opacity: fadeAnim, borderLeftColor: cat.color, transform: [{ translateY: slideAnim }] }]}>
+          <Entrance
+            key={actividad.id}
+            style={[styles.card, { borderLeftColor: cat.color }]}
+          >
             <Text style={[styles.cardTag, { color: cat.color }]}>
               {cat.icon}{'  '}{actividad.categoria.toUpperCase()}
             </Text>
             <Text style={styles.cardNombre}>{actividad.nombre}</Text>
             <Text style={styles.cardDesc}>{actividad.descripcion}</Text>
 
-            <Animated.View style={{ transform: [{ scale: scaleOtra }] }}>
-              <TouchableOpacity
-                style={[styles.btnOtra, { borderColor: cat.color }, loadingOtra && styles.btnDisabled]}
-                onPress={handleOtraIdea}
-                onPressIn={() => Animated.spring(scaleOtra, { toValue: 0.97, useNativeDriver: true }).start()}
-                onPressOut={() => Animated.spring(scaleOtra, { toValue: 1, useNativeDriver: true }).start()}
-                disabled={loadingOtra}
-                activeOpacity={0.9}
-              >
-                <Text style={[styles.btnOtraText, { color: loadingOtra ? theme.colors.textFaint : cat.color }]}>
-                  {loadingOtra ? 'Buscando...' : 'Quiero otra idea'}
-                </Text>
-              </TouchableOpacity>
-            </Animated.View>
-          </Animated.View>
+            <Tappable
+              style={[styles.btnOtra, { borderColor: cat.color }, loadingOtra && styles.btnDisabled]}
+              onPress={handleOtraIdea}
+              disabled={loadingOtra}
+              haptic={false}
+            >
+              <Text style={[styles.btnOtraText, { color: loadingOtra ? theme.colors.textFaint : cat.color }]}>
+                {loadingOtra ? 'Buscando...' : 'Quiero otra idea'}
+              </Text>
+            </Tappable>
+          </Entrance>
         )}
       </ScrollView>
     </View>
@@ -218,8 +186,8 @@ const useStyles = makeThemedStyles((t) => ({
     justifyContent: 'center',
     marginBottom: 24,
   },
+  moodBtnWrapper: { width: '44%' },
   moodBtn: {
-    width: '44%',
     backgroundColor: t.colors.surface,
     borderRadius: t.shape.radiusLg,
     paddingVertical: 18,

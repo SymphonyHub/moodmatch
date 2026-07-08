@@ -26,7 +26,7 @@ const amanecer = {
     danger: '#b3392f',
     dangerSoft: '#f9e3df',
     overlay: 'rgba(67, 48, 43, 0.5)',
-    headerBackground: '#f3e2d0',
+    headerBackground: '#faf3ec',
     onHeader: '#43302b',
     tabBarBackground: '#fffdfa',
     tabBarBorder: '#ecdccc',

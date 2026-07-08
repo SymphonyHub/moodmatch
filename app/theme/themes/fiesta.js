@@ -1,12 +1,12 @@
-// Fiesta — playful: violeta vivo, esquinas bien redondeadas, sombras con tinte
-// de color, íconos rellenos y tipografía redondeada (Baloo 2).
+// Fiesta — playful: magenta vivo (separado del índigo de marca), esquinas bien
+// redondeadas, sombras con tinte de color, íconos rellenos y Baloo 2.
 
 const fiesta = {
   id: 'fiesta',
   name: 'Fiesta',
   tagline: 'Colorido y juguetón',
   isDark: false,
-  statusBar: { onBackground: 'dark', onHeader: 'light' },
+  statusBar: { onBackground: 'dark', onHeader: 'dark' },
   icons: { variant: 'filled' },
   colors: {
     background: '#f6f2fb',
@@ -15,22 +15,22 @@ const fiesta = {
     text: '#2d2440',
     textMuted: '#5f5578',
     textFaint: '#6d6483',
-    primary: '#7c3aed',
+    primary: '#a626aa',
     onPrimary: '#ffffff',
-    primarySoft: '#f0e7fd',
-    primarySoftBorder: '#d8c3fa',
-    primaryDisabled: '#c4a8f5',
+    primarySoft: '#f8e8f9',
+    primarySoftBorder: '#eac9ec',
+    primaryDisabled: '#d79ad9',
     accent: '#a95a00',
     accentSoft: '#fdf0dc',
     border: '#e6def2',
     danger: '#c22f52',
     dangerSoft: '#fdedf1',
     overlay: 'rgba(45, 36, 64, 0.55)',
-    headerBackground: '#7c3aed',
-    onHeader: '#ffffff',
+    headerBackground: '#f6f2fb',
+    onHeader: '#2d2440',
     tabBarBackground: '#ffffff',
     tabBarBorder: '#e6def2',
-    tabActive: '#7c3aed',
+    tabActive: '#a626aa',
     tabInactive: '#5f5578',
     moods: {
       FELIZ:   { color: '#a95a00', soft: '#fdf0dc' },
@@ -78,14 +78,14 @@ const fiesta = {
   },
   shadows: {
     card: {
-      shadowColor: '#7c3aed',
+      shadowColor: '#a626aa',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.12,
       shadowRadius: 6,
       elevation: 2,
     },
     cardStrong: {
-      shadowColor: '#7c3aed',
+      shadowColor: '#a626aa',
       shadowOffset: { width: 0, height: 3 },
       shadowOpacity: 0.16,
       shadowRadius: 8,

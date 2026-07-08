@@ -21,6 +21,8 @@ const nocturno = {
     primarySoft: '#1f3524',
     primarySoftBorder: '#2e4a34',
     primaryDisabled: '#3a5240',
+    accent: '#f0977a',
+    accentSoft: '#3a2620',
     border: '#2c3430',
     danger: '#ef8080',
     dangerSoft: '#3a2222',
@@ -53,10 +55,17 @@ const nocturno = {
   typography: {
     scale: 1,
     fonts: {
-      regular: { fontWeight: '400' },
-      medium: { fontWeight: '500' },
-      semibold: { fontWeight: '600' },
-      bold: { fontWeight: '700' },
+      regular: { fontFamily: 'Manrope_400Regular' },
+      medium: { fontFamily: 'Manrope_500Medium' },
+      semibold: { fontFamily: 'Manrope_600SemiBold' },
+      bold: { fontFamily: 'Manrope_700Bold' },
+    },
+    type: {
+      display: { fontFamily: 'Sora_700Bold', fontSize: 28, lineHeight: 34 },
+      title: { fontFamily: 'Sora_700Bold', fontSize: 20, lineHeight: 26 },
+      section: { fontFamily: 'Sora_600SemiBold', fontSize: 16, lineHeight: 22 },
+      body: { fontFamily: 'Manrope_500Medium', fontSize: 15, lineHeight: 23 },
+      caption: { fontFamily: 'Manrope_400Regular', fontSize: 12, lineHeight: 17 },
     },
   },
   shape: {

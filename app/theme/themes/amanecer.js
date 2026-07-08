@@ -20,6 +20,8 @@ const amanecer = {
     primarySoft: '#fbeee3',
     primarySoftBorder: '#eed3bd',
     primaryDisabled: '#d9a486',
+    accent: '#42639e',
+    accentSoft: '#e8edf6',
     border: '#ecdccc',
     danger: '#b3392f',
     dangerSoft: '#f9e3df',
@@ -56,6 +58,13 @@ const amanecer = {
       medium: { fontFamily: 'Nunito_500Medium' },
       semibold: { fontFamily: 'Nunito_600SemiBold' },
       bold: { fontFamily: 'Nunito_700Bold' },
+    },
+    type: {
+      display: { fontFamily: 'Sora_700Bold', fontSize: 28, lineHeight: 34 },
+      title: { fontFamily: 'Sora_700Bold', fontSize: 20, lineHeight: 26 },
+      section: { fontFamily: 'Sora_600SemiBold', fontSize: 16, lineHeight: 22 },
+      body: { fontFamily: 'Nunito_500Medium', fontSize: 15, lineHeight: 23 },
+      caption: { fontFamily: 'Nunito_400Regular', fontSize: 12, lineHeight: 17 },
     },
   },
   shape: {

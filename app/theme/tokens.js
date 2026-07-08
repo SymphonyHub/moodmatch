@@ -27,6 +27,8 @@ export const REQUIRED_COLOR_KEYS = [
   'primarySoft',
   'primarySoftBorder',
   'primaryDisabled',
+  'accent',
+  'accentSoft',
   'border',
   'danger',
   'dangerSoft',
@@ -50,5 +52,9 @@ export const REQUIRED_SHAPE_KEYS = [
 ];
 
 export const REQUIRED_FONT_ROLES = ['regular', 'medium', 'semibold', 'bold'];
+
+// Presets de jerarquía tipográfica (typography.type): Sora titula en todos los
+// temas (consistencia de marca); el cuerpo conserva la personalidad de cada tema.
+export const REQUIRED_TYPE_ROLES = ['display', 'title', 'section', 'body', 'caption'];
 
 export const REQUIRED_SHADOW_KEYS = ['card', 'cardStrong', 'modal'];

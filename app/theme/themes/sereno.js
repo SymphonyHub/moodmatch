@@ -20,6 +20,8 @@ const sereno = {
     primarySoft: '#e8f5e9',
     primarySoftBorder: '#c8e6c9',
     primaryDisabled: '#a5d6a7',
+    accent: '#b34c30',
+    accentSoft: '#fceee9',
     border: '#e2e6e2',
     danger: '#c62828',
     dangerSoft: '#fdeaea',
@@ -52,10 +54,17 @@ const sereno = {
   typography: {
     scale: 1,
     fonts: {
-      regular: { fontWeight: '400' },
-      medium: { fontWeight: '500' },
-      semibold: { fontWeight: '600' },
-      bold: { fontWeight: '700' },
+      regular: { fontFamily: 'Manrope_400Regular' },
+      medium: { fontFamily: 'Manrope_500Medium' },
+      semibold: { fontFamily: 'Manrope_600SemiBold' },
+      bold: { fontFamily: 'Manrope_700Bold' },
+    },
+    type: {
+      display: { fontFamily: 'Sora_700Bold', fontSize: 28, lineHeight: 34 },
+      title: { fontFamily: 'Sora_700Bold', fontSize: 20, lineHeight: 26 },
+      section: { fontFamily: 'Sora_600SemiBold', fontSize: 16, lineHeight: 22 },
+      body: { fontFamily: 'Manrope_500Medium', fontSize: 15, lineHeight: 23 },
+      caption: { fontFamily: 'Manrope_400Regular', fontSize: 12, lineHeight: 17 },
     },
   },
   shape: {

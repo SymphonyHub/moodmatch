@@ -37,6 +37,8 @@ describe.each(THEME_IDS)('contraste WCAG AA — tema %s', (id) => {
     ['primary/surface', c.primary, c.surface],
     ['primary/primarySoft', c.primary, c.primarySoft],
     ['onPrimary/primary', c.onPrimary, c.primary],
+    ['accent/surface', c.accent, c.surface],
+    ['accent/accentSoft', c.accent, c.accentSoft],
     ['onHeader/headerBackground', c.onHeader, c.headerBackground],
     ['danger/dangerSoft', c.danger, c.dangerSoft],
     ['tabActive/tabBarBackground', c.tabActive, c.tabBarBackground],

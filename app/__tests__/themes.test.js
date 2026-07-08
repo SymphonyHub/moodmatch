@@ -12,6 +12,7 @@ import {
   REQUIRED_COLOR_KEYS,
   REQUIRED_SHAPE_KEYS,
   REQUIRED_FONT_ROLES,
+  REQUIRED_TYPE_ROLES,
   REQUIRED_SHADOW_KEYS,
 } from '../theme/tokens';
 
@@ -68,6 +69,19 @@ describe('registro de temas', () => {
     for (const key of REQUIRED_SHADOW_KEYS) {
       expect(t.shadows[key]).toBeDefined();
     }
+  });
+
+  test.each(THEME_IDS)('tema %s define los presets de jerarquía tipográfica', (id) => {
+    const { type } = THEMES[id].typography;
+    for (const role of REQUIRED_TYPE_ROLES) {
+      expect(typeof type[role].fontSize).toBe('number');
+      expect(typeof type[role].lineHeight).toBe('number');
+      expect(type[role].lineHeight).toBeGreaterThanOrEqual(type[role].fontSize);
+    }
+    // Sora titula en todos los temas: consistencia de marca.
+    expect(type.display.fontFamily).toBe('Sora_700Bold');
+    expect(type.title.fontFamily).toBe('Sora_700Bold');
+    expect(type.section.fontFamily).toBe('Sora_600SemiBold');
   });
 
   test.each(THEME_IDS)('tema %s expone fontSize aplicando su escala', (id) => {

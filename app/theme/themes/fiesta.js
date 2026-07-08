@@ -20,6 +20,8 @@ const fiesta = {
     primarySoft: '#f0e7fd',
     primarySoftBorder: '#d8c3fa',
     primaryDisabled: '#c4a8f5',
+    accent: '#a95a00',
+    accentSoft: '#fdf0dc',
     border: '#e6def2',
     danger: '#c22f52',
     dangerSoft: '#fdedf1',
@@ -56,6 +58,13 @@ const fiesta = {
       medium: { fontFamily: 'Baloo2_500Medium' },
       semibold: { fontFamily: 'Baloo2_600SemiBold' },
       bold: { fontFamily: 'Baloo2_700Bold' },
+    },
+    type: {
+      display: { fontFamily: 'Sora_700Bold', fontSize: 28, lineHeight: 34 },
+      title: { fontFamily: 'Sora_700Bold', fontSize: 20, lineHeight: 26 },
+      section: { fontFamily: 'Sora_600SemiBold', fontSize: 16, lineHeight: 22 },
+      body: { fontFamily: 'Baloo2_500Medium', fontSize: 15, lineHeight: 23 },
+      caption: { fontFamily: 'Baloo2_400Regular', fontSize: 12, lineHeight: 17 },
     },
   },
   shape: {

@@ -21,6 +21,8 @@ const contraste = {
     primarySoft: '#dcefdd',
     primarySoftBorder: '#1b5e20',
     primaryDisabled: '#767676',
+    accent: '#8a3c00',
+    accentSoft: '#f7e6d9',
     border: '#000000',
     danger: '#a10000',
     dangerSoft: '#ffe3e3',
@@ -57,6 +59,13 @@ const contraste = {
       medium: { fontWeight: '600' },
       semibold: { fontWeight: '700' },
       bold: { fontWeight: '800' },
+    },
+    type: {
+      display: { fontFamily: 'Sora_700Bold', fontSize: 30, lineHeight: 37 },
+      title: { fontFamily: 'Sora_700Bold', fontSize: 22, lineHeight: 28 },
+      section: { fontFamily: 'Sora_600SemiBold', fontSize: 17, lineHeight: 24 },
+      body: { fontWeight: '600', fontSize: 16, lineHeight: 25 },
+      caption: { fontWeight: '500', fontSize: 13, lineHeight: 18 },
     },
   },
   shape: {

@@ -4,6 +4,12 @@ import { View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
+import { Sora_600SemiBold } from '@expo-google-fonts/sora/600SemiBold';
+import { Sora_700Bold } from '@expo-google-fonts/sora/700Bold';
+import { Manrope_400Regular } from '@expo-google-fonts/manrope/400Regular';
+import { Manrope_500Medium } from '@expo-google-fonts/manrope/500Medium';
+import { Manrope_600SemiBold } from '@expo-google-fonts/manrope/600SemiBold';
+import { Manrope_700Bold } from '@expo-google-fonts/manrope/700Bold';
 import { Nunito_400Regular } from '@expo-google-fonts/nunito/400Regular';
 import { Nunito_500Medium } from '@expo-google-fonts/nunito/500Medium';
 import { Nunito_600SemiBold } from '@expo-google-fonts/nunito/600SemiBold';
@@ -23,6 +29,12 @@ function ThemedStack() {
 
   // Solo los pesos que usan los temas (imports por subpath para no inflar el bundle).
   const [fontsLoaded, fontError] = useFonts({
+    Sora_600SemiBold,
+    Sora_700Bold,
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
     Nunito_400Regular,
     Nunito_500Medium,
     Nunito_600SemiBold,

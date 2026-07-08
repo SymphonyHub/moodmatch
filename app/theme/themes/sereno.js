@@ -1,0 +1,93 @@
+// Sereno — tema por defecto. Minimalista claro, evolución del look original de la app.
+// Todos los pares texto/fondo cumplen WCAG AA (≥ 4.5:1); verificado por tests.
+
+const sereno = {
+  id: 'sereno',
+  name: 'Sereno',
+  tagline: 'Claro y minimalista',
+  isDark: false,
+  statusBar: { onBackground: 'dark', onHeader: 'light' },
+  icons: { variant: 'outline' },
+  colors: {
+    background: '#f4f6f4',
+    surface: '#ffffff',
+    surfaceElevated: '#ffffff',
+    text: '#22302a',
+    textMuted: '#5c6a63',
+    textFaint: '#647169',
+    primary: '#2e7d32',
+    onPrimary: '#ffffff',
+    primarySoft: '#e8f5e9',
+    border: '#e2e6e2',
+    danger: '#c62828',
+    dangerSoft: '#fdeaea',
+    overlay: 'rgba(16, 24, 19, 0.55)',
+    headerBackground: '#2e7d32',
+    onHeader: '#ffffff',
+    tabBarBackground: '#ffffff',
+    tabBarBorder: '#e2e6e2',
+    tabActive: '#2e7d32',
+    tabInactive: '#5c6a63',
+    moods: {
+      FELIZ:   { color: '#2e7d32', soft: '#e8f5e9' },
+      TRISTE:  { color: '#1565c0', soft: '#e7f0fa' },
+      ANSIOSO: { color: '#c94f00', soft: '#fdeee2' },
+      CALMADO: { color: '#00695c', soft: '#e0f2ef' },
+      ENOJADO: { color: '#c62828', soft: '#fdeaea' },
+      NEUTRO:  { color: '#5f6a64', soft: '#eef0ee' },
+    },
+    categories: {
+      social: '#1565c0',
+      físico: '#c94f00',
+      creativo: '#6a1b9a',
+      relajación: '#00707b',
+      reflexión: '#2e7d32',
+      entretenimiento: '#c62828',
+      productividad: '#a35e00',
+      mindfulness: '#00695c',
+    },
+  },
+  typography: {
+    scale: 1,
+    fonts: {
+      regular: { fontWeight: '400' },
+      medium: { fontWeight: '500' },
+      semibold: { fontWeight: '600' },
+      bold: { fontWeight: '700' },
+    },
+  },
+  shape: {
+    radiusSm: 8,
+    radiusMd: 11,
+    radiusLg: 14,
+    radiusXl: 20,
+    borderThin: 1,
+    borderMedium: 1.5,
+    borderThick: 2,
+  },
+  shadows: {
+    card: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.07,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    cardStrong: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 6,
+      elevation: 3,
+    },
+    modal: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+  },
+};
+
+export default sereno;

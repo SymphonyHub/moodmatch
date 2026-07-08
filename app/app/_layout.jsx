@@ -1,11 +1,35 @@
 import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { ThemeProvider, useTheme } from '../theme/ThemeContext';
+
+function ThemedStack() {
+  const { theme, hydrated } = useTheme();
+
+  // Mantiene el splash visible hasta conocer el tema guardado: evita un flash
+  // del tema por defecto cuando el usuario usa otro.
+  if (!hydrated) return null;
+
+  return (
+    <>
+      <StatusBar style={theme.statusBar.onBackground} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: theme.colors.background },
+        }}
+      >
+        <Stack.Screen name="index" />
+        <Stack.Screen name="login" />
+        <Stack.Screen name="(tabs)" />
+      </Stack>
+    </>
+  );
+}
 
 export default function RootLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="login" />
-      <Stack.Screen name="(tabs)" />
-    </Stack>
+    <ThemeProvider>
+      <ThemedStack />
+    </ThemeProvider>
   );
 }

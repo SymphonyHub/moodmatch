@@ -172,8 +172,7 @@ export default function HomeScreen() {
 const useStyles = makeThemedStyles((t) => ({
   container: { padding: 20, paddingBottom: 40 },
   pregunta: {
-    fontSize: t.fontSize(20),
-    ...t.typography.fonts.bold,
+    ...t.typography.type.title,
     color: t.colors.text,
     textAlign: 'center',
     marginBottom: 20,
@@ -239,15 +238,13 @@ const useStyles = makeThemedStyles((t) => ({
     marginBottom: 8,
   },
   cardNombre: {
-    fontSize: t.fontSize(20),
-    ...t.typography.fonts.bold,
+    ...t.typography.type.title,
     color: t.colors.text,
     marginBottom: 10,
   },
   cardDesc: {
-    fontSize: t.fontSize(15),
+    ...t.typography.type.body,
     color: t.colors.textMuted,
-    lineHeight: Math.round(t.fontSize(15) * 1.55),
     marginBottom: 18,
   },
   btnOtra: {
@@ -277,8 +274,7 @@ const useStyles = makeThemedStyles((t) => ({
     ...t.shadows.modal,
   },
   cheerTitle: {
-    fontSize: t.fontSize(18),
-    ...t.typography.fonts.bold,
+    ...t.typography.type.title,
     color: t.colors.text,
     marginBottom: 16,
   },
@@ -296,7 +292,7 @@ const useStyles = makeThemedStyles((t) => ({
     lineHeight: Math.round(t.fontSize(22) * 1.45),
   },
   cheerCount: {
-    fontSize: t.fontSize(12),
+    ...t.typography.type.caption,
     color: t.colors.textFaint,
     marginBottom: 12,
   },

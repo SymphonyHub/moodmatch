@@ -192,14 +192,13 @@ export default function AmigosScreen() {
 const useStyles = makeThemedStyles((t) => ({
   container: { padding: 20, paddingBottom: 40 },
   titulo: {
-    fontSize: t.fontSize(22),
-    ...t.typography.fonts.bold,
+    ...t.typography.type.title,
     color: t.colors.text,
     marginBottom: 4,
     marginTop: 4,
   },
   subtitulo: {
-    fontSize: t.fontSize(13),
+    ...t.typography.type.caption,
     color: t.colors.textMuted,
     marginBottom: 22,
   },
@@ -290,8 +289,7 @@ const useStyles = makeThemedStyles((t) => ({
   },
   socialSection: { marginTop: 4 },
   socialTitulo: {
-    fontSize: t.fontSize(16),
-    ...t.typography.fonts.bold,
+    ...t.typography.type.section,
     color: t.colors.text,
     marginBottom: 12,
   },
@@ -328,8 +326,7 @@ const useStyles = makeThemedStyles((t) => ({
     paddingBottom: 36,
   },
   modalTitle: {
-    fontSize: t.fontSize(16),
-    ...t.typography.fonts.bold,
+    ...t.typography.type.section,
     color: t.colors.text,
     marginBottom: 16,
     textAlign: 'center',

@@ -121,14 +121,13 @@ const useStyles = makeThemedStyles((t) => ({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   container: { padding: 24, alignItems: 'center', paddingBottom: 40 },
   titulo: {
-    fontSize: t.fontSize(22),
-    ...t.typography.fonts.bold,
+    ...t.typography.type.title,
     color: t.colors.text,
     marginBottom: 4,
     marginTop: 4,
   },
   nombre: {
-    fontSize: t.fontSize(16),
+    ...t.typography.type.body,
     color: t.colors.textMuted,
     marginBottom: 22,
   },

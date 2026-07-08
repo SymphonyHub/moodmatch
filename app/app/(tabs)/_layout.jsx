@@ -36,7 +36,7 @@ export default function TabsLayout() {
           },
           headerStyle: { backgroundColor: theme.colors.headerBackground },
           headerTintColor: theme.colors.onHeader,
-          headerTitleStyle: { ...theme.typography.fonts.bold },
+          headerTitleStyle: { ...theme.typography.type.title },
           sceneStyle: { backgroundColor: theme.colors.background },
           animation: 'shift',
         }}

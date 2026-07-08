@@ -164,15 +164,14 @@ export default function AjustesScreen() {
 const useStyles = makeThemedStyles((t) => ({
   container: { padding: 20, paddingBottom: 40 },
   seccion: {
-    fontSize: t.fontSize(18),
-    ...t.typography.fonts.bold,
+    ...t.typography.type.section,
     color: t.colors.text,
     marginBottom: 6,
     marginTop: 4,
   },
   seccionCuenta: { marginTop: 32 },
   seccionHint: {
-    fontSize: t.fontSize(13),
+    ...t.typography.type.caption,
     color: t.colors.textMuted,
     marginBottom: 14,
   },
@@ -256,7 +255,7 @@ const usePreviewStyles = makeThemedStyles((t) => ({
   },
   headerTxt: {
     color: t.colors.onHeader,
-    ...t.typography.fonts.bold,
+    fontFamily: t.typography.type.title.fontFamily,
     fontSize: t.fontSize(14),
   },
   body: { padding: 14 },
@@ -295,12 +294,16 @@ const usePreviewStyles = makeThemedStyles((t) => ({
     marginBottom: 4,
   },
   cardTitle: {
+    fontFamily: t.typography.type.title.fontFamily,
     fontSize: t.fontSize(15),
-    ...t.typography.fonts.bold,
     color: t.colors.text,
     marginBottom: 3,
   },
-  cardDesc: { fontSize: t.fontSize(12), color: t.colors.textMuted },
+  cardDesc: {
+    fontFamily: t.typography.type.body.fontFamily,
+    fontSize: t.fontSize(12),
+    color: t.colors.textMuted,
+  },
   btn: {
     backgroundColor: t.colors.primary,
     borderRadius: t.shape.radiusMd,

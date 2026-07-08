@@ -106,7 +106,7 @@ export default function LoginScreen() {
     >
       <StatusBar style={theme.statusBar.onBackground} />
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.titulo}>MoodMatch 🌿</Text>
+        <Text style={styles.titulo}>MoodMatch</Text>
         <Text style={styles.subtitulo}>Tu bienestar, un ánimo a la vez</Text>
 
         <View style={styles.toggle}>
@@ -188,14 +188,15 @@ const useStyles = makeThemedStyles((t) => ({
   flex: { flex: 1, backgroundColor: t.colors.background },
   container: { flexGrow: 1, padding: 28, justifyContent: 'center' },
   titulo: {
+    ...t.typography.type.display,
     fontSize: t.fontSize(34),
-    ...t.typography.fonts.bold,
+    lineHeight: Math.round(t.fontSize(34) * 1.2),
     textAlign: 'center',
     color: t.colors.primary,
     marginBottom: 6,
   },
   subtitulo: {
-    fontSize: t.fontSize(14),
+    ...t.typography.type.body,
     color: t.colors.textMuted,
     textAlign: 'center',
     marginBottom: 36,

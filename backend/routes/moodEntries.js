@@ -5,20 +5,15 @@ const { requireAuth } = require('../middleware/auth');
 const VALID_MOODS = ['FELIZ', 'TRISTE', 'ANSIOSO', 'CALMADO', 'ENOJADO', 'NEUTRO'];
 
 async function nextSuggestion(userId, moodType, moodEntryId) {
-  const [count, moodActivities] = await Promise.all([
-    prisma.suggestion.count({
-      where: { moodEntry: { userId, moodType } },
-    }),
-    prisma.moodActivity.findMany({
-      where: { moodType },
-      include: { activity: true },
-      orderBy: { activityId: 'asc' },
-    }),
-  ]);
+  const moodActivities = await prisma.moodActivity.findMany({
+    where: { moodType },
+    include: { activity: true },
+    orderBy: { activityId: 'asc' },
+  });
 
   if (moodActivities.length === 0) return null;
 
-  const idx = count % moodActivities.length;
+  const idx = Math.floor(Math.random() * moodActivities.length);
   const chosen = moodActivities[idx].activity;
 
   await prisma.suggestion.create({

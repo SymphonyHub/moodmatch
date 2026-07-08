@@ -2,7 +2,7 @@
   "expo": {
     "name": "MoodMatch",
     "slug": "moodmatch",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "scheme": "moodmatch",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -18,9 +18,8 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#2e7d32",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/adaptive-icon-foreground.png",
+        "backgroundImage": "./assets/adaptive-icon-background.png"
       },
       "permissions": [
         "android.permission.CAMERA",

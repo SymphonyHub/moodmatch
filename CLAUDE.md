@@ -1,149 +1,138 @@
-# MoodMatch — Visión sin límites (post-semestre)
+# MoodMatch — Reconstrucción completa (v3)
 
-## Contexto
+## Estado del proyecto
 
-MoodMatch ya fue entregado y aprobado (Nota 2, Ingeniería de Software). El semestre
-terminó. A partir de ahora este documento reemplaza cualquier restricción de scope
-académico anterior: el objetivo es convertir MoodMatch en una app de nivel profesional,
-como si fuera a lanzarse de verdad a una tienda de apps.
+Este documento **reemplaza** cualquier `CLAUDE.md` anterior. La Fase 1 (sistema de
+temas base) ya está construida y funcionando. Antes de arrancar con lo nuevo,
+hay 2 bugs pendientes de esa fase que se arreglan primero (ver sección 0).
 
-**Stack actual (base a mantener, no reescribir desde cero salvo justificación clara):**
+A partir de acá, MoodMatch deja de ser un proyecto académico: es una reconstrucción
+a fondo, con el objetivo de un producto pulido, original y competitivo con apps
+de bienestar reales del mercado actual.
+
+**Stack (se mantiene, no reescribir desde cero):**
 - Backend: Node.js / Express, Prisma ORM, PostgreSQL en Neon
 - Frontend: Expo / React Native
-- Deploy: Render (backend), EAS Build (APK)
-- Tests: 22 tests unitarios con Jest (base a expandir, no descartar)
-
-**Nada de lo anterior es un techo.** Las decisiones de scope pasadas (WebSockets
-diferidos, alcance de amigos recortado, etc.) fueron correctas para una entrega
-académica con tiempo limitado. Ahora no hay ese límite: se reevalúa todo desde cero
-con el criterio de "¿qué haría que esta app sea genuinamente excelente?".
-
-## Filosofía de esta fase
-
-Trabajar como lo haría un equipo de producto + diseño + ingeniería senior construyendo
-un producto real, no como un estudiante terminando una tarea. Eso significa:
-- Explicar decisiones de diseño, no solo implementarlas
-- Pensar en el usuario final, no solo en que "funcione"
-- Cuidar el detalle: animaciones, microcopy, estados vacíos, casos borde
-- Priorizar por impacto real en la experiencia, no por lo más fácil de implementar
+- Deploy: Render (backend), build nativo Android (EAS o local)
 
 ---
 
-## 1. Sistema de temas (Theming)
+## 0. Bugs a corregir primero (antes de cualquier feature nueva)
 
-- Selector de tema accesible desde configuración, con preview en vivo antes de aplicar
-- Mínimo 4-5 temas completos (no solo cambio de color primario): paleta, tipografía,
-  iconografía y hasta el estilo de las ilustraciones/avatares deben sentirse coherentes
-  por tema. Ejemplos de dirección: minimalista claro, oscuro/nocturno, pastel cálido,
-  alto contraste (accesibilidad), y uno "playful"/colorido
-- Persistencia del tema elegido (local y sincronizado con el perfil del usuario)
-- Modo oscuro real (no solo invertir colores) con buen contraste y legibilidad
-- Transición animada suave al cambiar de tema
+1. **Error de React en pantalla Amigos**: toast rojo "An effect function must
+   not return anything besides a cleanup function". Encontrar el `useEffect`
+   que retorna algo indebido y corregirlo.
+2. **Header/barra superior no sigue el tema**: queda verde fijo en todas las
+   pantallas pese a que el resto de la UI sí quedó tokenizada. Revisar por qué
+   no se migró y corregir.
 
-## 2. Apartado de amigos — reconstruir a fondo
-
-Ideas a evaluar e implementar según lo que tenga más sentido (no todo tiene que
-entrar, pero hay que pensar en grande y justificar qué se prioriza):
-
-- **Perfiles de amigos enriquecidos**: avatar, racha de días registrando ánimo,
-  "ánimo predominante de la semana", última actividad compartida
-- **Feed social liviano**: línea de tiempo de ánimos de amigos (con control de
-  privacidad — el usuario decide qué comparte y con quién)
-- **Grupos/círculos de amigos**, no solo lista plana — por ejemplo "familia",
-  "amigos cercanos", "compañeros de curso"
-- **Racha compartida**: si dos amigos registran ánimo el mismo día X veces
-  seguidas, se desbloquea algo (gamificación liviana, sin exagerar)
-- **Actividades colaborativas reales**: la sección "para hacer con amigos" pasa
-  de ser una lista estática a poder proponerle una actividad a un amigo específico
-  y que este la acepte/rechace, con notificación
-- **Ánimo colectivo del círculo**: visualización agregada y anónima si se quiere
-  ("tu grupo está mayormente CALMADO hoy")
-- **Sistema de reacciones** además de los 6 mensajes predefinidos — algo más
-  expresivo pero que mantenga el control de privacidad y no se convierta en
-  otra red social ansiógena (cuidado de diseño ético aquí, es una app de bienestar)
-- **Notificaciones push reales** (Expo Notifications) para invitaciones de
-  amistad, actividades propuestas y ánimos recibidos
-- **Búsqueda y sugerencia de amigos** más allá del QR (código alfanumérico
-  para compartir a distancia, por ejemplo)
-
-## 3. Emociones — pulido e innovación
-
-- **Avatares emocionales que reaccionan y hablan**: cada uno de los 6 estados
-  (FELIZ, TRISTE, ANSIOSO, CALMADO, ENOJADO, NEUTRO) tiene su propio personaje/avatar
-  con animaciones y una "voz" (texto conversacional, no necesariamente audio real)
-  que responde según el ánimo registrado. Ejemplo: si registras ANSIOSO, el avatar
-  correspondiente muestra empatía y ofrece una actividad de respiración antes de
-  la sugerencia estándar
-- Definir personalidad y tono de cada avatar (consistente con las guías de
-  wellbeing: nunca minimizar el malestar, nunca ser excesivamente positivo
-  frente a emociones difíciles, siempre validar antes de sugerir)
-- **Animaciones de transición** entre estados emocionales (Lottie o Reanimated)
-- **Historial visual de ánimo**: gráfico de tendencia semanal/mensual, con
-  posibilidad de detectar patrones simples ("llevas 3 días registrando ANSIOSO,
-  ¿quieres ver actividades enfocadas en eso?") — sin diagnosticar ni psicoanalizar,
-  solo reflejar el patrón que el propio usuario registró
-  - **Importante (bienestar del usuario)**: esta función debe limitarse a mostrar
-    lo que el usuario mismo registró, nunca inferir causas, nunca sugerir una
-    condición de salud mental, y siempre dejar la puerta abierta a "hablar con
-    alguien" sin ser alarmista
-- **Journaling opcional**: nota corta de texto libre junto al registro de ánimo,
-  privada por defecto
-- **Sugerencias de actividad más inteligentes**: mantener el sistema determinista
-  actual como base, pero permitir que evolucione con el historial del usuario
-  (qué actividades ha marcado como "me ayudó" vs no), sin volverse una caja negra
-
-## 4. Otras áreas a llevar a nivel profesional
-
-- **Onboarding**: flujo de bienvenida que explique el propósito de la app y
-  pida los permisos necesarios con contexto (por qué notificaciones, por qué cámara)
-- **Accesibilidad real**: soporte de lector de pantalla, tamaños de fuente
-  ajustables, contraste verificado en cada tema
-- **Testing**: expandir mucho más allá de los 22 tests — integración, e2e de
-  los flujos nuevos (amigos, temas, avatares), tests de los casos borde de
-  privacidad en el feed social
-- **Seguridad y privacidad**: dado que ahora hay más datos sociales/emocionales
-  compartidos, reforzar controles de privacidad granular y auditar qué se expone
-  en cada endpoint nuevo
-- **Performance**: con feed social y más datos, revisar paginación, caching e
-  índices en Neon desde el diseño, no como parche después
-- **CI/CD**: pipeline que corra tests y linting en cada push
-- **Documentación**: README y ADRs (Architecture Decision Records) para las
-  decisiones grandes de esta fase, dado que ahora sí hay espacio para hacerlo bien
+Verificar ambos arreglos visualmente (o con test si aplica) antes de seguir.
 
 ---
 
-## Cómo debe trabajar Claude Code en esta fase
+## 1. Identidad visual — dirección nueva
 
-- Este es un proyecto grande: trabajar por **fases**, no intentar todo en una sola sesión maratónica
-- Antes de cada fase grande (ej. "reconstruir amigos", "sistema de temas"), usar
-  **plan mode**, mostrar el plan, y esperar confirmación antes de tocar código
-- Mantener siempre la app en estado funcional: no dejar la mitad de una feature
-  a medio construir sin poder correr la app
-- Escribir tests junto con cada feature nueva, no al final
-- Ser honesto sobre trade-offs y complejidad — si algo de la lista es demasiado
-  para un proyecto de este tamaño, decirlo y proponer una versión más simple
-  en vez de implementar algo a medias
-- Cuidar especialmente el tono de los avatares emocionales y las funciones de
-  historial/patrones: esta es una app de bienestar, no debe psicoanalizar al
-  usuario ni hacer afirmaciones clínicas — solo reflejar y acompañar
+Los colores institucionales de la universidad **ya no aplican**. MoodMatch necesita
+identidad propia, original, que no se sienta genérica ni parecida a un tutorial de
+React Native.
 
-## Configuración de la sesión (fuera de este archivo)
+- Definir una paleta de marca original (no verde-genérico-wellness tipo Headspace/Calm
+  clonado) — buscar algo distintivo que igual comunique calma y bienestar
+- Tipografía: elegir 1-2 familias con personalidad (no la fuente default del sistema),
+  jerarquía clara entre títulos, cuerpo y detalles
+- Definir un lenguaje de **efectos y microinteracciones** consistente: transiciones
+  entre pantallas, feedback táctil en botones/tarjetas, animaciones de entrada de
+  contenido (no efectos porque sí — cada uno debe reforzar la sensación de calma
+  y pulido, no sobrecargar)
+- Esto se vuelve la base sobre la que se construyen los 5 temas existentes +
+  personalización de usuario (sección 4)
 
-```
-/model claude-fable-5
-/effort max
-```
+## 2. Sección de emociones — de botones a conversación
 
-O de forma persistente en `.claude/settings.json`:
+Reemplazar la grilla de 6 botones de emoción por un **flujo conversacional de entrada**:
 
-```json
-{
-  "model": "claude-fable-5",
-  "effortLevel": "max"
-}
-```
+- Al abrir la sección, un mensaje tipo chat pregunta "¿Cómo estás hoy?" y muestra
+  las 6 opciones de ánimo como respuestas rápidas dentro del chat (no como grilla
+  aparte) — mantener las 6 categorías existentes (FELIZ, TRISTE, ANSIOSO, CALMADO,
+  ENOJADO, NEUTRO) como base semántica, ya que el backend y las sugerencias de
+  actividad dependen de ellas
+- Al elegir una, se inicia una conversación breve sobre esa emoción: 2-4 intercambios
+  como máximo antes de llegar a la sugerencia de actividad — no es terapia ni
+  debe simular serlo, es acompañamiento breve
+- **Reglas de tono no negociables** (esto es una app de bienestar, no un producto
+  cualquiera):
+  - Nunca minimizar lo que la persona siente ("tranquilo, no es para tanto" está prohibido)
+  - Nunca diagnosticar ni sugerir una condición de salud mental
+  - Nunca ser forzadamente positivo frente a emociones difíciles (TRISTE, ANSIOSO, ENOJADO)
+  - Siempre validar primero, sugerir después
+  - Si en algún punto detecta señales de crisis genuina (no solo "estoy triste"),
+    el flujo debe poder mostrar un mensaje claro sugiriendo hablar con alguien de
+    confianza o una línea de ayuda — sin ser alarmista para el uso normal del día a día
+- El chatbot puede ser tan simple como respuestas basadas en reglas/plantillas por
+  emoción (barato, predecible, fácil de mantener el tono) o usar la API de Claude
+  si se decide invertir en algo más dinámico — **evaluar esto en plan mode antes de
+  implementar**, no asumir la opción más compleja por defecto
+- Al terminar la conversación, se llega a la sugerencia de actividad existente
+  (mantener el sistema determinista de 15 actividades por emoción como base,
+  no reemplazarlo)
 
-Recuerda que Fable a máximo esfuerzo es la configuración más cara y lenta —
-tiene sentido para esta fase de reconstrucción profunda. Termina cada fase,
-revisa el resultado, y decide si sigues con Fable/max o bajas a Sonnet 5/high
-para iteraciones más chicas de ajuste.
+## 3. Sección de amigos — reconstrucción completa
+
+- **Mensajería directa**: poder enviarle un mensaje de texto libre a un amigo
+  (no solo los 6 mensajes predefinidos de "ánimo") — definir si es chat 1 a 1
+  persistente o mensajes puntuales tipo nota, según lo que sea razonable para
+  el alcance del proyecto
+- **Mantener el sistema de QR** tal cual está — funciona bien, no tocar esa parte
+- **Agregar invitación por link/código compartible**: generar un link o código
+  único por usuario que se pueda compartir por WhatsApp u otras apps (usando el
+  share sheet nativo de Android/Expo, no una integración directa con la API de
+  WhatsApp) — quien lo recibe y lo abre, llega a una pantalla de "agregar amigo"
+  dentro de la app
+- Revisar de nuevo las ideas de la fase anterior (perfiles enriquecidos, grupos,
+  actividades colaborativas) y priorizar cuáles entran ahora vs. cuáles quedan
+  para después — no es necesario meter todo de una vez
+
+## 4. Ajustes — pulido + personalización real
+
+- Mantener los 5 temas base ya construidos (Sereno, Nocturno, Amanecer, Alto
+  Contraste, Fiesta) — no se descartan
+- **Agregar un 6to modo: "Personalizado"** — el usuario elige sus propios colores
+  (color picker para color primario, de acento y de fondo como mínimo) y su
+  fuente preferida entre las opciones definidas en la sección 1
+  - Validar automáticamente contraste WCAG AA igual que se hizo con los temas
+    base — si la combinación elegida no pasa el mínimo, avisar al usuario antes
+    de aplicar (no bloquear, pero sí advertir)
+  - Guardar la paleta personalizada en el perfil del usuario (mismo mecanismo
+    que ya existe para `themePreference`)
+- Pulir el resto de la pantalla de Ajustes: agrupación visual más clara,
+  mejor jerarquía entre secciones (Apariencia, Cuenta, Notificaciones si aplica)
+
+## 5. Navbar y footer — actualización estética
+
+- Rediseñar la barra de navegación inferior con un lenguaje visual más actual
+  (2026): iconografía consistente, indicador de sección activa más elegante
+  que un simple cambio de color, posible efecto de transición al cambiar de tab
+- Revisar que la barra superior (header) sea coherente con el resto del rediseño
+  una vez corregido el bug de la sección 0
+- Todo esto debe respetar el sistema de temas — incluyendo el modo personalizado
+
+---
+
+## Cómo debe trabajar Claude Code
+
+- Corregir los bugs de la sección 0 primero, verificar, y recién después seguir
+- Trabajar por fases — sugerido: (0) bugs → (1) identidad visual base → (2) navbar/footer
+  → (3) emociones/chat → (4) amigos → (5) ajustes/personalización — pero proponer
+  el orden que tenga más sentido técnico si hay dependencias entre partes
+- Antes de cada fase, **plan mode obligatorio**, mostrar el plan y esperar confirmación
+- No avanzar a la siguiente fase sin confirmación explícita del usuario, sobre todo
+  después de que él pruebe visualmente en su dispositivo
+- Para la decisión de chatbot con IA real vs. basado en reglas (sección 2): presentar
+  ambas opciones con sus trade-offs (costo, complejidad, calidez de la conversación)
+  antes de implementar cualquiera
+- Mantener siempre la app en estado funcional al final de cada fase — nunca dejar
+  una pantalla rota o a medio construir
+- Escribir/actualizar tests junto con cada feature, no al final
+- Cuidar el tono de las conversaciones de emociones según las reglas de la sección 2
+  en cada iteración — esto no es negociable ni se sacrifica por velocidad
+

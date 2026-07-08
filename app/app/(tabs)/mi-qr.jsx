@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
+  View, Text, TouchableOpacity,
   ScrollView, ActivityIndicator, Alert, Modal, Animated,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
@@ -8,10 +8,12 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { apiGetMe, apiAddFriend } from '../../services/api';
-
-const GREEN = '#2e7d32';
+import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 
 export default function MiQrScreen() {
+  const { theme } = useTheme();
+  const styles = useStyles();
+
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
@@ -64,7 +66,7 @@ export default function MiQrScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={GREEN} />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -77,7 +79,9 @@ export default function MiQrScreen() {
         <>
           <Text style={styles.nombre}>{user.nombre}</Text>
           <View style={styles.qrBox}>
-            <QRCode value={user.qrCode} size={210} color="#222" backgroundColor="#fff" />
+            {/* El QR se mantiene oscuro sobre blanco en todos los temas: los lectores
+                necesitan ese contraste, y el recuadro blanco hace de zona de silencio. */}
+            <QRCode value={user.qrCode} size={210} color="#1a1a1a" backgroundColor="#ffffff" />
           </View>
           <Text style={styles.hint}>
             Muéstrale este código a tus amigos para que te agreguen
@@ -120,6 +124,7 @@ export default function MiQrScreen() {
       </Animated.View>
 
       <Modal visible={scanning} animationType="slide" onRequestClose={() => setScanning(false)}>
+        {/* La UI de la cámara va sobre video en vivo: colores fijos, independientes del tema. */}
         <View style={styles.cameraContainer}>
           <CameraView
             style={styles.camera}
@@ -140,53 +145,93 @@ export default function MiQrScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((t) => ({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   container: { padding: 24, alignItems: 'center', paddingBottom: 40 },
-  titulo: { fontSize: 22, fontWeight: 'bold', color: '#333', marginBottom: 4, marginTop: 4 },
-  nombre: { fontSize: 16, color: '#666', marginBottom: 22 },
+  titulo: {
+    fontSize: t.fontSize(22),
+    ...t.typography.fonts.bold,
+    color: t.colors.text,
+    marginBottom: 4,
+    marginTop: 4,
+  },
+  nombre: {
+    fontSize: t.fontSize(16),
+    color: t.colors.textMuted,
+    marginBottom: 22,
+  },
   qrBox: {
     padding: 22,
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: '#ffffff',
+    borderRadius: t.shape.radiusXl,
+    ...t.shadows.cardStrong,
     marginBottom: 14,
   },
-  hint: { fontSize: 13, color: '#888', textAlign: 'center', marginBottom: 24, paddingHorizontal: 12 },
-  errorTxt: { color: '#c62828', marginBottom: 16 },
-  banner: { width: '100%', borderRadius: 10, padding: 14, marginBottom: 16 },
-  bannerOk: { backgroundColor: '#e8f5e9' },
-  bannerError: { backgroundColor: '#ffebee' },
-  bannerText: { textAlign: 'center', fontWeight: '600', fontSize: 14 },
-  bannerTextOk: { color: '#2e7d32' },
-  bannerTextError: { color: '#c62828' },
+  hint: {
+    fontSize: t.fontSize(13),
+    color: t.colors.textFaint,
+    textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 12,
+  },
+  errorTxt: { color: t.colors.danger, marginBottom: 16 },
+  banner: {
+    width: '100%',
+    borderRadius: t.shape.radiusMd,
+    padding: 14,
+    marginBottom: 16,
+  },
+  bannerOk: { backgroundColor: t.colors.primarySoft },
+  bannerError: { backgroundColor: t.colors.dangerSoft },
+  bannerText: {
+    textAlign: 'center',
+    ...t.typography.fonts.semibold,
+    fontSize: t.fontSize(14),
+  },
+  bannerTextOk: { color: t.colors.primary },
+  bannerTextError: { color: t.colors.danger },
   btn: {
-    backgroundColor: GREEN,
-    borderRadius: 12,
+    backgroundColor: t.colors.primary,
+    borderRadius: t.shape.radiusMd,
     paddingVertical: 15,
     paddingHorizontal: 24,
     alignItems: 'center',
     width: '100%',
     marginBottom: 12,
   },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  btnText: {
+    color: t.colors.onPrimary,
+    fontSize: t.fontSize(16),
+    ...t.typography.fonts.bold,
+  },
   btnSalir: {
-    borderWidth: 1.5,
-    borderColor: '#ccc',
-    borderRadius: 12,
+    borderWidth: t.shape.borderMedium,
+    borderColor: t.colors.border,
+    borderRadius: t.shape.radiusMd,
     paddingVertical: 13,
     alignItems: 'center',
     width: '100%',
   },
-  btnSalirText: { color: '#888', fontSize: 15 },
+  btnSalirText: { color: t.colors.textMuted, fontSize: t.fontSize(15) },
   cameraContainer: { flex: 1, backgroundColor: '#000' },
   camera: { flex: 1 },
-  cameraOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
-  scanFrame: { width: 240, height: 240, borderWidth: 3, borderColor: '#fff', borderRadius: 16, backgroundColor: 'transparent' },
+  cameraOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanFrame: {
+    width: 240,
+    height: 240,
+    borderWidth: 3,
+    borderColor: '#fff',
+    borderRadius: 16,
+    backgroundColor: 'transparent',
+  },
   scanLabel: { color: '#fff', fontSize: 15, marginTop: 18, fontWeight: '600' },
   btnCancelar: {
     position: 'absolute',
@@ -198,4 +243,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   btnCancelarText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-});
+}));

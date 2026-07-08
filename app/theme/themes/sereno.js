@@ -18,6 +18,8 @@ const sereno = {
     primary: '#2e7d32',
     onPrimary: '#ffffff',
     primarySoft: '#e8f5e9',
+    primarySoftBorder: '#c8e6c9',
+    primaryDisabled: '#a5d6a7',
     border: '#e2e6e2',
     danger: '#c62828',
     dangerSoft: '#fdeaea',

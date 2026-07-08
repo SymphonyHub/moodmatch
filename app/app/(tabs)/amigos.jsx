@@ -1,21 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
+  View, Text, TouchableOpacity,
   ScrollView, ActivityIndicator, Modal, Animated,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { apiGetFriendships, apiSendCheer, apiGetSocialActivities } from '../../services/api';
-
-const GREEN = '#2e7d32';
-
-const MOOD_INFO = {
-  FELIZ:   { emoji: '😊', label: 'Feliz',   color: '#2e7d32' },
-  TRISTE:  { emoji: '😢', label: 'Triste',  color: '#1565c0' },
-  ANSIOSO: { emoji: '😰', label: 'Ansioso', color: '#e65100' },
-  CALMADO: { emoji: '😌', label: 'Calmado', color: '#00695c' },
-  ENOJADO: { emoji: '😠', label: 'Enojado', color: '#c62828' },
-  NEUTRO:  { emoji: '😐', label: 'Neutro',  color: '#616161' },
-};
+import { MOOD_INFO } from '../../constants/moods';
+import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 
 const CHEERS = [
   '💚 Pensando en ti',
@@ -45,9 +36,14 @@ function ScaleBtn({ wrapperStyle, style, onPress, children, disabled }) {
 }
 
 function FriendCard({ amigo, onAnimo, index }) {
+  const { theme } = useTheme();
+  const styles = useStyles();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
   const mood = amigo.moodReciente ? MOOD_INFO[amigo.moodReciente] : null;
+  const moodColor = amigo.moodReciente
+    ? theme.colors.moods[amigo.moodReciente]?.color ?? theme.colors.textMuted
+    : null;
 
   useEffect(() => {
     Animated.parallel([
@@ -64,7 +60,7 @@ function FriendCard({ amigo, onAnimo, index }) {
       <View style={styles.info}>
         <Text style={styles.nombre}>{amigo.nombre}</Text>
         {mood ? (
-          <Text style={[styles.mood, { color: mood.color }]}>{mood.emoji}{'  '}{mood.label}</Text>
+          <Text style={[styles.mood, { color: moodColor }]}>{mood.emoji}{'  '}{mood.label}</Text>
         ) : (
           <Text style={styles.moodNulo}>Sin registrar aún</Text>
         )}
@@ -77,6 +73,9 @@ function FriendCard({ amigo, onAnimo, index }) {
 }
 
 export default function AmigosScreen() {
+  const { theme } = useTheme();
+  const styles = useStyles();
+
   const [amigos, setAmigos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actividades, setActividades] = useState([]);
@@ -174,7 +173,7 @@ export default function AmigosScreen() {
         )}
 
         {loading ? (
-          <ActivityIndicator size="large" color={GREEN} style={styles.spinner} />
+          <ActivityIndicator size="large" color={theme.colors.primary} style={styles.spinner} />
         ) : amigos.length === 0 ? (
           <View style={styles.vacioCont}>
             <Text style={styles.vacioEmoji}>👥</Text>
@@ -220,100 +219,160 @@ export default function AmigosScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((t) => ({
   container: { padding: 20, paddingBottom: 40 },
-  titulo: { fontSize: 22, fontWeight: 'bold', color: '#333', marginBottom: 4, marginTop: 4 },
-  subtitulo: { fontSize: 13, color: '#999', marginBottom: 22 },
+  titulo: {
+    fontSize: t.fontSize(22),
+    ...t.typography.fonts.bold,
+    color: t.colors.text,
+    marginBottom: 4,
+    marginTop: 4,
+  },
+  subtitulo: {
+    fontSize: t.fontSize(13),
+    color: t.colors.textMuted,
+    marginBottom: 22,
+  },
   spinner: { marginTop: 40 },
-  bannerOk: { backgroundColor: '#e8f5e9', borderRadius: 10, padding: 12, marginBottom: 16 },
-  bannerOkText: { color: GREEN, fontWeight: '600', textAlign: 'center', fontSize: 14 },
+  bannerOk: {
+    backgroundColor: t.colors.primarySoft,
+    borderRadius: t.shape.radiusMd,
+    padding: 12,
+    marginBottom: 16,
+  },
+  bannerOkText: {
+    color: t.colors.primary,
+    ...t.typography.fonts.semibold,
+    textAlign: 'center',
+    fontSize: t.fontSize(14),
+  },
   vacioCont: { alignItems: 'center', marginTop: 48, paddingHorizontal: 24 },
   vacioEmoji: { fontSize: 52, marginBottom: 16 },
-  vacioTxt: { fontSize: 16, fontWeight: '600', color: '#555', textAlign: 'center', marginBottom: 8 },
-  vacioHint: { fontSize: 13, color: '#aaa', textAlign: 'center', lineHeight: 20 },
+  vacioTxt: {
+    fontSize: t.fontSize(16),
+    ...t.typography.fonts.semibold,
+    color: t.colors.textMuted,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  vacioHint: {
+    fontSize: t.fontSize(13),
+    color: t.colors.textFaint,
+    textAlign: 'center',
+    lineHeight: Math.round(t.fontSize(13) * 1.55),
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 14,
+    backgroundColor: t.colors.surface,
+    borderRadius: t.shape.radiusLg,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.07,
-    shadowRadius: 4,
-    elevation: 2,
+    ...t.shadows.card,
   },
   avatar: {
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: '#e8f5e9',
+    backgroundColor: t.colors.primarySoft,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
   },
-  avatarTxt: { fontSize: 20, fontWeight: 'bold', color: GREEN },
+  avatarTxt: {
+    fontSize: t.fontSize(20),
+    ...t.typography.fonts.bold,
+    color: t.colors.primary,
+  },
   info: { flex: 1 },
-  nombre: { fontSize: 16, fontWeight: '600', color: '#222', marginBottom: 4 },
-  mood: { fontSize: 14, fontWeight: '500' },
-  moodNulo: { fontSize: 14, color: '#ccc' },
+  nombre: {
+    fontSize: t.fontSize(16),
+    ...t.typography.fonts.semibold,
+    color: t.colors.text,
+    marginBottom: 4,
+  },
+  mood: { fontSize: t.fontSize(14), ...t.typography.fonts.medium },
+  moodNulo: { fontSize: t.fontSize(14), color: t.colors.textFaint },
   btnAnimo: {
-    backgroundColor: '#e8f5e9',
-    borderRadius: 10,
+    backgroundColor: t.colors.primarySoft,
+    borderRadius: t.shape.radiusMd,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#c8e6c9',
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.primarySoftBorder,
   },
-  btnAnimoText: { fontSize: 13, fontWeight: '600', color: GREEN },
+  btnAnimoText: {
+    fontSize: t.fontSize(13),
+    ...t.typography.fonts.semibold,
+    color: t.colors.primary,
+  },
   btnRecargar: {
     paddingVertical: 10,
     paddingHorizontal: 28,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: '#ccc',
+    borderRadius: t.shape.radiusMd,
+    borderWidth: t.shape.borderMedium,
+    borderColor: t.colors.border,
   },
-  btnRecargarTxt: { color: '#888', fontSize: 14, fontWeight: '600' },
+  btnRecargarTxt: {
+    color: t.colors.textMuted,
+    fontSize: t.fontSize(14),
+    ...t.typography.fonts.semibold,
+  },
   socialSection: { marginTop: 4 },
-  socialTitulo: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 12 },
+  socialTitulo: {
+    fontSize: t.fontSize(16),
+    ...t.typography.fonts.bold,
+    color: t.colors.text,
+    marginBottom: 12,
+  },
   actCard: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
+    backgroundColor: t.colors.surface,
+    borderRadius: t.shape.radiusLg,
     padding: 16,
     marginBottom: 10,
     borderLeftWidth: 4,
-    borderLeftColor: '#1565c0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.07,
-    shadowRadius: 4,
-    elevation: 2,
+    borderLeftColor: t.colors.categories.social,
+    ...t.shadows.card,
   },
-  actNombre: { fontSize: 15, fontWeight: '700', color: '#222', marginBottom: 4 },
-  actDesc: { fontSize: 13, color: '#666', lineHeight: 19 },
+  actNombre: {
+    fontSize: t.fontSize(15),
+    ...t.typography.fonts.bold,
+    color: t.colors.text,
+    marginBottom: 4,
+  },
+  actDesc: {
+    fontSize: t.fontSize(13),
+    color: t.colors.textMuted,
+    lineHeight: Math.round(t.fontSize(13) * 1.5),
+  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: t.colors.overlay,
     justifyContent: 'flex-end',
   },
   modalBox: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    backgroundColor: t.colors.surfaceElevated,
+    borderTopLeftRadius: t.shape.radiusXl,
+    borderTopRightRadius: t.shape.radiusXl,
     padding: 24,
     paddingBottom: 36,
   },
-  modalTitle: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 16, textAlign: 'center' },
+  modalTitle: {
+    fontSize: t.fontSize(16),
+    ...t.typography.fonts.bold,
+    color: t.colors.text,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
   cheerOption: {
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: '#f5f5f5',
+    borderRadius: t.shape.radiusMd,
+    backgroundColor: t.colors.background,
     marginBottom: 8,
   },
   cheerOptionDisabled: { opacity: 0.5 },
-  cheerOptionText: { fontSize: 15, color: '#333' },
+  cheerOptionText: { fontSize: t.fontSize(15), color: t.colors.text },
   modalCancelar: { marginTop: 8, alignItems: 'center', paddingVertical: 12 },
-  modalCancelarText: { color: '#aaa', fontSize: 15 },
-});
+  modalCancelarText: { color: t.colors.textFaint, fontSize: t.fontSize(15) },
+}));

@@ -1,33 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
+  View, Text, TouchableOpacity,
   ScrollView, ActivityIndicator, Animated, Modal,
 } from 'react-native';
 import { apiCreateMoodEntry, apiGetCheers } from '../../services/api';
-
-const GREEN = '#2e7d32';
-
-const MOODS = [
-  { value: 'FELIZ',   label: 'Feliz',   emoji: '😊' },
-  { value: 'TRISTE',  label: 'Triste',  emoji: '😢' },
-  { value: 'ANSIOSO', label: 'Ansioso', emoji: '😰' },
-  { value: 'CALMADO', label: 'Calmado', emoji: '😌' },
-  { value: 'ENOJADO', label: 'Enojado', emoji: '😠' },
-  { value: 'NEUTRO',  label: 'Neutro',  emoji: '😐' },
-];
-
-const CATEGORIA = {
-  social:          { color: '#1565c0', icon: '👥' },
-  físico:          { color: '#e65100', icon: '🏃' },
-  creativo:        { color: '#6a1b9a', icon: '🎨' },
-  relajación:      { color: '#00838f', icon: '🌊' },
-  reflexión:       { color: '#2e7d32', icon: '📝' },
-  entretenimiento: { color: '#c62828', icon: '🎬' },
-  productividad:   { color: '#f57f17', icon: '⚡' },
-  mindfulness:     { color: '#00695c', icon: '🧘' },
-};
+import { MOODS } from '../../constants/moods';
+import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../../constants/categories';
+import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 
 export default function HomeScreen() {
+  const { theme } = useTheme();
+  const styles = useStyles();
+
   const [selectedMood, setSelectedMood] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingOtra, setLoadingOtra] = useState(false);
@@ -101,7 +85,7 @@ export default function HomeScreen() {
       if (data.error) { setError(data.error); return; }
       mostrarConFade(data.actividadSugerida);
     } catch {
-      setError('Error de conexión. Verifica la IP en config.js');
+      setError('No pudimos conectar. Revisa tu conexión e intenta de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -120,7 +104,12 @@ export default function HomeScreen() {
     }
   };
 
-  const cat = actividad ? (CATEGORIA[actividad.categoria] ?? { color: '#555', icon: '✨' }) : null;
+  const cat = actividad
+    ? {
+        color: theme.colors.categories[actividad.categoria] ?? theme.colors.textMuted,
+        icon: CATEGORY_ICONS[actividad.categoria] ?? DEFAULT_CATEGORY_ICON,
+      }
+    : null;
   const cheerActual = cheers[cheerIdx];
 
   return (
@@ -179,7 +168,7 @@ export default function HomeScreen() {
               activeOpacity={0.9}
             >
               {loading
-                ? <ActivityIndicator color="#fff" />
+                ? <ActivityIndicator color={theme.colors.onPrimary} />
                 : <Text style={styles.btnText}>Ver actividad sugerida</Text>}
             </TouchableOpacity>
           </Animated.View>
@@ -200,7 +189,7 @@ export default function HomeScreen() {
                 disabled={loadingOtra}
                 activeOpacity={0.9}
               >
-                <Text style={[styles.btnOtraText, { color: loadingOtra ? '#999' : cat.color }]}>
+                <Text style={[styles.btnOtraText, { color: loadingOtra ? theme.colors.textFaint : cat.color }]}>
                   {loadingOtra ? 'Buscando...' : 'Quiero otra idea'}
                 </Text>
               </TouchableOpacity>
@@ -212,12 +201,12 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((t) => ({
   container: { padding: 20, paddingBottom: 40 },
   pregunta: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: t.fontSize(20),
+    ...t.typography.fonts.bold,
+    color: t.colors.text,
     textAlign: 'center',
     marginBottom: 20,
     marginTop: 4,
@@ -231,81 +220,127 @@ const styles = StyleSheet.create({
   },
   moodBtn: {
     width: '44%',
-    backgroundColor: '#fff',
-    borderRadius: 14,
+    backgroundColor: t.colors.surface,
+    borderRadius: t.shape.radiusLg,
     paddingVertical: 18,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e8e8e8',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.07,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: t.shape.borderThick,
+    borderColor: t.colors.border,
+    ...t.shadows.card,
   },
-  moodBtnActive: { borderColor: GREEN, backgroundColor: '#e8f5e9' },
+  moodBtnActive: {
+    borderColor: t.colors.primary,
+    backgroundColor: t.colors.primarySoft,
+  },
   emoji: { fontSize: 38, marginBottom: 6 },
-  moodLabel: { fontSize: 14, fontWeight: '600', color: '#666' },
-  moodLabelActive: { color: GREEN },
-  error: { color: '#c62828', textAlign: 'center', marginBottom: 12, fontSize: 14 },
+  moodLabel: {
+    fontSize: t.fontSize(14),
+    ...t.typography.fonts.semibold,
+    color: t.colors.textMuted,
+  },
+  moodLabelActive: { color: t.colors.primary },
+  error: {
+    color: t.colors.danger,
+    textAlign: 'center',
+    marginBottom: 12,
+    fontSize: t.fontSize(14),
+  },
   btn: {
-    backgroundColor: GREEN,
-    borderRadius: 12,
+    backgroundColor: t.colors.primary,
+    borderRadius: t.shape.radiusMd,
     paddingVertical: 15,
     alignItems: 'center',
   },
-  btnDisabled: { backgroundColor: '#a5d6a7' },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  btnDisabled: { backgroundColor: t.colors.primaryDisabled },
+  btnText: {
+    color: t.colors.onPrimary,
+    fontSize: t.fontSize(16),
+    ...t.typography.fonts.bold,
+  },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
+    backgroundColor: t.colors.surfaceElevated,
+    borderRadius: t.shape.radiusLg,
     padding: 22,
     borderLeftWidth: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    ...t.shadows.cardStrong,
   },
-  cardTag: { fontSize: 11, fontWeight: 'bold', letterSpacing: 1.2, marginBottom: 8 },
-  cardNombre: { fontSize: 20, fontWeight: 'bold', color: '#222', marginBottom: 10 },
-  cardDesc: { fontSize: 15, color: '#555', lineHeight: 23, marginBottom: 18 },
+  cardTag: {
+    fontSize: t.fontSize(11),
+    ...t.typography.fonts.bold,
+    letterSpacing: 1.2,
+    marginBottom: 8,
+  },
+  cardNombre: {
+    fontSize: t.fontSize(20),
+    ...t.typography.fonts.bold,
+    color: t.colors.text,
+    marginBottom: 10,
+  },
+  cardDesc: {
+    fontSize: t.fontSize(15),
+    color: t.colors.textMuted,
+    lineHeight: Math.round(t.fontSize(15) * 1.55),
+    marginBottom: 18,
+  },
   btnOtra: {
-    borderWidth: 1.5,
-    borderRadius: 10,
+    borderWidth: t.shape.borderMedium,
+    borderRadius: t.shape.radiusMd,
     paddingVertical: 11,
     alignItems: 'center',
     marginBottom: 10,
   },
-  btnOtraText: { fontWeight: '600', fontSize: 15 },
+  btnOtraText: {
+    ...t.typography.fonts.semibold,
+    fontSize: t.fontSize(15),
+  },
   cheerOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: t.colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 28,
   },
   cheerBox: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
+    backgroundColor: t.colors.surfaceElevated,
+    borderRadius: t.shape.radiusXl,
     padding: 28,
     width: '100%',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    ...t.shadows.modal,
   },
-  cheerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 16 },
-  cheerFrom: { fontSize: 13, color: '#888', marginBottom: 10, textAlign: 'center' },
-  cheerMsg: { fontSize: 22, textAlign: 'center', color: '#222', marginBottom: 20, lineHeight: 32 },
-  cheerCount: { fontSize: 12, color: '#bbb', marginBottom: 12 },
+  cheerTitle: {
+    fontSize: t.fontSize(18),
+    ...t.typography.fonts.bold,
+    color: t.colors.text,
+    marginBottom: 16,
+  },
+  cheerFrom: {
+    fontSize: t.fontSize(13),
+    color: t.colors.textMuted,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  cheerMsg: {
+    fontSize: t.fontSize(22),
+    textAlign: 'center',
+    color: t.colors.text,
+    marginBottom: 20,
+    lineHeight: Math.round(t.fontSize(22) * 1.45),
+  },
+  cheerCount: {
+    fontSize: t.fontSize(12),
+    color: t.colors.textFaint,
+    marginBottom: 12,
+  },
   cheerBtn: {
-    backgroundColor: GREEN,
-    borderRadius: 12,
+    backgroundColor: t.colors.primary,
+    borderRadius: t.shape.radiusMd,
     paddingVertical: 13,
     paddingHorizontal: 32,
   },
-  cheerBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-});
+  cheerBtnText: {
+    color: t.colors.onPrimary,
+    ...t.typography.fonts.bold,
+    fontSize: t.fontSize(15),
+  },
+}));

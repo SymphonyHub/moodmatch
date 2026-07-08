@@ -1,18 +1,21 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform,
   ActivityIndicator, ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { apiLogin, apiRegister } from '../services/api';
-
-const GREEN = '#2e7d32';
+import { useTheme, makeThemedStyles } from '../theme/ThemeContext';
 
 const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
 export default function LoginScreen() {
+  const { theme } = useTheme();
+  const styles = useStyles();
+
   const [modo, setModo] = useState('login');
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
@@ -78,7 +81,7 @@ export default function LoginScreen() {
       await AsyncStorage.setItem('token', data.token);
       router.replace('/(tabs)/home');
     } catch {
-      setErrGeneral('Error de conexión. Verifica la IP en config.js');
+      setErrGeneral('No pudimos conectar. Revisa tu conexión e intenta de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -89,6 +92,7 @@ export default function LoginScreen() {
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <StatusBar style={theme.statusBar.onBackground} />
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <Text style={styles.titulo}>MoodMatch 🌿</Text>
         <Text style={styles.subtitulo}>Tu bienestar, un ánimo a la vez</Text>
@@ -117,7 +121,7 @@ export default function LoginScreen() {
             <TextInput
               style={[styles.input, !!errNombre && styles.inputError]}
               placeholder="Nombre"
-              placeholderTextColor="#aaa"
+              placeholderTextColor={theme.colors.textFaint}
               value={nombre}
               onChangeText={(v) => { setNombre(v); setErrNombre(''); }}
               autoCapitalize="words"
@@ -129,7 +133,7 @@ export default function LoginScreen() {
         <TextInput
           style={[styles.input, !!errEmail && styles.inputError]}
           placeholder="Email"
-          placeholderTextColor="#aaa"
+          placeholderTextColor={theme.colors.textFaint}
           value={email}
           onChangeText={(v) => { setEmail(v); setErrEmail(''); }}
           keyboardType="email-address"
@@ -141,7 +145,7 @@ export default function LoginScreen() {
         <TextInput
           style={[styles.input, !!errPassword && styles.inputError]}
           placeholder="Contraseña"
-          placeholderTextColor="#aaa"
+          placeholderTextColor={theme.colors.textFaint}
           value={password}
           onChangeText={(v) => { setPassword(v); setErrPassword(''); }}
           secureTextEntry
@@ -156,7 +160,7 @@ export default function LoginScreen() {
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={theme.colors.onPrimary} />
           ) : (
             <Text style={styles.btnText}>
               {modo === 'login' ? 'Ingresar' : 'Crear cuenta'}
@@ -168,43 +172,78 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#f5f5f5' },
+const useStyles = makeThemedStyles((t) => ({
+  flex: { flex: 1, backgroundColor: t.colors.background },
   container: { flexGrow: 1, padding: 28, justifyContent: 'center' },
-  titulo: { fontSize: 34, fontWeight: 'bold', textAlign: 'center', color: GREEN, marginBottom: 6 },
-  subtitulo: { fontSize: 14, color: '#888', textAlign: 'center', marginBottom: 36 },
+  titulo: {
+    fontSize: t.fontSize(34),
+    ...t.typography.fonts.bold,
+    textAlign: 'center',
+    color: t.colors.primary,
+    marginBottom: 6,
+  },
+  subtitulo: {
+    fontSize: t.fontSize(14),
+    color: t.colors.textMuted,
+    textAlign: 'center',
+    marginBottom: 36,
+  },
   toggle: {
     flexDirection: 'row',
-    backgroundColor: '#e0e0e0',
-    borderRadius: 10,
+    backgroundColor: t.colors.border,
+    borderRadius: t.shape.radiusMd,
     padding: 4,
     marginBottom: 24,
   },
-  toggleBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
-  toggleActive: { backgroundColor: '#fff' },
-  toggleText: { color: '#888', fontWeight: '600', fontSize: 15 },
-  toggleTextActive: { color: GREEN },
+  toggleBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: t.shape.radiusSm,
+    alignItems: 'center',
+  },
+  toggleActive: { backgroundColor: t.colors.surface },
+  toggleText: {
+    color: t.colors.textMuted,
+    ...t.typography.fonts.semibold,
+    fontSize: t.fontSize(15),
+  },
+  toggleTextActive: { color: t.colors.primary },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
+    backgroundColor: t.colors.surface,
+    borderRadius: t.shape.radiusMd,
     paddingHorizontal: 16,
     paddingVertical: 13,
-    fontSize: 16,
+    fontSize: t.fontSize(16),
     marginBottom: 4,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    color: '#222',
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.border,
+    color: t.colors.text,
   },
-  inputError: { borderColor: '#c62828' },
-  fieldError: { color: '#c62828', fontSize: 12, marginBottom: 10, marginLeft: 4 },
-  errorGeneral: { color: '#c62828', marginBottom: 12, textAlign: 'center', fontSize: 14, marginTop: 4 },
+  inputError: { borderColor: t.colors.danger },
+  fieldError: {
+    color: t.colors.danger,
+    fontSize: t.fontSize(12),
+    marginBottom: 10,
+    marginLeft: 4,
+  },
+  errorGeneral: {
+    color: t.colors.danger,
+    marginBottom: 12,
+    textAlign: 'center',
+    fontSize: t.fontSize(14),
+    marginTop: 4,
+  },
   btn: {
-    backgroundColor: GREEN,
-    borderRadius: 10,
+    backgroundColor: t.colors.primary,
+    borderRadius: t.shape.radiusMd,
     paddingVertical: 15,
     alignItems: 'center',
     marginTop: 8,
   },
-  btnDisabled: { backgroundColor: '#a5d6a7' },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-});
+  btnDisabled: { backgroundColor: t.colors.primaryDisabled },
+  btnText: {
+    color: t.colors.onPrimary,
+    fontSize: t.fontSize(16),
+    ...t.typography.fonts.bold,
+  },
+}));

@@ -25,6 +25,8 @@ export const REQUIRED_COLOR_KEYS = [
   'primary',
   'onPrimary',
   'primarySoft',
+  'primarySoftBorder',
+  'primaryDisabled',
   'border',
   'danger',
   'dangerSoft',

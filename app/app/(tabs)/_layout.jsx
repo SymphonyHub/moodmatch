@@ -48,6 +48,14 @@ export default function TabsLayout() {
             tabBarIcon: () => <Text style={{ fontSize: 20 }}>📱</Text>,
           }}
         />
+        <Tabs.Screen
+          name="ajustes"
+          options={{
+            title: 'Ajustes',
+            tabBarLabel: 'Ajustes',
+            tabBarIcon: () => <Text style={{ fontSize: 20 }}>⚙️</Text>,
+          }}
+        />
       </Tabs>
     </>
   );

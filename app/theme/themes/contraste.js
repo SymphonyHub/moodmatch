@@ -1,0 +1,78 @@
+// Alto Contraste — accesibilidad primero: blanco y negro puros, bordes gruesos,
+// tipografía más grande y pesada, colores AAA (≥ 7:1) para texto informativo.
+// Sin sombras: la separación la dan los bordes.
+
+const contraste = {
+  id: 'contraste',
+  name: 'Alto Contraste',
+  tagline: 'Máxima legibilidad',
+  isDark: false,
+  statusBar: { onBackground: 'dark', onHeader: 'light' },
+  icons: { variant: 'outline' },
+  colors: {
+    background: '#ffffff',
+    surface: '#ffffff',
+    surfaceElevated: '#ffffff',
+    text: '#000000',
+    textMuted: '#1f1f1f',
+    textFaint: '#3d3d3d',
+    primary: '#1b5e20',
+    onPrimary: '#ffffff',
+    primarySoft: '#dcefdd',
+    primarySoftBorder: '#1b5e20',
+    primaryDisabled: '#767676',
+    border: '#000000',
+    danger: '#a10000',
+    dangerSoft: '#ffe3e3',
+    overlay: 'rgba(0, 0, 0, 0.75)',
+    headerBackground: '#000000',
+    onHeader: '#ffffff',
+    tabBarBackground: '#ffffff',
+    tabBarBorder: '#000000',
+    tabActive: '#1b5e20',
+    tabInactive: '#3d3d3d',
+    moods: {
+      FELIZ:   { color: '#1b5e20', soft: '#e0efe1' },
+      TRISTE:  { color: '#0d47a1', soft: '#e1ebf7' },
+      ANSIOSO: { color: '#8a3c00', soft: '#f7e6d9' },
+      CALMADO: { color: '#00453c', soft: '#daefec' },
+      ENOJADO: { color: '#9b1c1c', soft: '#f9e0e0' },
+      NEUTRO:  { color: '#2b2b2b', soft: '#e8e8e8' },
+    },
+    categories: {
+      social: '#0d47a1',
+      físico: '#8a3c00',
+      creativo: '#59167d',
+      relajación: '#005059',
+      reflexión: '#1b5e20',
+      entretenimiento: '#9b1c1c',
+      productividad: '#6b4a00',
+      mindfulness: '#00453c',
+    },
+  },
+  typography: {
+    scale: 1.08,
+    fonts: {
+      regular: { fontWeight: '500' },
+      medium: { fontWeight: '600' },
+      semibold: { fontWeight: '700' },
+      bold: { fontWeight: '800' },
+    },
+  },
+  shape: {
+    radiusSm: 4,
+    radiusMd: 6,
+    radiusLg: 8,
+    radiusXl: 12,
+    borderThin: 2,
+    borderMedium: 2.5,
+    borderThick: 3,
+  },
+  shadows: {
+    card: {},
+    cardStrong: {},
+    modal: {},
+  },
+};
+
+export default contraste;

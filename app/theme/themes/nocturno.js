@@ -1,0 +1,78 @@
+// Nocturno — modo oscuro real: superficies elevadas por capas (no negro plano),
+// acento verde desaturado, moods re-calibrados para leerse sobre oscuro.
+// En oscuro las sombras no se ven: la separación la dan las capas de superficie.
+
+const nocturno = {
+  id: 'nocturno',
+  name: 'Nocturno',
+  tagline: 'Oscuro y descansado',
+  isDark: true,
+  statusBar: { onBackground: 'light', onHeader: 'light' },
+  icons: { variant: 'outline' },
+  colors: {
+    background: '#111513',
+    surface: '#1a201d',
+    surfaceElevated: '#232b27',
+    text: '#e8ecea',
+    textMuted: '#a5b1ab',
+    textFaint: '#8c9992',
+    primary: '#7bc47f',
+    onPrimary: '#0c2610',
+    primarySoft: '#1f3524',
+    primarySoftBorder: '#2e4a34',
+    primaryDisabled: '#3a5240',
+    border: '#2c3430',
+    danger: '#ef8080',
+    dangerSoft: '#3a2222',
+    overlay: 'rgba(0, 0, 0, 0.6)',
+    headerBackground: '#1a201d',
+    onHeader: '#e8ecea',
+    tabBarBackground: '#1a201d',
+    tabBarBorder: '#2c3430',
+    tabActive: '#7bc47f',
+    tabInactive: '#a5b1ab',
+    moods: {
+      FELIZ:   { color: '#82c786', soft: '#1f3524' },
+      TRISTE:  { color: '#7fb3e8', soft: '#1c2d40' },
+      ANSIOSO: { color: '#f0a36a', soft: '#3d2a1a' },
+      CALMADO: { color: '#6fd0c2', soft: '#173733' },
+      ENOJADO: { color: '#f08a8a', soft: '#3a2222' },
+      NEUTRO:  { color: '#aab5af', soft: '#252b28' },
+    },
+    categories: {
+      social: '#7fb3e8',
+      físico: '#f0a36a',
+      creativo: '#c49ae0',
+      relajación: '#66c7d4',
+      reflexión: '#82c786',
+      entretenimiento: '#f08a8a',
+      productividad: '#e0c060',
+      mindfulness: '#6fd0c2',
+    },
+  },
+  typography: {
+    scale: 1,
+    fonts: {
+      regular: { fontWeight: '400' },
+      medium: { fontWeight: '500' },
+      semibold: { fontWeight: '600' },
+      bold: { fontWeight: '700' },
+    },
+  },
+  shape: {
+    radiusSm: 8,
+    radiusMd: 11,
+    radiusLg: 14,
+    radiusXl: 20,
+    borderThin: 1,
+    borderMedium: 1.5,
+    borderThick: 2,
+  },
+  shadows: {
+    card: {},
+    cardStrong: {},
+    modal: {},
+  },
+};
+
+export default nocturno;

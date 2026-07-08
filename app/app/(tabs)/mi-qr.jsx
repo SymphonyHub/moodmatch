@@ -5,8 +5,6 @@ import {
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
 import { apiGetMe, apiAddFriend } from '../../services/api';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 
@@ -21,7 +19,6 @@ export default function MiQrScreen() {
   const [mensaje, setMensaje] = useState(null);
   const [permission, requestPermission] = useCameraPermissions();
   const scaleEscanear = useRef(new Animated.Value(1)).current;
-  const scaleSalir = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     apiGetMe()
@@ -56,11 +53,6 @@ export default function MiQrScreen() {
     } catch {
       setMensaje({ tipo: 'error', texto: 'Error al agregar amigo. Intenta de nuevo.' });
     }
-  };
-
-  const handleCerrarSesion = async () => {
-    await AsyncStorage.removeItem('token');
-    router.replace('/login');
   };
 
   if (loading) {
@@ -108,18 +100,6 @@ export default function MiQrScreen() {
           activeOpacity={0.9}
         >
           <Text style={styles.btnText}>📷  Escanear QR de un amigo</Text>
-        </TouchableOpacity>
-      </Animated.View>
-
-      <Animated.View style={{ width: '100%', transform: [{ scale: scaleSalir }] }}>
-        <TouchableOpacity
-          style={styles.btnSalir}
-          onPress={handleCerrarSesion}
-          onPressIn={() => Animated.spring(scaleSalir, { toValue: 0.97, useNativeDriver: true }).start()}
-          onPressOut={() => Animated.spring(scaleSalir, { toValue: 1, useNativeDriver: true }).start()}
-          activeOpacity={0.9}
-        >
-          <Text style={styles.btnSalirText}>Cerrar sesión</Text>
         </TouchableOpacity>
       </Animated.View>
 
@@ -204,15 +184,6 @@ const useStyles = makeThemedStyles((t) => ({
     fontSize: t.fontSize(16),
     ...t.typography.fonts.bold,
   },
-  btnSalir: {
-    borderWidth: t.shape.borderMedium,
-    borderColor: t.colors.border,
-    borderRadius: t.shape.radiusMd,
-    paddingVertical: 13,
-    alignItems: 'center',
-    width: '100%',
-  },
-  btnSalirText: { color: t.colors.textMuted, fontSize: t.fontSize(15) },
   cameraContainer: { flex: 1, backgroundColor: '#000' },
   camera: { flex: 1 },
   cameraOverlay: {

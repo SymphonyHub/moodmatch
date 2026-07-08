@@ -1,4 +1,8 @@
 import sereno from './sereno';
+import nocturno from './nocturno';
+import amanecer from './amanecer';
+import contraste from './contraste';
+import fiesta from './fiesta';
 
 // Helpers derivados que todo tema expone (p. ej. fontSize aplica la escala del tema).
 const withHelpers = (theme) => ({
@@ -6,7 +10,7 @@ const withHelpers = (theme) => ({
   fontSize: (size) => Math.round(size * theme.typography.scale),
 });
 
-const ALL_THEMES = [sereno];
+const ALL_THEMES = [sereno, nocturno, amanecer, contraste, fiesta];
 
 export const THEMES = Object.fromEntries(ALL_THEMES.map((t) => [t.id, withHelpers(t)]));
 export const THEME_IDS = ALL_THEMES.map((t) => t.id);

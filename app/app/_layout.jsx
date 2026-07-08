@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
+import { View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { ThemeProvider, useTheme } from '../theme/ThemeContext';
+import { ThemeProvider, ThemeVeil, useTheme } from '../theme/ThemeContext';
 
 function ThemedStack() {
   const { theme, hydrated } = useTheme();
@@ -10,7 +11,7 @@ function ThemedStack() {
   if (!hydrated) return null;
 
   return (
-    <>
+    <View style={{ flex: 1 }}>
       <StatusBar style={theme.statusBar.onBackground} />
       <Stack
         screenOptions={{
@@ -22,7 +23,8 @@ function ThemedStack() {
         <Stack.Screen name="login" />
         <Stack.Screen name="(tabs)" />
       </Stack>
-    </>
+      <ThemeVeil />
+    </View>
   );
 }
 

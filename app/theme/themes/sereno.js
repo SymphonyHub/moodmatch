@@ -33,14 +33,14 @@ const sereno = {
     moods: {
       FELIZ:   { color: '#2e7d32', soft: '#e8f5e9' },
       TRISTE:  { color: '#1565c0', soft: '#e7f0fa' },
-      ANSIOSO: { color: '#c94f00', soft: '#fdeee2' },
+      ANSIOSO: { color: '#b84800', soft: '#fdeee2' },
       CALMADO: { color: '#00695c', soft: '#e0f2ef' },
       ENOJADO: { color: '#c62828', soft: '#fdeaea' },
       NEUTRO:  { color: '#5f6a64', soft: '#eef0ee' },
     },
     categories: {
       social: '#1565c0',
-      físico: '#c94f00',
+      físico: '#b84800',
       creativo: '#6a1b9a',
       relajación: '#00707b',
       reflexión: '#2e7d32',

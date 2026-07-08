@@ -1,0 +1,96 @@
+// Amanecer — pastel cálido: cremas, durazno y terracota. Header suave (no saturado)
+// y sombras con tinte cálido. La tipografía redondeada (Nunito) se activa al
+// cargar las fuentes; hasta entonces usa la del sistema.
+
+const amanecer = {
+  id: 'amanecer',
+  name: 'Amanecer',
+  tagline: 'Cálido y suave',
+  isDark: false,
+  statusBar: { onBackground: 'dark', onHeader: 'dark' },
+  icons: { variant: 'outline' },
+  colors: {
+    background: '#faf3ec',
+    surface: '#fffdfa',
+    surfaceElevated: '#ffffff',
+    text: '#43302b',
+    textMuted: '#6f5a4d',
+    textFaint: '#7d6659',
+    primary: '#a54e28',
+    onPrimary: '#ffffff',
+    primarySoft: '#fbeee3',
+    primarySoftBorder: '#eed3bd',
+    primaryDisabled: '#d9a486',
+    border: '#ecdccc',
+    danger: '#b3392f',
+    dangerSoft: '#f9e3df',
+    overlay: 'rgba(67, 48, 43, 0.5)',
+    headerBackground: '#f3e2d0',
+    onHeader: '#43302b',
+    tabBarBackground: '#fffdfa',
+    tabBarBorder: '#ecdccc',
+    tabActive: '#a54e28',
+    tabInactive: '#6f5a4d',
+    moods: {
+      FELIZ:   { color: '#4f7231', soft: '#f0f5e6' },
+      TRISTE:  { color: '#54629f', soft: '#e8ebf7' },
+      ANSIOSO: { color: '#9c5525', soft: '#f9e8d8' },
+      CALMADO: { color: '#25776b', soft: '#def0ea' },
+      ENOJADO: { color: '#b3392f', soft: '#f9e3df' },
+      NEUTRO:  { color: '#756453', soft: '#efe8df' },
+    },
+    categories: {
+      social: '#4a6fb0',
+      físico: '#9c5525',
+      creativo: '#8a5299',
+      relajación: '#1d7584',
+      reflexión: '#4f7231',
+      entretenimiento: '#b3392f',
+      productividad: '#8f6508',
+      mindfulness: '#25776b',
+    },
+  },
+  typography: {
+    scale: 1,
+    fonts: {
+      regular: { fontWeight: '400' },
+      medium: { fontWeight: '500' },
+      semibold: { fontWeight: '600' },
+      bold: { fontWeight: '700' },
+    },
+  },
+  shape: {
+    radiusSm: 10,
+    radiusMd: 12,
+    radiusLg: 16,
+    radiusXl: 22,
+    borderThin: 1,
+    borderMedium: 1.5,
+    borderThick: 2,
+  },
+  shadows: {
+    card: {
+      shadowColor: '#8a5a3a',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    cardStrong: {
+      shadowColor: '#8a5a3a',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.12,
+      shadowRadius: 6,
+      elevation: 3,
+    },
+    modal: {
+      shadowColor: '#8a5a3a',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+  },
+};
+
+export default amanecer;

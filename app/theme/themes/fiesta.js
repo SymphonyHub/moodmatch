@@ -1,0 +1,96 @@
+// Fiesta — playful: violeta vivo, esquinas bien redondeadas, sombras con tinte
+// de color e íconos rellenos. La tipografía redondeada (Baloo 2) se activa al
+// cargar las fuentes; hasta entonces usa la del sistema.
+
+const fiesta = {
+  id: 'fiesta',
+  name: 'Fiesta',
+  tagline: 'Colorido y juguetón',
+  isDark: false,
+  statusBar: { onBackground: 'dark', onHeader: 'light' },
+  icons: { variant: 'filled' },
+  colors: {
+    background: '#f6f2fb',
+    surface: '#ffffff',
+    surfaceElevated: '#ffffff',
+    text: '#2d2440',
+    textMuted: '#5f5578',
+    textFaint: '#6d6483',
+    primary: '#7c3aed',
+    onPrimary: '#ffffff',
+    primarySoft: '#f0e7fd',
+    primarySoftBorder: '#d8c3fa',
+    primaryDisabled: '#c4a8f5',
+    border: '#e6def2',
+    danger: '#c22f52',
+    dangerSoft: '#fdedf1',
+    overlay: 'rgba(45, 36, 64, 0.55)',
+    headerBackground: '#7c3aed',
+    onHeader: '#ffffff',
+    tabBarBackground: '#ffffff',
+    tabBarBorder: '#e6def2',
+    tabActive: '#7c3aed',
+    tabInactive: '#5f5578',
+    moods: {
+      FELIZ:   { color: '#a95a00', soft: '#fdf0dc' },
+      TRISTE:  { color: '#3b63d8', soft: '#eaeffd' },
+      ANSIOSO: { color: '#b93d0b', soft: '#fde8dc' },
+      CALMADO: { color: '#0c7568', soft: '#dcf5f2' },
+      ENOJADO: { color: '#c22f52', soft: '#fdedf1' },
+      NEUTRO:  { color: '#655d7a', soft: '#edeaf4' },
+    },
+    categories: {
+      social: '#3b63d8',
+      físico: '#b93d0b',
+      creativo: '#8f2fbf',
+      relajación: '#0779a3',
+      reflexión: '#0f7d3c',
+      entretenimiento: '#c22f52',
+      productividad: '#a95a00',
+      mindfulness: '#0c7568',
+    },
+  },
+  typography: {
+    scale: 1,
+    fonts: {
+      regular: { fontWeight: '400' },
+      medium: { fontWeight: '500' },
+      semibold: { fontWeight: '600' },
+      bold: { fontWeight: '700' },
+    },
+  },
+  shape: {
+    radiusSm: 12,
+    radiusMd: 14,
+    radiusLg: 18,
+    radiusXl: 26,
+    borderThin: 1,
+    borderMedium: 1.5,
+    borderThick: 2,
+  },
+  shadows: {
+    card: {
+      shadowColor: '#7c3aed',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.12,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    cardStrong: {
+      shadowColor: '#7c3aed',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.16,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    modal: {
+      shadowColor: '#2d2440',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+  },
+};
+
+export default fiesta;

@@ -30,6 +30,15 @@ export const apiGetMe = async () => {
   return fetch(`${API_URL}/api/users/me`, { headers }).then((r) => r.json());
 };
 
+export const apiUpdateThemePreference = async (themePreference) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/users/me`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ themePreference }),
+  }).then((r) => r.json());
+};
+
 export const apiCreateMoodEntry = async (moodType, nota = null) => {
   const headers = await authHeaders();
   return fetch(`${API_URL}/api/mood-entries`, {

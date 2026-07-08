@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { Animated, StyleSheet, useColorScheme } from 'react-native';
 import { THEMES, DEFAULT_THEME_ID, resolveThemeId } from './themes';
 import { loadThemeChoice, saveThemeChoice } from './persistence';
+import { apiUpdateThemePreference } from '../services/api';
 
 const ThemeContext = createContext(null);
 
@@ -22,9 +23,13 @@ export function ThemeProvider({ children }) {
     };
   }, []);
 
-  const setThemeChoice = useCallback((next) => {
+  // sync: false cuando el valor VIENE del servidor (adopción al login),
+  // para no reenviarle su propio dato. El PATCH es best-effort: si falla
+  // (sin red, backend viejo), el tema queda aplicado y guardado local igual.
+  const setThemeChoice = useCallback((next, { sync = true } = {}) => {
     setChoice(next);
     saveThemeChoice(next);
+    if (sync) apiUpdateThemePreference(next).catch(() => {});
   }, []);
 
   // Aplica un tema con transición suave: sube un velo del color de fondo del tema

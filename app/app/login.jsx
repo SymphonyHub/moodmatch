@@ -7,13 +7,14 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { apiLogin, apiRegister } from '../services/api';
+import { apiLogin, apiRegister, apiUpdateThemePreference } from '../services/api';
 import { useTheme, makeThemedStyles } from '../theme/ThemeContext';
+import { VALID_THEME_CHOICES } from '../theme/themes';
 
 const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
 export default function LoginScreen() {
-  const { theme } = useTheme();
+  const { theme, themeChoice, setThemeChoice } = useTheme();
   const styles = useStyles();
 
   const [modo, setModo] = useState('login');
@@ -79,6 +80,17 @@ export default function LoginScreen() {
       }
 
       await AsyncStorage.setItem('token', data.token);
+
+      // Reconciliar tema con el perfil: si el servidor tiene una preferencia
+      // guardada (otro dispositivo o reinstalación), se adopta; si no, se sube
+      // la elección local para que quede respaldada.
+      const serverPref = data.user?.themePreference;
+      if (serverPref && VALID_THEME_CHOICES.includes(serverPref)) {
+        if (serverPref !== themeChoice) setThemeChoice(serverPref, { sync: false });
+      } else {
+        apiUpdateThemePreference(themeChoice).catch(() => {});
+      }
+
       router.replace('/(tabs)/home');
     } catch {
       setErrGeneral('No pudimos conectar. Revisa tu conexión e intenta de nuevo.');

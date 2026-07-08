@@ -17,12 +17,13 @@ enum MoodType {
 }
 
 model User {
-  id           Int          @id @default(autoincrement())
-  nombre       String
-  email        String       @unique
-  passwordHash String
-  qrCode       String       @unique @default(uuid())
-  createdAt    DateTime     @default(now())
+  id              Int          @id @default(autoincrement())
+  nombre          String
+  email           String       @unique
+  passwordHash    String
+  qrCode          String       @unique @default(uuid())
+  themePreference String?
+  createdAt       DateTime     @default(now())
 
   moodEntries    MoodEntry[]
   friendsAdded   Friendship[] @relation("FriendshipUser")

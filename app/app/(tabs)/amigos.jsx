@@ -112,7 +112,14 @@ export default function AmigosScreen() {
     }
   }, []);
 
-  useFocusEffect(cargar);
+  // useFocusEffect espera un callback síncrono (con cleanup opcional).
+  // cargar es async: pasarla directo devuelve una Promise y React lanza
+  // "An effect function must not return anything besides a cleanup function".
+  useFocusEffect(
+    useCallback(() => {
+      cargar();
+    }, [cargar]),
+  );
 
   const enviarCheer = async (message) => {
     if (!cheerTarget) return;

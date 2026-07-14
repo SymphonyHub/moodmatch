@@ -23,6 +23,7 @@ model User {
   passwordHash    String
   qrCode          String       @unique @default(uuid())
   themePreference String?
+  customTheme     Json?
   createdAt       DateTime     @default(now())
 
   moodEntries    MoodEntry[]

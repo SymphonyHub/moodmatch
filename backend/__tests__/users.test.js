@@ -8,6 +8,7 @@ jest.mock('../lib/prisma', () => ({
 const request = require('supertest');
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const { Prisma } = require('@prisma/client');
 const usersRouter = require('../routes/users');
 const prisma = require('../lib/prisma');
 
@@ -24,7 +25,15 @@ const usuarioBase = {
   email: 'test@test.com',
   qrCode: 'uuid-123',
   themePreference: 'nocturno',
+  customTheme: null,
   createdAt: new Date(),
+};
+
+const paletaValida = {
+  primary: '#4a5fc1',
+  accent: '#b34c30',
+  background: '#f5f6fa',
+  bodyFont: 'manrope',
 };
 
 beforeEach(() => jest.clearAllMocks());
@@ -123,6 +132,18 @@ describe('PATCH /api/users/me — actualización', () => {
     expect(prisma.user.update.mock.calls[0][0].data).toEqual({ themePreference: null });
   });
 
+  test('acepta "personalizado" como preferencia', async () => {
+    prisma.user.update.mockResolvedValue({ ...usuarioBase, themePreference: 'personalizado' });
+
+    const res = await request(app)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ themePreference: 'personalizado' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.user.themePreference).toBe('personalizado');
+  });
+
   test('nunca expone passwordHash en la respuesta', async () => {
     prisma.user.update.mockResolvedValue({ ...usuarioBase, themePreference: 'sereno' });
 
@@ -136,5 +157,85 @@ describe('PATCH /api/users/me — actualización', () => {
     const updateArg = prisma.user.update.mock.calls[0][0];
     expect(updateArg.select.themePreference).toBe(true);
     expect(updateArg.select.passwordHash).toBeUndefined();
+  });
+});
+
+describe('GET /api/users/me — paleta personalizada', () => {
+  test('incluye customTheme en la respuesta', async () => {
+    prisma.user.findUnique.mockResolvedValue({ ...usuarioBase, customTheme: paletaValida });
+
+    const res = await request(app)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.user.customTheme).toEqual(paletaValida);
+  });
+});
+
+describe('PATCH /api/users/me — paleta personalizada', () => {
+  test('guarda una paleta válida', async () => {
+    prisma.user.update.mockResolvedValue({ ...usuarioBase, customTheme: paletaValida });
+
+    const res = await request(app)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ customTheme: paletaValida });
+
+    expect(res.status).toBe(200);
+    expect(res.body.user.customTheme).toEqual(paletaValida);
+    expect(prisma.user.update.mock.calls[0][0].data).toEqual({ customTheme: paletaValida });
+  });
+
+  test('acepta themePreference y customTheme en un solo PATCH', async () => {
+    prisma.user.update.mockResolvedValue({
+      ...usuarioBase,
+      themePreference: 'personalizado',
+      customTheme: paletaValida,
+    });
+
+    const res = await request(app)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ themePreference: 'personalizado', customTheme: paletaValida });
+
+    expect(res.status).toBe(200);
+    expect(prisma.user.update).toHaveBeenCalledTimes(1);
+    expect(prisma.user.update.mock.calls[0][0].data).toEqual({
+      themePreference: 'personalizado',
+      customTheme: paletaValida,
+    });
+  });
+
+  test('customTheme null limpia la paleta usando Prisma.DbNull', async () => {
+    prisma.user.update.mockResolvedValue({ ...usuarioBase, customTheme: null });
+
+    const res = await request(app)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ customTheme: null });
+
+    expect(res.status).toBe(200);
+    // null plano en data lanzaría en runtime con una columna Json: debe ser DbNull.
+    expect(prisma.user.update.mock.calls[0][0].data).toEqual({ customTheme: Prisma.DbNull });
+  });
+
+  test.each([
+    ['hex inválido', { ...paletaValida, primary: '#12g' }],
+    ['hex corto', { ...paletaValida, background: '#fff' }],
+    ['fuente fuera de whitelist', { ...paletaValida, bodyFont: 'comic-sans' }],
+    ['clave extra', { ...paletaValida, sorpresa: '#000000' }],
+    ['clave faltante', { primary: '#4a5fc1', accent: '#b34c30', background: '#f5f6fa' }],
+    ['array', ['#4a5fc1']],
+    ['string', 'no-un-objeto'],
+  ])('rechaza paleta inválida (%s) con 400', async (_caso, customTheme) => {
+    const res = await request(app)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ customTheme });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/inválida/i);
+    expect(prisma.user.update).not.toHaveBeenCalled();
   });
 });

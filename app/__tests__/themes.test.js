@@ -4,6 +4,7 @@ import {
   DEFAULT_THEME_ID,
   AUTO_THEME_ID,
   VALID_THEME_CHOICES,
+  CUSTOM_THEME_ID,
   resolveThemeId,
 } from '../theme/themes';
 import {
@@ -22,8 +23,14 @@ describe('registro de temas', () => {
     expect(THEMES[DEFAULT_THEME_ID]).toBeDefined();
   });
 
-  test('las elecciones válidas son los temas más "auto"', () => {
-    expect(VALID_THEME_CHOICES).toEqual([...THEME_IDS, AUTO_THEME_ID]);
+  test('las elecciones válidas son los temas más "auto" y "personalizado"', () => {
+    expect(VALID_THEME_CHOICES).toEqual([...THEME_IDS, AUTO_THEME_ID, CUSTOM_THEME_ID]);
+  });
+
+  test('"personalizado" no vive en el registro estático: resuelve al default', () => {
+    // El ThemeProvider lo intercepta antes; cualquier otro consumidor
+    // (o una versión vieja de la app) obtiene el tema por defecto.
+    expect(resolveThemeId(CUSTOM_THEME_ID, 'light')).toBe(DEFAULT_THEME_ID);
   });
 
   test.each(THEME_IDS)('tema %s tiene identidad completa', (id) => {

@@ -7,14 +7,15 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { apiLogin, apiRegister, apiUpdateThemePreference } from '../services/api';
+import { apiLogin, apiRegister, apiUpdateThemePreference, apiUpdateMe } from '../services/api';
 import { useTheme, makeThemedStyles } from '../theme/ThemeContext';
 import { VALID_THEME_CHOICES } from '../theme/themes';
+import { isValidCustomConfig } from '../theme/customTheme';
 
 const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
 export default function LoginScreen() {
-  const { theme, themeChoice, setThemeChoice } = useTheme();
+  const { theme, themeChoice, setThemeChoice, customConfig, setCustomConfig } = useTheme();
   const styles = useStyles();
 
   const [modo, setModo] = useState('login');
@@ -89,6 +90,16 @@ export default function LoginScreen() {
         if (serverPref !== themeChoice) setThemeChoice(serverPref, { sync: false });
       } else {
         apiUpdateThemePreference(themeChoice).catch(() => {});
+      }
+
+      // Lo mismo con la paleta personalizada: se valida SIEMPRE lo que venga
+      // del servidor antes de derivarle un tema (un hex corrupto rompería la
+      // derivación de colores).
+      const serverCustom = data.user?.customTheme;
+      if (isValidCustomConfig(serverCustom)) {
+        setCustomConfig(serverCustom, { sync: false });
+      } else if (customConfig) {
+        apiUpdateMe({ customTheme: customConfig }).catch(() => {});
       }
 
       router.replace('/(tabs)/home');

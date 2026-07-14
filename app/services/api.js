@@ -39,6 +39,16 @@ export const apiUpdateThemePreference = async (themePreference) => {
   }).then((r) => r.json());
 };
 
+// PATCH genérico del perfil: { themePreference?, customTheme? }.
+export const apiUpdateMe = async (fields) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/users/me`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify(fields),
+  }).then((r) => r.json());
+};
+
 export const apiCreateMoodEntry = async (moodType, nota = null) => {
   const headers = await authHeaders();
   return fetch(`${API_URL}/api/mood-entries`, {

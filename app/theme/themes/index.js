@@ -1,3 +1,4 @@
+import { CUSTOM_THEME_ID } from '../customTheme';
 import sereno from './sereno';
 import nocturno from './nocturno';
 import amanecer from './amanecer';
@@ -16,12 +17,17 @@ export const THEMES = Object.fromEntries(ALL_THEMES.map((t) => [t.id, withHelper
 export const THEME_IDS = ALL_THEMES.map((t) => t.id);
 export const DEFAULT_THEME_ID = 'sereno';
 export const AUTO_THEME_ID = 'auto';
+export { CUSTOM_THEME_ID };
 
-// Lo que el usuario puede elegir: un tema concreto o seguir el sistema.
-export const VALID_THEME_CHOICES = [...THEME_IDS, AUTO_THEME_ID];
+// Lo que el usuario puede elegir: un tema concreto, seguir el sistema o su
+// paleta personalizada (esta última la construye el ThemeProvider en runtime,
+// no vive en THEMES).
+export const VALID_THEME_CHOICES = [...THEME_IDS, AUTO_THEME_ID, CUSTOM_THEME_ID];
 
 // 'auto' sigue el modo del sistema: claro → sereno, oscuro → nocturno.
-// Ante un id desconocido (valor corrupto o de una versión vieja) cae al default.
+// Ante un id desconocido (valor corrupto o de una versión vieja) cae al default;
+// 'personalizado' también cae aquí a propósito: quien no lo intercepte antes
+// (ThemeProvider) obtiene el tema por defecto en lugar de romperse.
 export function resolveThemeId(choice, systemScheme) {
   if (choice === AUTO_THEME_ID) {
     return systemScheme === 'dark' && THEMES.nocturno ? 'nocturno' : DEFAULT_THEME_ID;

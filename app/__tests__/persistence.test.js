@@ -3,10 +3,17 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 );
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { loadThemeChoice, saveThemeChoice } from '../theme/persistence';
+import {
+  loadThemeChoice,
+  saveThemeChoice,
+  loadCustomThemeConfig,
+  saveCustomThemeConfig,
+} from '../theme/persistence';
 import { DEFAULT_THEME_ID } from '../theme/themes';
+import { DEFAULT_CUSTOM_CONFIG } from '../theme/customTheme';
 
 const STORAGE_KEY = 'moodmatch.themeChoice';
+const CUSTOM_KEY = 'moodmatch.customTheme';
 
 beforeEach(async () => {
   jest.clearAllMocks();
@@ -49,5 +56,36 @@ describe('saveThemeChoice', () => {
   test('no lanza si el almacenamiento falla (el tema queda en memoria)', async () => {
     AsyncStorage.setItem.mockRejectedValueOnce(new Error('storage roto'));
     await expect(saveThemeChoice('nocturno')).resolves.toBeUndefined();
+  });
+});
+
+describe('load/saveCustomThemeConfig', () => {
+  test('roundtrip de una paleta válida', async () => {
+    await saveCustomThemeConfig(DEFAULT_CUSTOM_CONFIG);
+    expect(await loadCustomThemeConfig()).toEqual(DEFAULT_CUSTOM_CONFIG);
+  });
+
+  test('devuelve null si no hay nada guardado', async () => {
+    expect(await loadCustomThemeConfig()).toBeNull();
+  });
+
+  test('devuelve null con JSON corrupto', async () => {
+    await AsyncStorage.setItem(CUSTOM_KEY, '{esto no es json');
+    expect(await loadCustomThemeConfig()).toBeNull();
+  });
+
+  test('devuelve null con una forma inválida', async () => {
+    await AsyncStorage.setItem(CUSTOM_KEY, JSON.stringify({ primary: 'azul' }));
+    expect(await loadCustomThemeConfig()).toBeNull();
+  });
+
+  test('devuelve null si el almacenamiento falla', async () => {
+    AsyncStorage.getItem.mockRejectedValueOnce(new Error('storage roto'));
+    expect(await loadCustomThemeConfig()).toBeNull();
+  });
+
+  test('save no lanza si el almacenamiento falla', async () => {
+    AsyncStorage.setItem.mockRejectedValueOnce(new Error('storage roto'));
+    await expect(saveCustomThemeConfig(DEFAULT_CUSTOM_CONFIG)).resolves.toBeUndefined();
   });
 });

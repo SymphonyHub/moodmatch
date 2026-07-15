@@ -87,6 +87,25 @@ export const apiGetCheers = async () => {
   return fetch(`${API_URL}/api/cheers`, { headers }).then((r) => r.json());
 };
 
+export const apiGetMessages = async (friendId) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/messages/${friendId}`, { headers }).then((r) => r.json());
+};
+
+export const apiSendMessage = async (friendId, message) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/messages/${friendId}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ message }),
+  }).then((r) => r.json());
+};
+
+export const apiGetUnreadCount = async () => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/messages/unread-count`, { headers }).then((r) => r.json());
+};
+
 export const apiGetSocialActivities = async () => {
   const headers = await authHeaders();
   return fetch(`${API_URL}/api/activities?categoria=social`, { headers }).then((r) => r.json());

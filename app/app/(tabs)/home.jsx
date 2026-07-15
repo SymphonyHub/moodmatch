@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
-  View, Text, ScrollView, ActivityIndicator, Modal,
+  View, Text, ScrollView, ActivityIndicator,
 } from 'react-native';
-import { apiCreateMoodEntry, apiGetCheers } from '../../services/api';
+import { apiCreateMoodEntry } from '../../services/api';
 import { MOODS } from '../../constants/moods';
 import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../../constants/categories';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
@@ -18,30 +18,6 @@ export default function HomeScreen() {
   const [loadingOtra, setLoadingOtra] = useState(false);
   const [actividad, setActividad] = useState(null);
   const [error, setError] = useState('');
-
-  const [cheers, setCheers] = useState([]);
-  const [cheerIdx, setCheerIdx] = useState(0);
-  const [showCheerModal, setShowCheerModal] = useState(false);
-
-  useEffect(() => {
-    apiGetCheers()
-      .then((data) => {
-        if (data.cheers && data.cheers.length > 0) {
-          setCheers(data.cheers);
-          setCheerIdx(0);
-          setShowCheerModal(true);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  const cerrarCheerModal = () => {
-    if (cheerIdx < cheers.length - 1) {
-      setCheerIdx((i) => i + 1);
-    } else {
-      setShowCheerModal(false);
-    }
-  };
 
   const seleccionarMood = (value) => {
     setSelectedMood(value);
@@ -83,32 +59,10 @@ export default function HomeScreen() {
         icon: CATEGORY_ICONS[actividad.categoria] ?? DEFAULT_CATEGORY_ICON,
       }
     : null;
-  const cheerActual = cheers[cheerIdx];
-
+  // Los mensajes de amigos ya no interrumpen con un modal al entrar:
+  // viven en el chat y se anuncian con el badge de la pestaña Amigos.
   return (
     <View style={{ flex: 1 }}>
-      <Modal visible={showCheerModal} transparent animationType="none">
-        <Entrance distance={0} style={styles.cheerOverlay}>
-          <Entrance distance={20} style={styles.cheerBox}>
-            <Text style={styles.cheerTitle}>Tienes un mensaje</Text>
-            {cheerActual && (
-              <View>
-                <Text style={styles.cheerFrom}>{cheerActual.fromNombre} te envio:</Text>
-                <Text style={styles.cheerMsg}>{cheerActual.message}</Text>
-              </View>
-            )}
-            {cheers.length > 1 && (
-              <Text style={styles.cheerCount}>{cheerIdx + 1} / {cheers.length}</Text>
-            )}
-            <Tappable style={styles.cheerBtn} onPress={cerrarCheerModal}>
-              <Text style={styles.cheerBtnText}>
-                {cheerIdx < cheers.length - 1 ? 'Siguiente' : 'Gracias'}
-              </Text>
-            </Tappable>
-          </Entrance>
-        </Entrance>
-      </Modal>
-
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.pregunta}>Como te sientes hoy?</Text>
 
@@ -256,55 +210,6 @@ const useStyles = makeThemedStyles((t) => ({
   },
   btnOtraText: {
     ...t.typography.fonts.semibold,
-    fontSize: t.fontSize(15),
-  },
-  cheerOverlay: {
-    flex: 1,
-    backgroundColor: t.colors.overlay,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 28,
-  },
-  cheerBox: {
-    backgroundColor: t.colors.surfaceElevated,
-    borderRadius: t.shape.radiusXl,
-    padding: 28,
-    width: '100%',
-    alignItems: 'center',
-    ...t.shadows.modal,
-  },
-  cheerTitle: {
-    ...t.typography.type.title,
-    color: t.colors.text,
-    marginBottom: 16,
-  },
-  cheerFrom: {
-    fontSize: t.fontSize(13),
-    color: t.colors.textMuted,
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  cheerMsg: {
-    fontSize: t.fontSize(22),
-    textAlign: 'center',
-    color: t.colors.text,
-    marginBottom: 20,
-    lineHeight: Math.round(t.fontSize(22) * 1.45),
-  },
-  cheerCount: {
-    ...t.typography.type.caption,
-    color: t.colors.textFaint,
-    marginBottom: 12,
-  },
-  cheerBtn: {
-    backgroundColor: t.colors.primary,
-    borderRadius: t.shape.radiusMd,
-    paddingVertical: 13,
-    paddingHorizontal: 32,
-  },
-  cheerBtnText: {
-    color: t.colors.onPrimary,
-    ...t.typography.fonts.bold,
     fontSize: t.fontSize(15),
   },
 }));

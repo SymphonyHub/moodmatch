@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { apiLogin, apiRegister, apiUpdateThemePreference, apiUpdateMe } from '../services/api';
+import { getPendingInvite, clearPendingInvite } from '../utils/pendingInvite';
 import { useTheme, makeThemedStyles } from '../theme/ThemeContext';
 import { VALID_THEME_CHOICES } from '../theme/themes';
 import { isValidCustomConfig } from '../theme/customTheme';
@@ -102,7 +103,14 @@ export default function LoginScreen() {
         apiUpdateMe({ customTheme: customConfig }).catch(() => {});
       }
 
-      router.replace('/(tabs)/home');
+      // Si se llegó acá desde un link de invitación, retomarlo ahora que hay sesión
+      const pendingCode = await getPendingInvite().catch(() => null);
+      if (pendingCode) {
+        await clearPendingInvite().catch(() => {});
+        router.replace({ pathname: '/add-friend', params: { code: pendingCode } });
+      } else {
+        router.replace('/(tabs)/home');
+      }
     } catch {
       setErrGeneral('No pudimos conectar. Revisa tu conexión e intenta de nuevo.');
     } finally {

@@ -12,6 +12,8 @@ app.use('/api/users',        require('./routes/users'));
 app.use('/api/friendships',  require('./routes/friendships'));
 app.use('/api/activities',   require('./routes/activities'));
 app.use('/api/cheers',       require('./routes/cheers'));
+app.use('/api/messages',     require('./routes/messages'));
+app.use('/invite',           require('./routes/invite'));
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 

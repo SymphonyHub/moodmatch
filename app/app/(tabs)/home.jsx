@@ -1,23 +1,39 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, ActivityIndicator, Modal,
+  View, Text, ScrollView, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { apiCreateMoodEntry, apiGetCheers } from '../../services/api';
+import { apiCreateMoodEntry, apiNextSuggestion, apiGetCheers } from '../../services/api';
 import { MOODS } from '../../constants/moods';
-import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../../constants/categories';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
+import {
+  crearConversacion,
+  reducer,
+  pasoActual,
+  quickRepliesDe,
+} from '../../features/emociones/conversacion';
+import { ETIQUETAS } from '../../features/emociones/guiones';
 import Tappable from '../../components/Tappable';
 import Entrance from '../../components/Entrance';
+import ChatBubble from '../../components/chat/ChatBubble';
+import QuickReplies from '../../components/chat/QuickReplies';
+import TypingIndicator from '../../components/chat/TypingIndicator';
+import ChatInput from '../../components/chat/ChatInput';
+import ActivitySuggestionCard from '../../components/chat/ActivitySuggestionCard';
+
+// Pausa de "escribiendo" antes de cada burbuja del bot: apenas por encima de
+// durations.gentle (380 ms) — presencia sin latencia fingida.
+const TYPING_MS = 450;
 
 export default function HomeScreen() {
   const { theme } = useTheme();
   const styles = useStyles();
 
-  const [selectedMood, setSelectedMood] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [conv, dispatch] = useReducer(reducer, undefined, () => crearConversacion());
+  // Revelado escalonado: cuántos mensajes del stream ya se muestran.
+  const [visibles, setVisibles] = useState(0);
+  const [escribiendo, setEscribiendo] = useState(false);
   const [loadingOtra, setLoadingOtra] = useState(false);
-  const [actividad, setActividad] = useState(null);
-  const [error, setError] = useState('');
+  const scrollRef = useRef(null);
 
   const [cheers, setCheers] = useState([]);
   const [cheerIdx, setCheerIdx] = useState(0);
@@ -43,50 +59,108 @@ export default function HomeScreen() {
     }
   };
 
-  const seleccionarMood = (value) => {
-    setSelectedMood(value);
-    setActividad(null);
-    setError('');
-  };
-
-  const handleRegistrar = async () => {
-    if (!selectedMood) { setError('Selecciona cómo te sientes primero'); return; }
-    setError('');
-    setLoading(true);
-    try {
-      const data = await apiCreateMoodEntry(selectedMood);
-      if (data.error) { setError(data.error); return; }
-      setActividad(data.actividadSugerida);
-    } catch {
-      setError('No pudimos conectar. Revisa tu conexión e intenta de nuevo.');
-    } finally {
-      setLoading(false);
+  // Revela los mensajes de a uno: los del usuario al instante, los del bot
+  // tras una pausa breve de "escribiendo".
+  useEffect(() => {
+    if (visibles > conv.mensajes.length) {
+      // La conversación se reinició: parte de cero.
+      setVisibles(0);
+      return undefined;
     }
-  };
+    if (visibles === conv.mensajes.length) {
+      setEscribiendo(false);
+      return undefined;
+    }
+    const siguiente = conv.mensajes[visibles];
+    if (siguiente.autor === 'usuario') {
+      setVisibles((v) => v + 1);
+      return undefined;
+    }
+    setEscribiendo(true);
+    const timer = setTimeout(() => {
+      setEscribiendo(false);
+      setVisibles((v) => v + 1);
+    }, TYPING_MS);
+    return () => clearTimeout(timer);
+  }, [visibles, conv.mensajes.length]);
+
+  // Al terminar la conversación se crea el (único) MoodEntry, con el texto
+  // libre acumulado como nota. Si el usuario abandona antes, no se registra.
+  useEffect(() => {
+    if (conv.fase !== 'creandoEntrada') return undefined;
+    let cancelado = false;
+    apiCreateMoodEntry(conv.mood, conv.notas.join('\n') || null)
+      .then((data) => {
+        if (cancelado) return;
+        if (data.moodEntry && data.actividadSugerida) {
+          dispatch({
+            tipo: 'ENTRADA_CREADA',
+            moodEntryId: data.moodEntry.id,
+            actividad: data.actividadSugerida,
+          });
+        } else {
+          dispatch({ tipo: 'ENTRADA_FALLO' });
+        }
+      })
+      .catch(() => {
+        if (!cancelado) dispatch({ tipo: 'ENTRADA_FALLO' });
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [conv.fase]);
 
   const handleOtraIdea = async () => {
-    if (!selectedMood) return;
+    if (!conv.moodEntryId) return;
     setLoadingOtra(true);
     try {
-      const data = await apiCreateMoodEntry(selectedMood);
-      if (data.actividadSugerida) setActividad(data.actividadSugerida);
+      const data = await apiNextSuggestion(conv.moodEntryId);
+      if (data.activity) dispatch({ tipo: 'NUEVA_ACTIVIDAD', actividad: data.activity });
     } catch {
-      // falla silenciosamente
+      // falla silenciosamente: se conserva la actividad actual
     } finally {
       setLoadingOtra(false);
     }
   };
 
-  const cat = actividad
-    ? {
-        color: theme.colors.categories[actividad.categoria] ?? theme.colors.textMuted,
-        icon: CATEGORY_ICONS[actividad.categoria] ?? DEFAULT_CATEGORY_ICON,
-      }
-    : null;
+  // El turno es del usuario solo cuando el bot terminó de "hablar".
+  const turnoUsuario = visibles === conv.mensajes.length && !escribiendo;
+
+  const qr = quickRepliesDe(conv);
+  let chips = null;
+  if (turnoUsuario && qr) {
+    if (qr.tipo === 'moods') {
+      chips = MOODS.map((m) => ({
+        id: m.value,
+        label: m.label,
+        emoji: m.emoji,
+        tint: theme.colors.moods[m.value],
+      }));
+    } else if (qr.tipo === 'guion') {
+      chips = qr.replies.map((r) => ({ id: r.id, label: r.label }));
+    } else if (qr.tipo === 'reintentar') {
+      chips = [{ id: 'reintentar', label: ETIQUETAS.reintentar }];
+    } else if (qr.tipo === 'reiniciar') {
+      chips = [{ id: 'reiniciar', label: ETIQUETAS.reiniciar }];
+    }
+  }
+
+  const onChip = (id) => {
+    if (qr.tipo === 'moods') dispatch({ tipo: 'ELEGIR_MOOD', mood: id });
+    else if (qr.tipo === 'guion') dispatch({ tipo: 'QUICK_REPLY', replyId: id });
+    else if (qr.tipo === 'reintentar') dispatch({ tipo: 'REINTENTAR_ENTRADA' });
+    else if (qr.tipo === 'reiniciar') dispatch({ tipo: 'REINICIAR' });
+  };
+
+  const paso = pasoActual(conv);
+  const mostrarInput = turnoUsuario && !!paso?.textoLibre;
   const cheerActual = cheers[cheerIdx];
 
   return (
-    <View style={{ flex: 1 }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <Modal visible={showCheerModal} transparent animationType="none">
         <Entrance distance={0} style={styles.cheerOverlay}>
           <Entrance distance={20} style={styles.cheerBox}>
@@ -109,154 +183,56 @@ export default function HomeScreen() {
         </Entrance>
       </Modal>
 
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.pregunta}>Como te sientes hoy?</Text>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.chat}
+        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+        keyboardShouldPersistTaps="handled"
+      >
+        {conv.mensajes.slice(0, visibles).map((mensaje) => {
+          if (mensaje.tipo === 'actividad') {
+            if (!conv.actividad) return null;
+            return (
+              <ActivitySuggestionCard
+                key={mensaje.id}
+                actividad={conv.actividad}
+                onOtraIdea={handleOtraIdea}
+                onAceptar={() => dispatch({ tipo: 'ACEPTAR_ACTIVIDAD' })}
+                loadingOtra={loadingOtra}
+              />
+            );
+          }
+          return (
+            <ChatBubble
+              key={mensaje.id}
+              autor={mensaje.autor}
+              tipo={mensaje.tipo}
+              texto={mensaje.texto}
+              mood={conv.mood}
+            />
+          );
+        })}
 
-        <View style={styles.grid}>
-          {MOODS.map((mood) => (
-            <Tappable
-              key={mood.value}
-              wrapperStyle={styles.moodBtnWrapper}
-              style={[styles.moodBtn, selectedMood === mood.value && styles.moodBtnActive]}
-              onPress={() => seleccionarMood(mood.value)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.emoji}>{mood.emoji}</Text>
-              <Text style={[styles.moodLabel, selectedMood === mood.value && styles.moodLabelActive]}>
-                {mood.label}
-              </Text>
-            </Tappable>
-          ))}
-        </View>
-
-        {!!error && <Text style={styles.error}>{error}</Text>}
-
-        {!actividad ? (
-          <Tappable
-            style={[styles.btn, (!selectedMood || loading) && styles.btnDisabled]}
-            onPress={handleRegistrar}
-            disabled={loading || !selectedMood}
-          >
-            {loading
-              ? <ActivityIndicator color={theme.colors.onPrimary} />
-              : <Text style={styles.btnText}>Ver actividad sugerida</Text>}
-          </Tappable>
-        ) : (
-          <Entrance
-            key={actividad.id}
-            style={[styles.card, { borderLeftColor: cat.color }]}
-          >
-            <Text style={[styles.cardTag, { color: cat.color }]}>
-              {cat.icon}{'  '}{actividad.categoria.toUpperCase()}
-            </Text>
-            <Text style={styles.cardNombre}>{actividad.nombre}</Text>
-            <Text style={styles.cardDesc}>{actividad.descripcion}</Text>
-
-            <Tappable
-              style={[styles.btnOtra, { borderColor: cat.color }, loadingOtra && styles.btnDisabled]}
-              onPress={handleOtraIdea}
-              disabled={loadingOtra}
-              haptic={false}
-            >
-              <Text style={[styles.btnOtraText, { color: loadingOtra ? theme.colors.textFaint : cat.color }]}>
-                {loadingOtra ? 'Buscando...' : 'Quiero otra idea'}
-              </Text>
-            </Tappable>
-          </Entrance>
-        )}
+        {escribiendo && <TypingIndicator />}
+        {chips && <QuickReplies items={chips} onSelect={onChip} />}
       </ScrollView>
-    </View>
+
+      {mostrarInput && (
+        <ChatInput
+          onSend={(texto) => dispatch({ tipo: 'TEXTO_LIBRE', texto })}
+          placeholder={ETIQUETAS.placeholderTextoLibre}
+        />
+      )}
+    </KeyboardAvoidingView>
   );
 }
 
 const useStyles = makeThemedStyles((t) => ({
-  container: { padding: 20, paddingBottom: 40 },
-  pregunta: {
-    ...t.typography.type.title,
-    color: t.colors.text,
-    textAlign: 'center',
-    marginBottom: 20,
-    marginTop: 4,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
-  moodBtnWrapper: { width: '44%' },
-  moodBtn: {
-    backgroundColor: t.colors.surface,
-    borderRadius: t.shape.radiusLg,
-    paddingVertical: 18,
-    alignItems: 'center',
-    borderWidth: t.shape.borderThick,
-    borderColor: t.colors.border,
-    ...t.shadows.card,
-  },
-  moodBtnActive: {
-    borderColor: t.colors.primary,
-    backgroundColor: t.colors.primarySoft,
-  },
-  emoji: { fontSize: 38, marginBottom: 6 },
-  moodLabel: {
-    fontSize: t.fontSize(14),
-    ...t.typography.fonts.semibold,
-    color: t.colors.textMuted,
-  },
-  moodLabelActive: { color: t.colors.primary },
-  error: {
-    color: t.colors.danger,
-    textAlign: 'center',
-    marginBottom: 12,
-    fontSize: t.fontSize(14),
-  },
-  btn: {
-    backgroundColor: t.colors.primary,
-    borderRadius: t.shape.radiusMd,
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
-  btnDisabled: { backgroundColor: t.colors.primaryDisabled },
-  btnText: {
-    color: t.colors.onPrimary,
-    fontSize: t.fontSize(16),
-    ...t.typography.fonts.bold,
-  },
-  card: {
-    backgroundColor: t.colors.surfaceElevated,
-    borderRadius: t.shape.radiusLg,
-    padding: 22,
-    borderLeftWidth: 5,
-    ...t.shadows.cardStrong,
-  },
-  cardTag: {
-    fontSize: t.fontSize(11),
-    ...t.typography.fonts.bold,
-    letterSpacing: 1.2,
-    marginBottom: 8,
-  },
-  cardNombre: {
-    ...t.typography.type.title,
-    color: t.colors.text,
-    marginBottom: 10,
-  },
-  cardDesc: {
-    ...t.typography.type.body,
-    color: t.colors.textMuted,
-    marginBottom: 18,
-  },
-  btnOtra: {
-    borderWidth: t.shape.borderMedium,
-    borderRadius: t.shape.radiusMd,
-    paddingVertical: 11,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  btnOtraText: {
-    ...t.typography.fonts.semibold,
-    fontSize: t.fontSize(15),
+  chat: {
+    padding: 16,
+    paddingTop: 18,
+    paddingBottom: 28,
+    flexGrow: 1,
   },
   cheerOverlay: {
     flex: 1,

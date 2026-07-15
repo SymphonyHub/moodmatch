@@ -108,6 +108,22 @@ router.get('/', requireAuth, async (req, res) => {
   res.json({ amigos });
 });
 
+// GET /api/friendships/count — conteo ligero para el hook global del frontend
+// (FriendsCountContext). Misma semántica de vínculo simétrico que GET /:
+// pueden existir filas espejo A→B y B→A, así que se deduplica por el otro id.
+router.get('/count', requireAuth, async (req, res) => {
+  const me = req.user.userId;
+
+  const rows = await prisma.friendship.findMany({
+    where: { OR: [{ userId: me }, { friendId: me }] },
+    select: { userId: true, friendId: true },
+  });
+
+  const otros = new Set(rows.map((f) => (f.userId === me ? f.friendId : f.userId)));
+
+  res.json({ count: otros.size });
+});
+
 // POST /api/friendships/:friendId/cheer
 // Deprecated: la UI nueva envía por /api/messages; se mantiene para builds viejos.
 router.post('/:friendId/cheer', requireAuth, async (req, res) => {

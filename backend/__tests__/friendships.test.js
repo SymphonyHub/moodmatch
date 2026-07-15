@@ -162,6 +162,67 @@ describe('GET /api/friendships — vínculo simétrico', () => {
   });
 });
 
+describe('GET /api/friendships/count — conteo ligero', () => {
+  test('rechaza sin token con 401', async () => {
+    const res = await request(app).get('/api/friendships/count');
+
+    expect(res.status).toBe(401);
+    expect(prisma.friendship.findMany).not.toHaveBeenCalled();
+  });
+
+  test('sin amistades devuelve { count: 0 }', async () => {
+    prisma.friendship.findMany.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/api/friendships/count')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ count: 0 });
+  });
+
+  test('deduplica filas espejo (A→B y B→A cuentan como 1)', async () => {
+    prisma.friendship.findMany.mockResolvedValue([
+      { userId: MY_USER_ID, friendId: 2 },
+      { userId: 2, friendId: MY_USER_ID },
+    ]);
+
+    const res = await request(app)
+      .get('/api/friendships/count')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.body).toEqual({ count: 1 });
+  });
+
+  test('suma "yo agregué" y "me agregaron" sin duplicar', async () => {
+    prisma.friendship.findMany.mockResolvedValue([
+      { userId: MY_USER_ID, friendId: 2 },
+      { userId: 3, friendId: MY_USER_ID },
+      { userId: MY_USER_ID, friendId: 4 },
+      { userId: 4, friendId: MY_USER_ID }, // espejo de 4
+    ]);
+
+    const res = await request(app)
+      .get('/api/friendships/count')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.body).toEqual({ count: 3 });
+  });
+
+  test('usa la consulta ligera (solo userId/friendId, sin includes)', async () => {
+    prisma.friendship.findMany.mockResolvedValue([]);
+
+    await request(app)
+      .get('/api/friendships/count')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(prisma.friendship.findMany).toHaveBeenCalledWith({
+      where: { OR: [{ userId: MY_USER_ID }, { friendId: MY_USER_ID }] },
+      select: { userId: true, friendId: true },
+    });
+  });
+});
+
 describe('POST /api/friendships/:friendId/cheer — amistad simétrica', () => {
   test('permite enviar cheer cuando el otro me agregó a mí', async () => {
     prisma.friendship.findFirst.mockResolvedValue({

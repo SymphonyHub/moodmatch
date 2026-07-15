@@ -58,6 +58,16 @@ export const apiCreateMoodEntry = async (moodType, nota = null) => {
   }).then((r) => r.json());
 };
 
+// "Quiero otra idea": nueva sugerencia sobre el MISMO MoodEntry (responde
+// { activity }), en vez de crear un registro nuevo por cada reintento.
+export const apiNextSuggestion = async (moodEntryId) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/mood-entries/${moodEntryId}/suggestion`, {
+    method: 'POST',
+    headers,
+  }).then((r) => r.json());
+};
+
 
 export const apiGetFriendships = async () => {
   const headers = await authHeaders();

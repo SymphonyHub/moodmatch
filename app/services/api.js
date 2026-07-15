@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../config';
 
-const getToken = () => AsyncStorage.getItem('token');
+// Exportado para que los stores de datos (p.ej. friendsCountStore) gateen
+// por sesión sin duplicar la clave de AsyncStorage.
+export const getToken = () => AsyncStorage.getItem('token');
 
 const authHeaders = async () => {
   const token = await getToken();
@@ -119,4 +121,9 @@ export const apiGetUnreadCount = async () => {
 export const apiGetSocialActivities = async () => {
   const headers = await authHeaders();
   return fetch(`${API_URL}/api/activities?categoria=social`, { headers }).then((r) => r.json());
+};
+
+export const apiGetFriendsCount = async () => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/friendships/count`, { headers }).then((r) => r.json());
 };

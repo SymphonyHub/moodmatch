@@ -1,8 +1,8 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, Modal, KeyboardAvoidingView, Platform,
+  View, Text, ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { apiCreateMoodEntry, apiNextSuggestion, apiGetCheers } from '../../services/api';
+import { apiCreateMoodEntry, apiNextSuggestion } from '../../services/api';
 import { MOODS } from '../../constants/moods';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import {
@@ -12,8 +12,6 @@ import {
   quickRepliesDe,
 } from '../../features/emociones/conversacion';
 import { ETIQUETAS } from '../../features/emociones/guiones';
-import Tappable from '../../components/Tappable';
-import Entrance from '../../components/Entrance';
 import ChatBubble from '../../components/chat/ChatBubble';
 import QuickReplies from '../../components/chat/QuickReplies';
 import TypingIndicator from '../../components/chat/TypingIndicator';
@@ -34,30 +32,6 @@ export default function HomeScreen() {
   const [escribiendo, setEscribiendo] = useState(false);
   const [loadingOtra, setLoadingOtra] = useState(false);
   const scrollRef = useRef(null);
-
-  const [cheers, setCheers] = useState([]);
-  const [cheerIdx, setCheerIdx] = useState(0);
-  const [showCheerModal, setShowCheerModal] = useState(false);
-
-  useEffect(() => {
-    apiGetCheers()
-      .then((data) => {
-        if (data.cheers && data.cheers.length > 0) {
-          setCheers(data.cheers);
-          setCheerIdx(0);
-          setShowCheerModal(true);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  const cerrarCheerModal = () => {
-    if (cheerIdx < cheers.length - 1) {
-      setCheerIdx((i) => i + 1);
-    } else {
-      setShowCheerModal(false);
-    }
-  };
 
   // Revela los mensajes de a uno: los del usuario al instante, los del bot
   // tras una pausa breve de "escribiendo".
@@ -154,35 +128,12 @@ export default function HomeScreen() {
 
   const paso = pasoActual(conv);
   const mostrarInput = turnoUsuario && !!paso?.textoLibre;
-  const cheerActual = cheers[cheerIdx];
 
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Modal visible={showCheerModal} transparent animationType="none">
-        <Entrance distance={0} style={styles.cheerOverlay}>
-          <Entrance distance={20} style={styles.cheerBox}>
-            <Text style={styles.cheerTitle}>Tienes un mensaje</Text>
-            {cheerActual && (
-              <View>
-                <Text style={styles.cheerFrom}>{cheerActual.fromNombre} te envio:</Text>
-                <Text style={styles.cheerMsg}>{cheerActual.message}</Text>
-              </View>
-            )}
-            {cheers.length > 1 && (
-              <Text style={styles.cheerCount}>{cheerIdx + 1} / {cheers.length}</Text>
-            )}
-            <Tappable style={styles.cheerBtn} onPress={cerrarCheerModal}>
-              <Text style={styles.cheerBtnText}>
-                {cheerIdx < cheers.length - 1 ? 'Siguiente' : 'Gracias'}
-              </Text>
-            </Tappable>
-          </Entrance>
-        </Entrance>
-      </Modal>
-
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={styles.chat}
@@ -233,54 +184,5 @@ const useStyles = makeThemedStyles((t) => ({
     paddingTop: 18,
     paddingBottom: 28,
     flexGrow: 1,
-  },
-  cheerOverlay: {
-    flex: 1,
-    backgroundColor: t.colors.overlay,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 28,
-  },
-  cheerBox: {
-    backgroundColor: t.colors.surfaceElevated,
-    borderRadius: t.shape.radiusXl,
-    padding: 28,
-    width: '100%',
-    alignItems: 'center',
-    ...t.shadows.modal,
-  },
-  cheerTitle: {
-    ...t.typography.type.title,
-    color: t.colors.text,
-    marginBottom: 16,
-  },
-  cheerFrom: {
-    fontSize: t.fontSize(13),
-    color: t.colors.textMuted,
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  cheerMsg: {
-    fontSize: t.fontSize(22),
-    textAlign: 'center',
-    color: t.colors.text,
-    marginBottom: 20,
-    lineHeight: Math.round(t.fontSize(22) * 1.45),
-  },
-  cheerCount: {
-    ...t.typography.type.caption,
-    color: t.colors.textFaint,
-    marginBottom: 12,
-  },
-  cheerBtn: {
-    backgroundColor: t.colors.primary,
-    borderRadius: t.shape.radiusMd,
-    paddingVertical: 13,
-    paddingHorizontal: 32,
-  },
-  cheerBtnText: {
-    color: t.colors.onPrimary,
-    ...t.typography.fonts.bold,
-    fontSize: t.fontSize(15),
   },
 }));

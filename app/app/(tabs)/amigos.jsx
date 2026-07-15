@@ -1,24 +1,18 @@
 import { useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, ActivityIndicator, Modal,
+  View, Text, ScrollView, ActivityIndicator, Share,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
-import { apiGetFriendships, apiSendCheer, apiGetSocialActivities } from '../../services/api';
+import { router, useFocusEffect } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { apiGetFriendships, apiGetMe, apiGetSocialActivities } from '../../services/api';
 import { MOOD_INFO } from '../../constants/moods';
+import { buildInviteMessage } from '../../utils/invite';
+import { API_URL } from '../../config';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../../components/Tappable';
 import Entrance from '../../components/Entrance';
 
-const CHEERS = [
-  '💚 Pensando en ti',
-  '✨ Espero que tengas un buen día',
-  '🤗 Aquí estoy si me necesitas',
-  '🌟 Eres más fuerte de lo que crees',
-  '☕ ¿Una pausa te vendría bien?',
-  '🙌 ¡Vas muy bien, sigue así!',
-];
-
-function FriendCard({ amigo, onAnimo, index }) {
+function FriendCard({ amigo, index }) {
   const { theme } = useTheme();
   const styles = useStyles();
   const mood = amigo.moodReciente ? MOOD_INFO[amigo.moodReciente] : null;
@@ -26,21 +20,33 @@ function FriendCard({ amigo, onAnimo, index }) {
     ? theme.colors.moods[amigo.moodReciente]?.color ?? theme.colors.textMuted
     : null;
 
+  const abrirChat = () => {
+    const params = { friendId: String(amigo.id), nombre: amigo.nombre };
+    if (amigo.moodReciente) params.mood = amigo.moodReciente;
+    router.push({ pathname: '/chat/[friendId]', params });
+  };
+
   return (
-    <Entrance index={index} style={styles.card}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarTxt}>{amigo.nombre.charAt(0).toUpperCase()}</Text>
-      </View>
-      <View style={styles.info}>
-        <Text style={styles.nombre}>{amigo.nombre}</Text>
-        {mood ? (
-          <Text style={[styles.mood, { color: moodColor }]}>{mood.emoji}{'  '}{mood.label}</Text>
+    <Entrance index={index}>
+      <Tappable style={styles.card} onPress={abrirChat} haptic={false}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarTxt}>{amigo.nombre.charAt(0).toUpperCase()}</Text>
+        </View>
+        <View style={styles.info}>
+          <Text style={styles.nombre}>{amigo.nombre}</Text>
+          {mood ? (
+            <Text style={[styles.mood, { color: moodColor }]}>{mood.emoji}{'  '}{mood.label}</Text>
+          ) : (
+            <Text style={styles.moodNulo}>Sin registrar aún</Text>
+          )}
+        </View>
+        {amigo.unread > 0 ? (
+          <View style={styles.badge}>
+            <Text style={styles.badgeTxt}>{amigo.unread > 99 ? '99+' : amigo.unread}</Text>
+          </View>
         ) : (
-          <Text style={styles.moodNulo}>Sin registrar aún</Text>
+          <Ionicons name="chatbubble-ellipses-outline" size={20} color={theme.colors.textFaint} />
         )}
-      </View>
-      <Tappable style={styles.btnAnimo} onPress={() => onAnimo(amigo)}>
-        <Text style={styles.btnAnimoText}>💚 Ánimo</Text>
       </Tappable>
     </Entrance>
   );
@@ -53,20 +59,19 @@ export default function AmigosScreen() {
   const [amigos, setAmigos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actividades, setActividades] = useState([]);
-
-  const [cheerTarget, setCheerTarget] = useState(null);
-  const [enviando, setEnviando] = useState(false);
-  const [cheerOk, setCheerOk] = useState('');
+  const [me, setMe] = useState(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      const [dataAmigos, dataActs] = await Promise.all([
+      const [dataAmigos, dataActs, dataMe] = await Promise.all([
         apiGetFriendships(),
         apiGetSocialActivities(),
+        apiGetMe(),
       ]);
       if (dataAmigos.amigos) setAmigos(dataAmigos.amigos);
       if (dataActs.activities) setActividades(dataActs.activities.slice(0, 3));
+      if (dataMe.user) setMe(dataMe.user);
     } finally {
       setLoading(false);
     }
@@ -81,111 +86,68 @@ export default function AmigosScreen() {
     }, [cargar]),
   );
 
-  const enviarCheer = async (message) => {
-    if (!cheerTarget) return;
-    setEnviando(true);
+  const invitar = async () => {
+    if (!me) return;
     try {
-      const data = await apiSendCheer(cheerTarget.id, message);
-      if (!data.error) {
-        setCheerOk(`¡Mensaje enviado a ${cheerTarget.nombre}! 💚`);
-      }
+      await Share.share({
+        message: buildInviteMessage(me.nombre, API_URL, me.qrCode),
+      });
     } catch {
-      // falla silenciosamente
-    } finally {
-      setEnviando(false);
-      setCheerTarget(null);
+      // el usuario cerró el share sheet: no es un error
     }
   };
 
   return (
-    <>
-      <Modal
-        visible={!!cheerTarget}
-        transparent
-        animationType="none"
-        onRequestClose={() => setCheerTarget(null)}
-      >
-        <Entrance distance={0} style={styles.modalOverlay}>
-          <Entrance distance={50} style={styles.modalBox}>
-            <Text style={styles.modalTitle}>
-              Envía un ánimo a {cheerTarget?.nombre}
-            </Text>
-            {CHEERS.map((msg) => (
-              <Tappable
-                key={msg}
-                style={[styles.cheerOption, enviando && styles.cheerOptionDisabled]}
-                onPress={() => enviarCheer(msg)}
-                disabled={enviando}
-              >
-                <Text style={styles.cheerOptionText}>{msg}</Text>
-              </Tappable>
-            ))}
-            <Tappable style={styles.modalCancelar} onPress={() => setCheerTarget(null)} haptic={false}>
-              <Text style={styles.modalCancelarText}>Cancelar</Text>
-            </Tappable>
-          </Entrance>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.titulo}>Mis amigos</Text>
+      <Text style={styles.subtitulo}>
+        Toca a un amigo para abrir el chat
+      </Text>
+
+      {loading ? (
+        <ActivityIndicator size="large" color={theme.colors.primary} style={styles.spinner} />
+      ) : amigos.length === 0 ? (
+        <Entrance style={styles.vacioCont}>
+          <Text style={styles.vacioEmoji}>👥</Text>
+          <Text style={styles.vacioTxt}>Aún no tienes amigos agregados</Text>
+          <Text style={styles.vacioHint}>
+            Comparte tu link de invitación o escanea el QR de alguien desde la pestaña "Mi QR".
+          </Text>
+          <Tappable style={styles.btnInvitar} onPress={invitar} disabled={!me}>
+            <Ionicons name="share-social-outline" size={18} color={theme.colors.onPrimary} />
+            <Text style={styles.btnInvitarTxt}>Invitar a un amigo</Text>
+          </Tappable>
         </Entrance>
-      </Modal>
+      ) : (
+        <>
+          {amigos.map((amigo, i) => (
+            <FriendCard key={amigo.id} amigo={amigo} index={i} />
+          ))}
 
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.titulo}>Mis amigos</Text>
-        <Text style={styles.subtitulo}>
-          El estado de ánimo más reciente de cada amigo
-        </Text>
+          <Tappable
+            wrapperStyle={{ marginTop: 10, marginBottom: 24 }}
+            style={styles.btnInvitar}
+            onPress={invitar}
+            disabled={!me}
+          >
+            <Ionicons name="share-social-outline" size={18} color={theme.colors.onPrimary} />
+            <Text style={styles.btnInvitarTxt}>Invitar a un amigo</Text>
+          </Tappable>
 
-        {!!cheerOk && (
-          <Entrance distance={8}>
-            <View style={styles.bannerOk}>
-              <Text style={styles.bannerOkText}>{cheerOk}</Text>
+          {actividades.length > 0 && (
+            <View style={styles.socialSection}>
+              <Text style={styles.socialTitulo}>Para hacer con amigos</Text>
+              {actividades.map((act, i) => (
+                <Entrance key={act.id} index={i} style={styles.actCard}>
+                  <Text style={styles.actNombre}>{act.nombre}</Text>
+                  <Text style={styles.actDesc}>{act.descripcion}</Text>
+                </Entrance>
+              ))}
             </View>
-          </Entrance>
-        )}
-
-        {loading ? (
-          <ActivityIndicator size="large" color={theme.colors.primary} style={styles.spinner} />
-        ) : amigos.length === 0 ? (
-          <Entrance style={styles.vacioCont}>
-            <Text style={styles.vacioEmoji}>👥</Text>
-            <Text style={styles.vacioTxt}>Aún no tienes amigos agregados</Text>
-            <Text style={styles.vacioHint}>
-              Ve a la pestaña "Mi QR" y escanea el código de alguien para empezar.
-            </Text>
-          </Entrance>
-        ) : (
-          <>
-            {amigos.map((amigo, i) => (
-              <FriendCard
-                key={amigo.id}
-                amigo={amigo}
-                index={i}
-                onAnimo={(a) => { setCheerOk(''); setCheerTarget(a); }}
-              />
-            ))}
-
-            <Tappable
-              wrapperStyle={{ alignSelf: 'center', marginTop: 8, marginBottom: 24 }}
-              style={styles.btnRecargar}
-              onPress={cargar}
-              haptic={false}
-            >
-              <Text style={styles.btnRecargarTxt}>Actualizar</Text>
-            </Tappable>
-
-            {actividades.length > 0 && (
-              <View style={styles.socialSection}>
-                <Text style={styles.socialTitulo}>Para hacer con amigos</Text>
-                {actividades.map((act, i) => (
-                  <Entrance key={act.id} index={i} style={styles.actCard}>
-                    <Text style={styles.actNombre}>{act.nombre}</Text>
-                    <Text style={styles.actDesc}>{act.descripcion}</Text>
-                  </Entrance>
-                ))}
-              </View>
-            )}
-          </>
-        )}
-      </ScrollView>
-    </>
+          )}
+        </>
+      )}
+    </ScrollView>
   );
 }
 
@@ -203,18 +165,6 @@ const useStyles = makeThemedStyles((t) => ({
     marginBottom: 22,
   },
   spinner: { marginTop: 40 },
-  bannerOk: {
-    backgroundColor: t.colors.primarySoft,
-    borderRadius: t.shape.radiusMd,
-    padding: 12,
-    marginBottom: 16,
-  },
-  bannerOkText: {
-    color: t.colors.primary,
-    ...t.typography.fonts.semibold,
-    textAlign: 'center',
-    fontSize: t.fontSize(14),
-  },
   vacioCont: { alignItems: 'center', marginTop: 48, paddingHorizontal: 24 },
   vacioEmoji: { fontSize: 52, marginBottom: 16 },
   vacioTxt: {
@@ -229,6 +179,7 @@ const useStyles = makeThemedStyles((t) => ({
     color: t.colors.textFaint,
     textAlign: 'center',
     lineHeight: Math.round(t.fontSize(13) * 1.55),
+    marginBottom: 20,
   },
   card: {
     flexDirection: 'row',
@@ -262,29 +213,33 @@ const useStyles = makeThemedStyles((t) => ({
   },
   mood: { fontSize: t.fontSize(14), ...t.typography.fonts.medium },
   moodNulo: { fontSize: t.fontSize(14), color: t.colors.textFaint },
-  btnAnimo: {
-    backgroundColor: t.colors.primarySoft,
+  badge: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: t.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+  },
+  badgeTxt: {
+    fontSize: t.fontSize(12),
+    ...t.typography.fonts.bold,
+    color: t.colors.onPrimary,
+  },
+  btnInvitar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: t.colors.primary,
     borderRadius: t.shape.radiusMd,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: t.shape.borderThin,
-    borderColor: t.colors.primarySoftBorder,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
   },
-  btnAnimoText: {
-    fontSize: t.fontSize(13),
-    ...t.typography.fonts.semibold,
-    color: t.colors.primary,
-  },
-  btnRecargar: {
-    paddingVertical: 10,
-    paddingHorizontal: 28,
-    borderRadius: t.shape.radiusMd,
-    borderWidth: t.shape.borderMedium,
-    borderColor: t.colors.border,
-  },
-  btnRecargarTxt: {
-    color: t.colors.textMuted,
-    fontSize: t.fontSize(14),
+  btnInvitarTxt: {
+    color: t.colors.onPrimary,
+    fontSize: t.fontSize(15),
     ...t.typography.fonts.semibold,
   },
   socialSection: { marginTop: 4 },
@@ -313,33 +268,4 @@ const useStyles = makeThemedStyles((t) => ({
     color: t.colors.textMuted,
     lineHeight: Math.round(t.fontSize(13) * 1.5),
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: t.colors.overlay,
-    justifyContent: 'flex-end',
-  },
-  modalBox: {
-    backgroundColor: t.colors.surfaceElevated,
-    borderTopLeftRadius: t.shape.radiusXl,
-    borderTopRightRadius: t.shape.radiusXl,
-    padding: 24,
-    paddingBottom: 36,
-  },
-  modalTitle: {
-    ...t.typography.type.section,
-    color: t.colors.text,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  cheerOption: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: t.shape.radiusMd,
-    backgroundColor: t.colors.background,
-    marginBottom: 8,
-  },
-  cheerOptionDisabled: { opacity: 0.5 },
-  cheerOptionText: { fontSize: t.fontSize(15), color: t.colors.text },
-  modalCancelar: { marginTop: 8, alignItems: 'center', paddingVertical: 12 },
-  modalCancelarText: { color: t.colors.textFaint, fontSize: t.fontSize(15) },
 }));

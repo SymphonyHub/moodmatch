@@ -19,6 +19,7 @@ import { Baloo2_500Medium } from '@expo-google-fonts/baloo-2/500Medium';
 import { Baloo2_600SemiBold } from '@expo-google-fonts/baloo-2/600SemiBold';
 import { Baloo2_700Bold } from '@expo-google-fonts/baloo-2/700Bold';
 import { ThemeProvider, ThemeVeil, useTheme } from '../theme/ThemeContext';
+import { FriendsCountProvider } from '../friends/FriendsCountContext';
 
 // El splash queda visible hasta tener el tema guardado y las fuentes cargadas:
 // así el arranque no muestra un flash del tema/tipografía por defecto.
@@ -78,7 +79,9 @@ function ThemedStack() {
 export default function RootLayout() {
   return (
     <ThemeProvider>
-      <ThemedStack />
+      <FriendsCountProvider>
+        <ThemedStack />
+      </FriendsCountProvider>
     </ThemeProvider>
   );
 }

@@ -1,40 +1,19 @@
 import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../../theme/ThemeContext';
-
-const TAB_ICONS = {
-  home: { outline: 'home-outline', filled: 'home' },
-  amigos: { outline: 'people-outline', filled: 'people' },
-  'mi-qr': { outline: 'qr-code-outline', filled: 'qr-code' },
-  ajustes: { outline: 'settings-outline', filled: 'settings' },
-};
-
-// Variante según tema: los temas "outline" rellenan solo la tab activa;
-// los temas "filled" (Fiesta) usan íconos rellenos siempre.
-const tabIcon = (route, variant) =>
-  function TabIcon({ color, size, focused }) {
-    const icons = TAB_ICONS[route];
-    const name = variant === 'filled' || focused ? icons.filled : icons.outline;
-    return <Ionicons name={name} size={size ?? 22} color={color} />;
-  };
+import TabBar from '../../components/TabBar';
 
 export default function TabsLayout() {
   const { theme } = useTheme();
-  const variant = theme.icons.variant;
 
   return (
     <>
       <StatusBar style={theme.statusBar.onHeader} />
       <Tabs
+        tabBar={(props) => <TabBar {...props} />}
         screenOptions={{
-          tabBarActiveTintColor: theme.colors.tabActive,
-          tabBarInactiveTintColor: theme.colors.tabInactive,
-          tabBarStyle: {
-            backgroundColor: theme.colors.tabBarBackground,
-            borderTopColor: theme.colors.tabBarBorder,
-          },
           headerStyle: { backgroundColor: theme.colors.headerBackground },
+          headerShadowVisible: false,
           headerTintColor: theme.colors.onHeader,
           headerTitleStyle: { ...theme.typography.type.title },
           sceneStyle: { backgroundColor: theme.colors.background },
@@ -46,7 +25,7 @@ export default function TabsLayout() {
           options={{
             title: 'Estado de ánimo',
             tabBarLabel: 'Inicio',
-            tabBarIcon: tabIcon('home', variant),
+            tabBarIconSet: { outline: 'home-outline', filled: 'home' },
           }}
         />
         <Tabs.Screen
@@ -54,7 +33,7 @@ export default function TabsLayout() {
           options={{
             title: 'Amigos',
             tabBarLabel: 'Amigos',
-            tabBarIcon: tabIcon('amigos', variant),
+            tabBarIconSet: { outline: 'people-outline', filled: 'people' },
           }}
         />
         <Tabs.Screen
@@ -62,7 +41,7 @@ export default function TabsLayout() {
           options={{
             title: 'Mi QR',
             tabBarLabel: 'Mi QR',
-            tabBarIcon: tabIcon('mi-qr', variant),
+            tabBarIconSet: { outline: 'qr-code-outline', filled: 'qr-code' },
           }}
         />
         <Tabs.Screen
@@ -70,7 +49,7 @@ export default function TabsLayout() {
           options={{
             title: 'Ajustes',
             tabBarLabel: 'Ajustes',
-            tabBarIcon: tabIcon('ajustes', variant),
+            tabBarIconSet: { outline: 'settings-outline', filled: 'settings' },
           }}
         />
       </Tabs>

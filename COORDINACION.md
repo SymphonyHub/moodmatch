@@ -42,7 +42,26 @@ de su dominio).
 Estado: (por completar)
 
 ### Agente B — Emociones/Chat
-Estado: (por completar)
+Estado: **Fase 6 terminada** en `feature/wellness-hub-individual` (pendiente
+prueba visual y merge). La sugerencia de actividad salió del chat y vive en
+la pestaña "Para mí"; el chat cierra con puente + chips ("Ver mi sugerencia"
+/ "Registrar otra emoción").
+
+**Contrato de entrega al Agente A (Wellness Hub):**
+- Componente: `app/components/wellness/ParaMiTab.jsx` — autosuficiente, sin
+  props obligatorias: hace su propio fetch al enfocar, maneja cargando /
+  vacío / error / contenido y usa el tema. Montarlo tal cual dentro de la
+  pestaña "Para mí" del contenedor del Hub (en una `View flex:1`).
+- Al integrar: (1) borrar `app/app/wellness.jsx` (pantalla PROVISIONAL mía,
+  conflicto esperado y trivial); (2) repuntar `RUTA_WELLNESS` en
+  `app/features/wellness/paraMi.js` a la ruta real del Hub — es el único
+  punto que consume el chip del chat.
+- No incluido a propósito: la pestaña "Con amigos" (dominio del Agente C) y
+  el patrón de bloqueo/desbloqueo por `friendsCount` (dominio A/C/D).
+
+**Backend nuevo disponible para todos:** `GET /api/mood-entries/latest`
+(requireAuth) → `{ moodEntry|null, actividad|null }` (último registro del
+usuario + su sugerencia más reciente aplanada).
 
 ### Agente C — Amigos
 Estado: (por completar)

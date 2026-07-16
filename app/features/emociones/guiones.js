@@ -33,8 +33,7 @@ export const ERROR_ENTRADA = [
 export const ETIQUETAS = {
   reintentar: 'Intentar de nuevo',
   reiniciar: 'Registrar otra emoción',
-  aceptarActividad: 'Me sirve, gracias',
-  otraIdea: 'Quiero otra idea',
+  verSugerencia: 'Ver mi sugerencia',
   placeholderTextoLibre: '…o cuéntame con tus palabras',
 };
 
@@ -96,8 +95,8 @@ export const GUIONES = {
       },
       cierre: {
         bot: [
-          'Gracias por compartir tu buen momento. Te propongo algo pequeño para sacarle todavía más brillo al día.',
-          'Me quedo con esa buena energía. Va una idea para aprovecharla.',
+          'Gracias por compartir tu buen momento. Te dejé una idea esperando en tu espacio Para mí, por si quieres sacarle todavía más brillo al día.',
+          'Me quedo con esa buena energía. En tu espacio Para mí te dejé una propuesta para aprovecharla cuando quieras.',
         ],
         next: SUGERENCIA,
       },
@@ -160,8 +159,8 @@ export const GUIONES = {
       },
       cierre: {
         bot: [
-          'Gracias por compartir esto conmigo. No voy a pretender arreglarlo con una frase, pero sí puedo proponerte algo pequeño y amable para este rato.',
-          'Te agradezco la confianza. No hay soluciones mágicas, pero a veces un gesto pequeño acompaña. Va una idea, por si te hace sentido.',
+          'Gracias por compartir esto conmigo. No voy a pretender arreglarlo con una frase. Te dejé algo pequeño y amable en tu espacio Para mí, por si en algún momento te hace sentido.',
+          'Te agradezco la confianza. Sin apuro: cuando quieras, en tu espacio Para mí hay una idea suave esperándote.',
         ],
         next: SUGERENCIA,
       },
@@ -224,8 +223,8 @@ export const GUIONES = {
       },
       cierre: {
         bot: [
-          'Gracias por contarme. No tienes que resolverlo todo ahora. Te propongo algo pequeño y concreto, solo para este momento.',
-          'Te escucho. Vamos paso a paso: va una idea simple para este rato, sin exigencias.',
+          'Gracias por contarme. No tienes que resolverlo todo ahora. Te dejé algo pequeño y concreto en tu espacio Para mí, solo para este momento.',
+          'Te escucho. Vamos paso a paso: en tu espacio Para mí te espera una idea simple, sin exigencias.',
         ],
         next: SUGERENCIA,
       },
@@ -287,8 +286,8 @@ export const GUIONES = {
       },
       cierre: {
         bot: [
-          'Gracias por compartir esa calma. Va una idea suave para sostenerla un rato más.',
-          'Me quedo con esa serenidad. Te propongo algo acorde al momento.',
+          'Gracias por compartir esa calma. Te dejé una idea suave en tu espacio Para mí, para sostenerla un rato más.',
+          'Me quedo con esa serenidad. En tu espacio Para mí hay una propuesta acorde al momento, para cuando quieras.',
         ],
         next: SUGERENCIA,
       },
@@ -350,8 +349,8 @@ export const GUIONES = {
       },
       cierre: {
         bot: [
-          'Gracias por sacarlo aquí en vez de guardarlo. No te voy a pedir que lo dejes pasar. Va una idea para soltar algo de esa energía, si te sirve.',
-          'Te agradezco la franqueza. El enojo pide salida, no silencio. Te propongo algo para canalizarlo un poco.',
+          'Gracias por sacarlo aquí en vez de guardarlo. No te voy a pedir que lo dejes pasar. Te dejé una idea en tu espacio Para mí para soltar algo de esa energía, si te sirve.',
+          'Te agradezco la franqueza. El enojo pide salida, no silencio. En tu espacio Para mí te espera algo para canalizarlo un poco.',
         ],
         next: SUGERENCIA,
       },
@@ -413,8 +412,8 @@ export const GUIONES = {
       },
       cierre: {
         bot: [
-          'Gracias por el registro. Va una idea simple, por si quieres darle un matiz al día.',
-          'Anotado. Te dejo una propuesta pequeña, sin compromiso.',
+          'Gracias por el registro. Te dejé una idea simple en tu espacio Para mí, por si quieres darle un matiz al día.',
+          'Anotado. En tu espacio Para mí quedó una propuesta pequeña, sin compromiso.',
         ],
         next: SUGERENCIA,
       },

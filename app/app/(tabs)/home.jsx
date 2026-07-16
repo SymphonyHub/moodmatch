@@ -2,7 +2,8 @@ import { useEffect, useReducer, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { apiCreateMoodEntry, apiNextSuggestion } from '../../services/api';
+import { router } from 'expo-router';
+import { apiCreateMoodEntry } from '../../services/api';
 import { MOODS } from '../../constants/moods';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import {
@@ -12,11 +13,11 @@ import {
   quickRepliesDe,
 } from '../../features/emociones/conversacion';
 import { ETIQUETAS } from '../../features/emociones/guiones';
+import { RUTA_WELLNESS } from '../../features/wellness/paraMi';
 import ChatBubble from '../../components/chat/ChatBubble';
 import QuickReplies from '../../components/chat/QuickReplies';
 import TypingIndicator from '../../components/chat/TypingIndicator';
 import ChatInput from '../../components/chat/ChatInput';
-import ActivitySuggestionCard from '../../components/chat/ActivitySuggestionCard';
 
 // Pausa de "escribiendo" antes de cada burbuja del bot: apenas por encima de
 // durations.gentle (380 ms) — presencia sin latencia fingida.
@@ -30,7 +31,6 @@ export default function HomeScreen() {
   // Revelado escalonado: cuántos mensajes del stream ya se muestran.
   const [visibles, setVisibles] = useState(0);
   const [escribiendo, setEscribiendo] = useState(false);
-  const [loadingOtra, setLoadingOtra] = useState(false);
   const scrollRef = useRef(null);
 
   // Revela los mensajes de a uno: los del usuario al instante, los del bot
@@ -84,19 +84,6 @@ export default function HomeScreen() {
     };
   }, [conv.fase]);
 
-  const handleOtraIdea = async () => {
-    if (!conv.moodEntryId) return;
-    setLoadingOtra(true);
-    try {
-      const data = await apiNextSuggestion(conv.moodEntryId);
-      if (data.activity) dispatch({ tipo: 'NUEVA_ACTIVIDAD', actividad: data.activity });
-    } catch {
-      // falla silenciosamente: se conserva la actividad actual
-    } finally {
-      setLoadingOtra(false);
-    }
-  };
-
   // El turno es del usuario solo cuando el bot terminó de "hablar".
   const turnoUsuario = visibles === conv.mensajes.length && !escribiendo;
 
@@ -114,6 +101,11 @@ export default function HomeScreen() {
       chips = qr.replies.map((r) => ({ id: r.id, label: r.label }));
     } else if (qr.tipo === 'reintentar') {
       chips = [{ id: 'reintentar', label: ETIQUETAS.reintentar }];
+    } else if (qr.tipo === 'puente') {
+      chips = [
+        { id: 'verSugerencia', label: ETIQUETAS.verSugerencia },
+        { id: 'reiniciar', label: ETIQUETAS.reiniciar },
+      ];
     } else if (qr.tipo === 'reiniciar') {
       chips = [{ id: 'reiniciar', label: ETIQUETAS.reiniciar }];
     }
@@ -123,7 +115,11 @@ export default function HomeScreen() {
     if (qr.tipo === 'moods') dispatch({ tipo: 'ELEGIR_MOOD', mood: id });
     else if (qr.tipo === 'guion') dispatch({ tipo: 'QUICK_REPLY', replyId: id });
     else if (qr.tipo === 'reintentar') dispatch({ tipo: 'REINTENTAR_ENTRADA' });
-    else if (qr.tipo === 'reiniciar') dispatch({ tipo: 'REINICIAR' });
+    else if (id === 'verSugerencia') {
+      // Cierra el chat (despedida) y lleva a la pestaña Para mí del Hub.
+      dispatch({ tipo: 'VER_HUB' });
+      router.push(RUTA_WELLNESS);
+    } else if (id === 'reiniciar') dispatch({ tipo: 'REINICIAR' });
   };
 
   const paso = pasoActual(conv);
@@ -140,29 +136,15 @@ export default function HomeScreen() {
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         keyboardShouldPersistTaps="handled"
       >
-        {conv.mensajes.slice(0, visibles).map((mensaje) => {
-          if (mensaje.tipo === 'actividad') {
-            if (!conv.actividad) return null;
-            return (
-              <ActivitySuggestionCard
-                key={mensaje.id}
-                actividad={conv.actividad}
-                onOtraIdea={handleOtraIdea}
-                onAceptar={() => dispatch({ tipo: 'ACEPTAR_ACTIVIDAD' })}
-                loadingOtra={loadingOtra}
-              />
-            );
-          }
-          return (
-            <ChatBubble
-              key={mensaje.id}
-              autor={mensaje.autor}
-              tipo={mensaje.tipo}
-              texto={mensaje.texto}
-              mood={conv.mood}
-            />
-          );
-        })}
+        {conv.mensajes.slice(0, visibles).map((mensaje) => (
+          <ChatBubble
+            key={mensaje.id}
+            autor={mensaje.autor}
+            tipo={mensaje.tipo}
+            texto={mensaje.texto}
+            mood={conv.mood}
+          />
+        ))}
 
         {escribiendo && <TypingIndicator />}
         {chips && <QuickReplies items={chips} onSelect={onChip} />}

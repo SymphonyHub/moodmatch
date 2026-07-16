@@ -9,10 +9,9 @@ import ChatBubble from '../components/chat/ChatBubble';
 import QuickReplies from '../components/chat/QuickReplies';
 import TypingIndicator from '../components/chat/TypingIndicator';
 import ChatInput from '../components/chat/ChatInput';
-import ActivitySuggestionCard from '../components/chat/ActivitySuggestionCard';
 
 test('la pantalla y los componentes del chat exportan componentes', () => {
-  [HomeScreen, ChatBubble, QuickReplies, TypingIndicator, ChatInput, ActivitySuggestionCard]
+  [HomeScreen, ChatBubble, QuickReplies, TypingIndicator, ChatInput]
     .forEach((Componente) => {
       expect(typeof Componente).toBe('function');
     });

@@ -10,15 +10,14 @@ export const MAX_INTERCAMBIOS = 4;
 
 export function crearConversacion(seed = Math.floor(Math.random() * 997)) {
   const base = {
-    fase: 'saludo', // saludo | conversando | creandoEntrada | errorEntrada | sugerencia | cerrado
+    fase: 'saludo', // saludo | conversando | creandoEntrada | errorEntrada | puente | cerrado
     mood: null,
     pasoId: null,
     intercambios: 0,
-    mensajes: [], // { id, autor: 'bot'|'usuario', tipo: 'texto'|'crisis'|'actividad', texto }
+    mensajes: [], // { id, autor: 'bot'|'usuario', tipo: 'texto'|'crisis', texto }
     notas: [], // texto libre acumulado → `nota` del MoodEntry
     crisisMostrada: false,
     moodEntryId: null,
-    actividad: null,
     seed,
     usos: {}, // clave de variante → cuántas veces se usó (rotación)
     nextId: 1,
@@ -100,14 +99,10 @@ export function reducer(estado, accion) {
 
     case 'ENTRADA_CREADA': {
       if (estado.fase !== 'creandoEntrada') return estado;
-      const s = {
-        ...estado,
-        moodEntryId: accion.moodEntryId,
-        actividad: accion.actividad,
-        fase: 'sugerencia',
-      };
-      // La card lee `estado.actividad`; el mensaje marca su lugar en el stream.
-      return agregarMensaje(s, 'bot', 'actividad', null);
+      // La sugerencia ya no se muestra aquí: vive en la pestaña "Para mí"
+      // del Wellness Hub. El cierre del guion hizo de puente y la UI ofrece
+      // los chips "Ver mi sugerencia" / "Registrar otra emoción".
+      return { ...estado, moodEntryId: accion.moodEntryId, fase: 'puente' };
     }
 
     case 'ENTRADA_FALLO': {
@@ -121,14 +116,11 @@ export function reducer(estado, accion) {
       return { ...estado, fase: 'creandoEntrada' };
     }
 
-    case 'NUEVA_ACTIVIDAD': {
-      if (estado.fase !== 'sugerencia') return estado;
-      return { ...estado, actividad: accion.actividad };
-    }
-
-    case 'ACEPTAR_ACTIVIDAD': {
-      if (estado.fase !== 'sugerencia') return estado;
-      let s = agregarMensaje(estado, 'usuario', 'texto', ETIQUETAS.aceptarActividad);
+    case 'VER_HUB': {
+      if (estado.fase !== 'puente') return estado;
+      // El usuario partió al Hub: el chat queda cerrado y despedido, para
+      // que al volver encuentre el chip "Registrar otra emoción".
+      let s = agregarMensaje(estado, 'usuario', 'texto', ETIQUETAS.verSugerencia);
       s = agregarBot(s, 'despedida', DESPEDIDA);
       return { ...s, fase: 'cerrado' };
     }
@@ -156,6 +148,7 @@ export function quickRepliesDe(estado) {
     return null;
   }
   if (estado.fase === 'errorEntrada') return { tipo: 'reintentar' };
+  if (estado.fase === 'puente') return { tipo: 'puente' };
   if (estado.fase === 'cerrado') return { tipo: 'reiniciar' };
   return null;
 }

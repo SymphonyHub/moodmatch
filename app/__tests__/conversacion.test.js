@@ -8,8 +8,6 @@ import {
 import { GUIONES, ETIQUETAS } from '../features/emociones/guiones';
 import { MOOD_KEYS } from '../theme/tokens';
 
-const ACTIVIDAD = { id: 7, nombre: 'Caminar', descripcion: 'Una vuelta corta', categoria: 'físico' };
-
 function elegir(estado, mood) {
   return reducer(estado, { tipo: 'ELEGIR_MOOD', mood });
 }
@@ -112,28 +110,23 @@ describe('tope duro de intercambios', () => {
   });
 });
 
-describe('sugerencia de actividad y cierre', () => {
-  function llegarASugerencia() {
+describe('puente al hub y cierre', () => {
+  function llegarAPuente() {
     let conv = elegir(crearConversacion(0), 'CALMADO');
     conv = reducer(conv, { tipo: 'QUICK_REPLY', replyId: 'reserva' });
     expect(conv.fase).toBe('creandoEntrada');
-    return reducer(conv, { tipo: 'ENTRADA_CREADA', moodEntryId: 42, actividad: ACTIVIDAD });
+    return reducer(conv, { tipo: 'ENTRADA_CREADA', moodEntryId: 42 });
   }
 
-  test('ENTRADA_CREADA guarda id y actividad y agrega el mensaje de actividad', () => {
-    const conv = llegarASugerencia();
-    expect(conv.fase).toBe('sugerencia');
+  test('ENTRADA_CREADA guarda el id y deja el chat en el puente, sin card adentro', () => {
+    const conv = llegarAPuente();
+    expect(conv.fase).toBe('puente');
     expect(conv.moodEntryId).toBe(42);
-    expect(conv.actividad).toEqual(ACTIVIDAD);
-    expect(ultimoMensaje(conv).tipo).toBe('actividad');
-  });
-
-  test('NUEVA_ACTIVIDAD reemplaza la actividad sin duplicar el mensaje', () => {
-    const conv = llegarASugerencia();
-    const otra = { ...ACTIVIDAD, id: 9, nombre: 'Dibujar' };
-    const conOtra = reducer(conv, { tipo: 'NUEVA_ACTIVIDAD', actividad: otra });
-    expect(conOtra.actividad).toEqual(otra);
-    expect(conOtra.mensajes.filter((m) => m.tipo === 'actividad')).toHaveLength(1);
+    // La sugerencia vive en la pestaña Para mí: ningún mensaje de actividad.
+    expect(conv.mensajes.some((m) => m.tipo === 'actividad')).toBe(false);
+    // El último mensaje sigue siendo el cierre del guion (el puente).
+    expect(ultimoMensaje(conv).autor).toBe('bot');
+    expect(quickRepliesDe(conv)).toEqual({ tipo: 'puente' });
   });
 
   test('ENTRADA_FALLO ofrece reintentar y REINTENTAR_ENTRADA vuelve a crear', () => {
@@ -145,17 +138,21 @@ describe('sugerencia de actividad y cierre', () => {
     expect(reducer(fallo, { tipo: 'REINTENTAR_ENTRADA' }).fase).toBe('creandoEntrada');
   });
 
-  test('ACEPTAR_ACTIVIDAD cierra con eco del usuario y despedida', () => {
-    const conv = reducer(llegarASugerencia(), { tipo: 'ACEPTAR_ACTIVIDAD' });
+  test('VER_HUB cierra con eco del usuario y despedida', () => {
+    const conv = reducer(llegarAPuente(), { tipo: 'VER_HUB' });
     expect(conv.fase).toBe('cerrado');
-    expect(conv.mensajes.some((m) => m.autor === 'usuario' && m.texto === ETIQUETAS.aceptarActividad)).toBe(true);
+    expect(conv.mensajes.some((m) => m.autor === 'usuario' && m.texto === ETIQUETAS.verSugerencia)).toBe(true);
     expect(ultimoMensaje(conv).autor).toBe('bot');
     expect(quickRepliesDe(conv)).toEqual({ tipo: 'reiniciar' });
   });
 
-  test('REINICIAR vuelve al estado inicial limpio', () => {
-    let conv = reducer(llegarASugerencia(), { tipo: 'ACEPTAR_ACTIVIDAD' });
-    conv = reducer(conv, { tipo: 'REINICIAR' });
+  test('VER_HUB fuera del puente se ignora', () => {
+    const conv = elegir(crearConversacion(0), 'CALMADO');
+    expect(reducer(conv, { tipo: 'VER_HUB' })).toBe(conv);
+  });
+
+  test('REINICIAR desde el puente vuelve al estado inicial limpio', () => {
+    const conv = reducer(llegarAPuente(), { tipo: 'REINICIAR' });
     expect(conv.fase).toBe('saludo');
     expect(conv.mensajes).toHaveLength(1);
     expect(conv.notas).toEqual([]);

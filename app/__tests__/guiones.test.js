@@ -134,4 +134,12 @@ describe('reglas de tono (mecánicas)', () => {
       });
     });
   });
+
+  test('todo cierre hace de puente: menciona el espacio Para mí', () => {
+    Object.values(GUIONES).forEach((guion) => {
+      guion.pasos.cierre.bot.forEach((texto) => {
+        expect(normalizar(texto)).toContain('para mi');
+      });
+    });
+  });
 });

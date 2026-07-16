@@ -1,54 +1,109 @@
-import { Text, View } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, ScrollView, Text, View } from 'react-native';
+import { apiGetSocialActivities } from '../services/api';
 import { makeThemedStyles, useTheme } from '../theme/ThemeContext';
-import Entrance from '../components/Entrance';
+import { springs, durations, easings } from '../theme/motion';
+
+const MAX_ACTIVIDADES = 3;
 
 const useStyles = makeThemedStyles((t) => ({
-  container: {
+  lista: { paddingBottom: 16 },
+  cargando: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
-    gap: 8,
   },
-  iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: t.colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
+  vacio: {
+    fontSize: t.fontSize(13),
+    color: t.colors.textFaint,
+    textAlign: 'center',
+    paddingVertical: 24,
   },
-  titulo: {
-    ...t.typography.type.section,
+  actCard: {
+    backgroundColor: t.colors.surface,
+    borderRadius: t.shape.radiusLg,
+    padding: 16,
+    marginBottom: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: t.colors.categories.social,
+    ...t.shadows.card,
+  },
+  actNombre: {
+    fontSize: t.fontSize(15),
+    ...t.typography.fonts.bold,
     color: t.colors.text,
-    textAlign: 'center',
+    marginBottom: 4,
   },
-  copy: {
-    ...t.typography.type.body,
+  actDesc: {
+    fontSize: t.fontSize(13),
     color: t.colors.textMuted,
-    textAlign: 'center',
+    lineHeight: Math.round(t.fontSize(13) * 1.5),
   },
 }));
 
-// Pestaña "Con amigos" del Wellness Hub — DOMINIO DEL AGENTE C (Amigos/QR):
-// aquí migra el contenido de "Para hacer con amigos". Este panel es SOLO el
-// contenido desbloqueado: la regla de bloqueo (lockStateFor) y el LockedState
-// viven en la pantalla contenedora (actividades.jsx), no aquí.
+// Pestaña "Con amigos" del Wellness Hub — dominio del Agente C (Amigos/QR).
+// SOLO el contenido desbloqueado: la regla de bloqueo (lockStateFor) y el
+// LockedState viven en la pantalla contenedora (actividades.jsx). Como este
+// panel se monta recién al desbloquear, su entrada con springs.unlock es la
+// física de resortes de la transición de desbloqueo.
 export default function ConAmigosPanel() {
   const { theme } = useTheme();
   const styles = useStyles();
 
+  const [actividades, setActividades] = useState(null);
+  const scale = useRef(new Animated.Value(0.96)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, ...springs.unlock }),
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: durations.gentle,
+        easing: easings.standard,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [scale, opacity]);
+
+  useEffect(() => {
+    let activo = true;
+    apiGetSocialActivities()
+      .then((data) => {
+        if (activo) setActividades(data.activities ? data.activities.slice(0, MAX_ACTIVIDADES) : []);
+      })
+      .catch(() => {
+        if (activo) setActividades([]);
+      });
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  if (actividades === null) {
+    return (
+      <Animated.View style={[styles.cargando, { opacity }]}>
+        <ActivityIndicator size="small" color={theme.colors.textFaint} />
+      </Animated.View>
+    );
+  }
+
   return (
-    <Entrance style={styles.container}>
-      <View style={styles.iconCircle}>
-        <Ionicons name="people-outline" size={32} color={theme.colors.primary} />
-      </View>
-      <Text style={styles.titulo}>Actividades en compañía</Text>
-      <Text style={styles.copy}>
-        Aquí van a aparecer ideas para hacer con tus amigos.
-      </Text>
-    </Entrance>
+    <Animated.View style={{ flex: 1, opacity, transform: [{ scale }] }}>
+      <ScrollView contentContainerStyle={styles.lista}>
+        {actividades.length === 0 ? (
+          <Text style={styles.vacio}>
+            No pudimos cargar las actividades. Intenta de nuevo más tarde.
+          </Text>
+        ) : (
+          actividades.map((act) => (
+            <View key={act.id} style={styles.actCard}>
+              <Text style={styles.actNombre}>{act.nombre}</Text>
+              <Text style={styles.actDesc}>{act.descripcion}</Text>
+            </View>
+          ))
+        )}
+      </ScrollView>
+    </Animated.View>
   );
 }

@@ -6,7 +6,6 @@ import { router, useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { apiGetFriendships } from '../../services/api';
 import { MOOD_INFO } from '../../constants/moods';
-import ConAmigosTab from '../../features/wellness/ConAmigosTab';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../../components/Tappable';
 import Entrance from '../../components/Entrance';
@@ -106,10 +105,6 @@ export default function AmigosScreen() {
         </View>
       )}
 
-      {/* TODO(wellness-hub): montaje provisional — mover este <ConAmigosTab />
-          a la pestaña "Con amigos" del Wellness Hub cuando el Agente A monte
-          la estructura (feature/wellness-hub-layout). */}
-      {!loading && <ConAmigosTab />}
     </ScrollView>
   );
 }

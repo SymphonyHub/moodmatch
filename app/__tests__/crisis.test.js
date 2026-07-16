@@ -31,6 +31,13 @@ describe('detectarCrisis — positivos (con y sin tildes/mayúsculas)', () => {
     'pienso en la autolesión',
     'quiero acabar con todo',
     'quiero terminar con todo',
+    // Patrones agregados en Fase 8 (escudo previo a la IA)
+    'no le veo sentido a la vida',
+    'no le encuentro sentido a vivir',
+    'no le veo sentido a seguir',
+    'mejor estaría muerto',
+    'estarían mejor sin mí',
+    'quiero desaparecer',
   ];
 
   positivos.forEach((frase) => {
@@ -54,6 +61,11 @@ describe('detectarCrisis — negativos (uso normal del día a día)', () => {
     'me carga mi trabajo',
     'estoy chato de todo',
     'me corté el pelo', // "corté" ≠ "cortarme"
+    // Guardas de los patrones de Fase 8
+    'no le veo sentido a esta tarea',
+    'no le encuentro sentido al ejercicio',
+    'desaparecieron mis llaves',
+    'mejor me quedo en la casa',
     '',
   ];
 

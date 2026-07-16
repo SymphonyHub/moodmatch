@@ -8,37 +8,14 @@ import {
 import { normalizar } from '../features/emociones/crisis';
 import { MOOD_KEYS } from '../theme/tokens';
 
-const MOODS_DIFICILES = ['TRISTE', 'ANSIOSO', 'ENOJADO'];
-
-// Frases prohibidas en TODO el guion (minimización y diagnóstico),
-// comparadas sin tildes ni mayúsculas.
-const LISTA_NEGRA_UNIVERSAL = [
-  'no es para tanto',
-  'podria ser peor',
-  'hay gente peor',
-  'no te preocupes',
-  'exagera', // cubre "exageras", "exageración"
-  'depresion',
-  'trastorno',
-  'diagnos',
-  'deberias sentirte',
-];
-
-// Positividad forzada: prohibida en las emociones difíciles.
-const LISTA_NEGRA_POSITIVIDAD = [
-  'animate',
-  'alegrate',
-  'sonrie',
-  'piensa positivo',
-  'piensa en positivo',
-  'mira el lado bueno',
-  'todo pasa por algo',
-  'se feliz',
-  'calmate',
-  'relajate',
-  'no estes triste',
-  'todo va a estar bien',
-];
+// Las listas de tono viven en features/emociones/tono.js (compartidas con el
+// validador del endpoint de IA — ver CONTRATO-GEMINI.md); este test las
+// aplica mecánicamente sobre todos los guiones.
+import {
+  MOODS_DIFICILES,
+  LISTA_NEGRA_UNIVERSAL,
+  LISTA_NEGRA_POSITIVIDAD,
+} from '../features/emociones/tono';
 
 function textosBotDe(guion) {
   return Object.values(guion.pasos).flatMap((paso) => paso.bot);

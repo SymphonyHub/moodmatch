@@ -22,6 +22,12 @@ const PATRONES = [
   /cortarme|me estoy cortando/,
   /autolesi/,
   /acabar con todo|terminar con todo/,
+  /no le (veo|encuentro) sentido a (la vida|vivir|seguir)/,
+  /mejor estaria muert|estarian mejor sin mi/,
+  // El más laxo del set: puede dar falsos positivos ("desaparecer del grupo").
+  // Trade-off aceptado: la burbuja es empática y no bloquea; ese texto se
+  // responde por plantilla en vez de enviarse a la IA (ver useCrisisShield).
+  /quiero desaparecer/,
 ];
 
 export function detectarCrisis(texto) {

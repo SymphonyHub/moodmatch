@@ -60,6 +60,13 @@ export const apiCreateMoodEntry = async (moodType, nota = null) => {
   }).then((r) => r.json());
 };
 
+// Último ánimo registrado + su sugerencia más reciente, para la pestaña
+// "Para mí" del Wellness Hub ({ moodEntry, actividad }, ambos null si no hay).
+export const apiGetLatestMoodEntry = async () => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/mood-entries/latest`, { headers }).then((r) => r.json());
+};
+
 // "Quiero otra idea": nueva sugerencia sobre el MISMO MoodEntry (responde
 // { activity }), en vez de crear un registro nuevo por cada reintento.
 export const apiNextSuggestion = async (moodEntryId) => {

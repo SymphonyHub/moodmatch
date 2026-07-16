@@ -10,14 +10,12 @@ import Entrance from '../Entrance';
 import ActivitySuggestionCard from './ActivitySuggestionCard';
 
 /**
- * CONTRATO PARA EL AGENTE A (feature/wellness-hub-layout):
- * ParaMiTab es autosuficiente: sin props obligatorias. Hace su propio fetch
- * (GET /api/mood-entries/latest) al enfocar la pantalla, maneja cargando /
- * vacío / error / contenido, y usa el tema. Montarlo tal cual dentro del
- * contenedor del Hub, en la pestaña "Para mí" (envuelto en una View flex:1).
- * Al integrarlo: (1) eliminar la pantalla provisional app/app/wellness.jsx,
- * (2) repuntar RUTA_WELLNESS (features/wellness/paraMi.js) a la ruta del Hub.
- * La pestaña "Con amigos" es del Agente C — este componente no la conoce.
+ * Contenido de la pestaña "Para mí" del Wellness Hub, montado por
+ * app/wellness/ParaMiPanel.jsx dentro de la pantalla actividades.jsx del
+ * Agente A. Autosuficiente: sin props obligatorias, hace su propio fetch
+ * (GET /api/mood-entries/latest) al enfocar, maneja cargando / vacío /
+ * error / contenido y usa el tema. La pestaña "Con amigos" es del Agente C
+ * — este componente no la conoce.
  */
 export default function ParaMiTab() {
   const { theme } = useTheme();
@@ -162,7 +160,9 @@ const useStyles = makeThemedStyles((t) => ({
     ...t.typography.fonts.bold,
     fontSize: t.fontSize(15),
   },
-  contenido: { padding: 16, paddingTop: 24, paddingBottom: 40 },
+  // El contenedor del Hub (actividades.jsx) ya aporta padding 16; aquí solo
+  // margen mínimo para que la sombra de la card no se recorte.
+  contenido: { padding: 4, paddingTop: 8, paddingBottom: 32 },
   contexto: {
     flexDirection: 'row',
     alignItems: 'center',

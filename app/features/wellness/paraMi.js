@@ -1,9 +1,9 @@
 // Dominio puro de la pestaña "Para mí" del Wellness Hub. Sin imports de
 // React Native (mismo criterio que features/emociones/).
 
-// Ruta a la que navega el chip "Ver mi sugerencia" del chat. ÚNICO punto a
-// repuntar cuando el contenedor del Hub (Agente A) defina su ruta real.
-export const RUTA_WELLNESS = '/wellness';
+// Ruta a la que navega el chip "Ver mi sugerencia" del chat: la tab
+// Actividades (Wellness Hub del Agente A), que abre en la pestaña Para mí.
+export const RUTA_WELLNESS = '/actividades';
 
 // Una línea por emoción sobre la sugerencia, según el último registro.
 // Mismas reglas de tono del chat (lista negra mecánica en paraMi.test.js):

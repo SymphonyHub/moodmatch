@@ -53,22 +53,20 @@ prueba visual. Interfaz para B y C:
   de no leídos de Amigos no se veía con el tab bar custom).
 
 ### Agente B — Emociones/Chat
-Estado: **Fase 6 terminada** en `feature/wellness-hub-individual` (pendiente
-prueba visual y merge). La sugerencia de actividad salió del chat y vive en
-la pestaña "Para mí"; el chat cierra con puente + chips ("Ver mi sugerencia"
+Estado: **Fase 6 terminada e INTEGRADA con el Hub del Agente A** (rama
+`feature/wellness-hub-individual`, mergeada con main post-hub). La
+sugerencia de actividad salió del chat y vive en la pestaña "Para mí"; el
+chat cierra con puente + chips ("Ver mi sugerencia" navega a `/actividades`
 / "Registrar otra emoción").
 
-**Contrato de entrega al Agente A (Wellness Hub):**
-- Componente: `app/components/wellness/ParaMiTab.jsx` — autosuficiente, sin
-  props obligatorias: hace su propio fetch al enfocar, maneja cargando /
-  vacío / error / contenido y usa el tema. Montarlo tal cual dentro de la
-  pestaña "Para mí" del contenedor del Hub (en una `View flex:1`).
-- Al integrar: (1) borrar `app/app/wellness.jsx` (pantalla PROVISIONAL mía,
-  conflicto esperado y trivial); (2) repuntar `RUTA_WELLNESS` en
-  `app/features/wellness/paraMi.js` a la ruta real del Hub — es el único
-  punto que consume el chip del chat.
-- No incluido a propósito: la pestaña "Con amigos" (dominio del Agente C) y
-  el patrón de bloqueo/desbloqueo por `friendsCount` (dominio A/C/D).
+Integración hecha según el contrato de A: `app/wellness/ParaMiPanel.jsx`
+monta `app/components/wellness/ParaMiTab.jsx` (autosuficiente: fetch propio
+al enfocar, estados cargando/vacío/error/contenido, temado); la pantalla
+provisional `app/app/wellness.jsx` fue eliminada y `RUTA_WELLNESS`
+(`app/features/wellness/paraMi.js`) apunta a `/actividades`.
+
+No incluido a propósito: la pestaña "Con amigos" (dominio del Agente C) y
+el patrón de bloqueo/desbloqueo por `friendsCount` (dominio A/C/D).
 
 **Backend nuevo disponible para todos:** `GET /api/mood-entries/latest`
 (requireAuth) → `{ moodEntry|null, actividad|null }` (último registro del

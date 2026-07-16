@@ -1,5 +1,5 @@
 jest.mock('../lib/prisma', () => ({
-  moodEntry: { create: jest.fn(), findFirst: jest.fn() },
+  moodEntry: { create: jest.fn(), findFirst: jest.fn(), findMany: jest.fn() },
   moodActivity: { findMany: jest.fn() },
   suggestion: { create: jest.fn() },
 }));
@@ -62,6 +62,78 @@ describe('POST /api/mood-entries — validación de moodType', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.moodEntry.moodType).toBe(mood);
+  });
+});
+
+describe('GET /api/mood-entries — historial con ventana de días', () => {
+  const DIA_MS = 24 * 60 * 60 * 1000;
+
+  test('rechaza sin token con 401', async () => {
+    const res = await request(app).get('/api/mood-entries');
+    expect(res.status).toBe(401);
+  });
+
+  test('sin registros responde 200 con lista vacía', async () => {
+    prisma.moodEntry.findMany.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/api/mood-entries')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ entries: [] });
+  });
+
+  test('consulta por defecto: usuario, últimos 30 días, desc, select acotado, tope 200', async () => {
+    prisma.moodEntry.findMany.mockResolvedValue([]);
+
+    await request(app)
+      .get('/api/mood-entries')
+      .set('Authorization', `Bearer ${token}`);
+
+    const args = prisma.moodEntry.findMany.mock.calls[0][0];
+    expect(args.where.userId).toBe(1);
+    expect(args.orderBy).toEqual({ createdAt: 'desc' });
+    expect(args.select).toEqual({ id: true, moodType: true, nota: true, createdAt: true });
+    expect(args.take).toBe(200);
+    const esperado = Date.now() - 30 * DIA_MS;
+    expect(Math.abs(args.where.createdAt.gte.getTime() - esperado)).toBeLessThan(5000);
+  });
+
+  test('?days=7 corta a una semana', async () => {
+    prisma.moodEntry.findMany.mockResolvedValue([]);
+
+    await request(app)
+      .get('/api/mood-entries?days=7')
+      .set('Authorization', `Bearer ${token}`);
+
+    const args = prisma.moodEntry.findMany.mock.calls[0][0];
+    const esperado = Date.now() - 7 * DIA_MS;
+    expect(Math.abs(args.where.createdAt.gte.getTime() - esperado)).toBeLessThan(5000);
+  });
+
+  test.each(['0', '91', 'abc', '7.5'])('rechaza days inválido con 400: %s', async (days) => {
+    const res = await request(app)
+      .get(`/api/mood-entries?days=${days}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/days/);
+  });
+
+  test('devuelve las entries tal cual', async () => {
+    const entries = [
+      { id: 2, moodType: 'FELIZ', nota: null, createdAt: '2026-07-15T10:00:00.000Z' },
+      { id: 1, moodType: 'TRISTE', nota: 'pesado', createdAt: '2026-07-14T09:00:00.000Z' },
+    ];
+    prisma.moodEntry.findMany.mockResolvedValue(entries);
+
+    const res = await request(app)
+      .get('/api/mood-entries')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.entries).toEqual(entries);
   });
 });
 

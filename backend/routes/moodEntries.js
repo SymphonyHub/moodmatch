@@ -23,6 +23,26 @@ async function nextSuggestion(userId, moodType, moodEntryId) {
   return chosen;
 }
 
+// GET /api/mood-entries?days=30 — registros del usuario dentro de la ventana
+// de días pedida (para la vista de historial). Sin suggestions: aquí solo
+// importan los ánimos y sus notas. Lista vacía = 200 (estado normal).
+router.get('/', requireAuth, async (req, res) => {
+  const days = req.query.days === undefined ? 30 : Number(req.query.days);
+  if (!Number.isInteger(days) || days < 1 || days > 90) {
+    return res.status(400).json({ error: 'days debe ser un entero entre 1 y 90' });
+  }
+
+  const corte = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const entries = await prisma.moodEntry.findMany({
+    where: { userId: req.user.userId, createdAt: { gte: corte } },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, moodType: true, nota: true, createdAt: true },
+    take: 200,
+  });
+
+  res.json({ entries });
+});
+
 // GET /api/mood-entries/latest — último registro del usuario + su sugerencia
 // más reciente, aplanada como `actividad`. Sin registros responde 200 con
 // nulls: para la pestaña "Para mí" el vacío es un estado normal, no un error.

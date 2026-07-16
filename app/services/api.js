@@ -60,6 +60,12 @@ export const apiCreateMoodEntry = async (moodType, nota = null) => {
   }).then((r) => r.json());
 };
 
+// Registros de ánimo de los últimos `days` días ({ entries }), para /historial.
+export const apiGetMoodHistory = async (days = 30) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/mood-entries?days=${days}`, { headers }).then((r) => r.json());
+};
+
 // Último ánimo registrado + su sugerencia más reciente, para la pestaña
 // "Para mí" del Wellness Hub ({ moodEntry, actividad }, ambos null si no hay).
 export const apiGetLatestMoodEntry = async () => {

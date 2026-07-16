@@ -23,6 +23,28 @@ async function nextSuggestion(userId, moodType, moodEntryId) {
   return chosen;
 }
 
+// GET /api/mood-entries/latest — último registro del usuario + su sugerencia
+// más reciente, aplanada como `actividad`. Sin registros responde 200 con
+// nulls: para la pestaña "Para mí" el vacío es un estado normal, no un error.
+router.get('/latest', requireAuth, async (req, res) => {
+  const entry = await prisma.moodEntry.findFirst({
+    where: { userId: req.user.userId },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      suggestions: {
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        include: { activity: true },
+      },
+    },
+  });
+
+  if (!entry) return res.json({ moodEntry: null, actividad: null });
+
+  const { suggestions, ...moodEntry } = entry;
+  res.json({ moodEntry, actividad: suggestions[0]?.activity ?? null });
+});
+
 // POST /api/mood-entries
 router.post('/', requireAuth, async (req, res) => {
   const { moodType, nota } = req.body;

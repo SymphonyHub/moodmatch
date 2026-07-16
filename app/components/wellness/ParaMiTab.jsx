@@ -1,9 +1,11 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { apiGetLatestMoodEntry, apiNextSuggestion } from '../../services/api';
 import { MOOD_INFO } from '../../constants/moods';
 import { ENCABEZADOS, tiempoRelativo } from '../../features/wellness/paraMi';
+import { RUTA_HISTORIAL } from '../../features/wellness/historial';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../Tappable';
 import Entrance from '../Entrance';
@@ -131,6 +133,18 @@ export default function ParaMiTab() {
           loadingOtra={loadingOtra}
         />
       </Entrance>
+
+      <Entrance index={3}>
+        <Tappable
+          style={styles.linkHistorial}
+          onPress={() => router.push(RUTA_HISTORIAL)}
+          haptic={false}
+        >
+          <Ionicons name="time-outline" size={16} color={theme.colors.primary} />
+          <Text style={styles.linkHistorialTexto}>Ver mi historial</Text>
+          <Ionicons name="chevron-forward" size={14} color={theme.colors.primary} />
+        </Tappable>
+      </Entrance>
     </ScrollView>
   );
 }
@@ -186,5 +200,18 @@ const useStyles = makeThemedStyles((t) => ({
     color: t.colors.textMuted,
     marginBottom: 16,
     paddingHorizontal: 8,
+  },
+  linkHistorial: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 4,
+    marginTop: 24,
+    padding: 8,
+  },
+  linkHistorialTexto: {
+    ...t.typography.type.body,
+    ...t.typography.fonts.semibold,
+    color: t.colors.primary,
   },
 }));

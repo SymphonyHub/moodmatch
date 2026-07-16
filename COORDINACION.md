@@ -72,6 +72,19 @@ el patrón de bloqueo/desbloqueo por `friendsCount` (dominio A/C/D).
 (requireAuth) → `{ moodEntry|null, actividad|null }` (último registro del
 usuario + su sugerencia más reciente aplanada).
 
+**Fase 7 (historial) terminada** en `feature/historial-mensaje-resumen`
+(pendiente prueba visual y merge):
+- Pantalla stack `/historial` (`app/app/historial.jsx`, registrada por
+  convención de archivos — layouts del Agente A intactos): card de mensaje
+  de progreso según patrón dominante + registros agrupados por día. Acceso
+  "Ver mi historial" dentro de ParaMiTab (mi dominio).
+- Dominio puro `app/features/wellness/historial.js`: regla local por conteo
+  (ventana 7 días, mín. 3 registros, umbral 60%), `MENSAJES_PATRON` con las
+  reglas de tono verificadas mecánicamente en `historial.test.js`.
+- **Backend nuevo disponible para todos:** `GET /api/mood-entries?days=N`
+  (requireAuth, default 30, rango 1-90, tope 200) →
+  `{ entries: [{id, moodType, nota, createdAt}] }`.
+
 ### Agente C — Amigos
 Estado: (por completar)
 

@@ -1,6 +1,7 @@
 import { Text, View } from 'react-native';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Entrance from '../Entrance';
+import MarkdownText from './MarkdownText';
 
 // Resalta en negrita los teléfonos de ayuda dentro del mensaje de crisis.
 function TextoCrisis({ texto, styles }) {
@@ -51,10 +52,12 @@ export default function ChatBubble({ autor, tipo = 'texto', texto, mood }) {
     );
   }
 
+  // El bot puede responder con markdown simple (Gemini); el texto plano de
+  // los guiones se renderiza idéntico que antes.
   return (
     <Entrance style={styles.filaBot} distance={12}>
       <View style={[styles.burbuja, styles.burbujaBot]}>
-        <Text style={styles.textoBot}>{texto}</Text>
+        <MarkdownText texto={texto} style={styles.textoBot} />
       </View>
     </Entrance>
   );

@@ -21,6 +21,10 @@ describe('lenguaje de movimiento', () => {
     expect(PRESS_SCALE).toBeLessThan(1);
   });
 
+  test('el spring de desbloqueo también asienta sin rebote fuerte', () => {
+    expect(springs.unlock.damping).toBeGreaterThanOrEqual(15);
+  });
+
   test('el escalonado de listas es corto', () => {
     expect(STAGGER_MS).toBeLessThanOrEqual(80);
   });

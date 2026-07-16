@@ -3,6 +3,7 @@ import { View, Text, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiAddFriend } from '../services/api';
+import { useFriendsCount } from '../friends/FriendsCountContext';
 import { setPendingInvite } from '../utils/pendingInvite';
 import { useTheme, makeThemedStyles } from '../theme/ThemeContext';
 import Tappable from '../components/Tappable';
@@ -14,6 +15,7 @@ export default function AddFriendScreen() {
   const { code } = useLocalSearchParams();
   const { theme } = useTheme();
   const styles = useStyles();
+  const { refresh } = useFriendsCount();
 
   // 'checking' | 'confirm' | 'adding' | 'done' | 'error'
   const [fase, setFase] = useState('checking');
@@ -45,6 +47,9 @@ export default function AddFriendScreen() {
         setFase('error');
         setMensaje(data.error);
       } else {
+        // Contrato de FriendsCountContext: forzar el conteo tras agregar,
+        // para que el desbloqueo de "Con amigos" no espere al TTL.
+        refresh({ force: true });
         setFase('done');
         setMensaje(`¡${data.friend.nombre} y tú ahora son amigos! 🎉`);
       }

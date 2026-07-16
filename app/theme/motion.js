@@ -15,9 +15,11 @@ export const easings = {
   accelerate: Easing.in(Easing.quad),
 };
 
-// Spring contenido para la presión táctil (asentamiento rápido, sin rebote).
+// Springs contenidos (asentamiento suave, sin rebote fuerte):
+// press = presión táctil; unlock = revelado de contenido que se desbloquea.
 export const springs = {
   press: { damping: 18, stiffness: 280, mass: 0.6 },
+  unlock: { damping: 16, stiffness: 200, mass: 0.9 },
 };
 
 export const PRESS_SCALE = 0.97;

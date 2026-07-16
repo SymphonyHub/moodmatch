@@ -1,17 +1,22 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity,
-  ScrollView, ActivityIndicator, Alert, Modal,
+  ScrollView, ActivityIndicator, Alert, Modal, Share,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { apiGetMe, apiAddFriend } from '../../services/api';
+import { useFriendsCount } from '../../friends/FriendsCountContext';
+import { buildInviteMessage } from '../../utils/invite';
+import { API_URL } from '../../config';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../../components/Tappable';
 
 export default function MiQrScreen() {
   const { theme } = useTheme();
   const styles = useStyles();
+  const { refresh } = useFriendsCount();
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -48,6 +53,9 @@ export default function MiQrScreen() {
       if (result.error) {
         setMensaje({ tipo: 'error', texto: result.error });
       } else {
+        // Contrato de FriendsCountContext: forzar el conteo tras agregar,
+        // para que el desbloqueo de "Con amigos" no espere al TTL.
+        refresh({ force: true });
         setMensaje({ tipo: 'ok', texto: `¡${result.friend.nombre} agregado! 🎉 Revisa la pestaña Amigos.` });
       }
     } catch {
@@ -94,6 +102,23 @@ export default function MiQrScreen() {
       <Tappable wrapperStyle={{ width: '100%' }} style={styles.btn} onPress={abrirCamara}>
         <Text style={styles.btnText}>📷  Escanear QR de un amigo</Text>
       </Tappable>
+
+      {user && (
+        <Tappable
+          wrapperStyle={{ width: '100%' }}
+          style={styles.btnInvitar}
+          onPress={async () => {
+            try {
+              await Share.share({ message: buildInviteMessage(user.nombre, API_URL, user.qrCode) });
+            } catch {
+              // el usuario cerró el share sheet: no es un error
+            }
+          }}
+        >
+          <Ionicons name="share-social-outline" size={18} color={theme.colors.primary} />
+          <Text style={styles.btnInvitarText}>Invitar por link</Text>
+        </Tappable>
+      )}
 
       <Modal visible={scanning} animationType="slide" onRequestClose={() => setScanning(false)}>
         {/* La UI de la cámara va sobre video en vivo: colores fijos, independientes del tema. */}
@@ -174,6 +199,25 @@ const useStyles = makeThemedStyles((t) => ({
     color: t.colors.onPrimary,
     fontSize: t.fontSize(16),
     ...t.typography.fonts.bold,
+  },
+  btnInvitar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: t.colors.primarySoft,
+    borderRadius: t.shape.radiusMd,
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.primarySoftBorder,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    width: '100%',
+    marginBottom: 12,
+  },
+  btnInvitarText: {
+    color: t.colors.primary,
+    fontSize: t.fontSize(15),
+    ...t.typography.fonts.semibold,
   },
   cameraContainer: { flex: 1, backgroundColor: '#000' },
   camera: { flex: 1 },

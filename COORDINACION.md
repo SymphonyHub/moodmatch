@@ -39,7 +39,18 @@ de su dominio).
 ## Estado (cada agente actualiza su sección al terminar una sesión)
 
 ### Agente A — Navbar/Footer
-Estado: (por completar)
+Estado: Fase 6 — esqueleto del Wellness Hub implementado en
+`feature/wellness-hub-layout` (worktree MoodMatch-wellness), pendiente de
+prueba visual. Interfaz para B y C:
+- Pantalla contenedora: `app/app/(tabs)/actividades.jsx` (5ª tab "Actividades",
+  2º lugar). NO tocarla: llenar los paneles.
+- B llena `app/wellness/ParaMiPanel.jsx`; C llena `app/wellness/ConAmigosPanel.jsx`
+  (solo contenido desbloqueado — la regla de candado vive en la pantalla, vía
+  `lockStateFor` de `app/wellness/hubLogic.js` y `useFriendsCount`).
+- Ids de pestañas estables: `para-mi` / `con-amigos` (test en
+  `__tests__/wellnessHub.test.js`).
+- Extra dentro de mi dominio: TabBar ahora renderiza `tabBarBadge` (el badge
+  de no leídos de Amigos no se veía con el tab bar custom).
 
 ### Agente B — Emociones/Chat
 Estado: (por completar)

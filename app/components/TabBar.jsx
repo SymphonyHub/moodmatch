@@ -43,7 +43,40 @@ const useStyles = makeThemedStyles((t) => ({
     ...t.typography.type.caption,
     marginTop: 3,
   },
+  badge: {
+    position: 'absolute',
+    top: 0,
+    left: '50%',
+    marginLeft: 8,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.colors.primary,
+  },
+  badgeTxt: {
+    ...t.typography.fonts.semibold,
+    fontSize: 11,
+    lineHeight: 14,
+    color: t.colors.onPrimary,
+  },
 }));
+
+// Badge de la tab (options.tabBarBadge): burbuja arriba-derecha del ícono.
+// tabBarBadgeStyle se divide: color/fontSize van al texto, el resto a la caja.
+function TabBadge({ value, style, styles }) {
+  if (value === undefined || value === null || value === '') return null;
+  const { color, fontSize, ...boxStyle } = style ?? {};
+  return (
+    <View style={[styles.badge, boxStyle]}>
+      <Text style={[styles.badgeTxt, color != null && { color }, fontSize != null && { fontSize }]}>
+        {String(value)}
+      </Text>
+    </View>
+  );
+}
 
 // Barra de tabs de la casa (prop `tabBar` de <Tabs>): una píldora suave se
 // desliza detrás del ícono activo con el mismo spring contenido de Tappable.
@@ -118,8 +151,12 @@ export default function TabBar({ state, descriptors, navigation }) {
                   color={color}
                 />
               ) : null}
+              <TabBadge value={options.tabBarBadge} style={options.tabBarBadgeStyle} styles={styles} />
             </View>
-            <Text style={[styles.label, focused && theme.typography.fonts.semibold, { color }]}>
+            <Text
+              numberOfLines={1}
+              style={[styles.label, focused && theme.typography.fonts.semibold, { color }]}
+            >
               {label}
             </Text>
           </Tappable>

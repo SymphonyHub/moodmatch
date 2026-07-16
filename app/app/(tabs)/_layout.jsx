@@ -53,6 +53,14 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
+          name="actividades"
+          options={{
+            title: 'Actividades',
+            tabBarLabel: 'Actividades',
+            tabBarIconSet: { outline: 'sparkles-outline', filled: 'sparkles' },
+          }}
+        />
+        <Tabs.Screen
           name="amigos"
           options={{
             title: 'Amigos',

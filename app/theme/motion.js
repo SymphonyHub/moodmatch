@@ -16,10 +16,12 @@ export const easings = {
 };
 
 // Springs contenidos (asentamiento suave, sin rebote fuerte):
-// press = presión táctil; unlock = revelado de contenido que se desbloquea.
+// press = presión táctil; unlock = revelado de contenido que se desbloquea;
+// typing = saltito de los puntos del indicador "escribiendo".
 export const springs = {
   press: { damping: 18, stiffness: 280, mass: 0.6 },
   unlock: { damping: 16, stiffness: 200, mass: 0.9 },
+  typing: { damping: 15, stiffness: 260, mass: 0.6 },
 };
 
 export const PRESS_SCALE = 0.97;

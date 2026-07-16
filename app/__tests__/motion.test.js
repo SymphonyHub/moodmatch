@@ -25,6 +25,10 @@ describe('lenguaje de movimiento', () => {
     expect(springs.unlock.damping).toBeGreaterThanOrEqual(15);
   });
 
+  test('el spring del indicador de escritura también asienta sin rebote fuerte', () => {
+    expect(springs.typing.damping).toBeGreaterThanOrEqual(15);
+  });
+
   test('el escalonado de listas es corto', () => {
     expect(STAGGER_MS).toBeLessThanOrEqual(80);
   });

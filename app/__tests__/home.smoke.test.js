@@ -9,10 +9,16 @@ import ChatBubble from '../components/chat/ChatBubble';
 import QuickReplies from '../components/chat/QuickReplies';
 import TypingIndicator from '../components/chat/TypingIndicator';
 import ChatInput from '../components/chat/ChatInput';
+import MarkdownText from '../components/chat/MarkdownText';
+import useAutoScroll from '../components/chat/useAutoScroll';
 
 test('la pantalla y los componentes del chat exportan componentes', () => {
-  [HomeScreen, ChatBubble, QuickReplies, TypingIndicator, ChatInput]
+  [HomeScreen, ChatBubble, QuickReplies, TypingIndicator, ChatInput, MarkdownText]
     .forEach((Componente) => {
       expect(typeof Componente).toBe('function');
     });
+});
+
+test('el hook de auto-scroll exporta una función', () => {
+  expect(typeof useAutoScroll).toBe('function');
 });

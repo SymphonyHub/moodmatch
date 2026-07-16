@@ -1,36 +1,39 @@
 import { useEffect, useRef } from 'react';
 import { Animated, View } from 'react-native';
 import { makeThemedStyles } from '../../theme/ThemeContext';
-import { durations, easings } from '../../theme/motion';
+import { springs } from '../../theme/motion';
 
-// "El bot está escribiendo": tres puntos que pulsan en secuencia, dentro de
-// una mini burbuja. Discreto, acorde al lenguaje de movimiento de la casa.
-function Punto({ delay, styles }) {
-  const opacity = useRef(new Animated.Value(0.25)).current;
+// "El bot está escribiendo": tres puntos que saltan en secuencia con un
+// resorte contenido (springs.typing) y una pausa entre ciclos para que
+// respire — calmo, no metrónomo. Dentro de una mini burbuja de bot.
+const SALTO_PX = -5;
+const CADENCIA_MS = 130; // desfase entre puntos
+const PAUSA_MS = 460; // respiro al final de cada ciclo
+
+function Punto({ orden, styles }) {
+  const translateY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: durations.base,
-          easing: easings.standard,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity, {
-          toValue: 0.25,
-          duration: durations.base,
-          easing: easings.standard,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
+    const salto = (haciaArriba) =>
+      Animated.spring(translateY, {
+        toValue: haciaArriba ? SALTO_PX : 0,
+        ...springs.typing,
+        useNativeDriver: true,
+      });
+
+    // El desfase inicial queda fuera del loop: cada punto repite un ciclo de
+    // igual duración, así la onda entre puntos se mantiene estable.
+    const anim = Animated.sequence([
+      Animated.delay(orden * CADENCIA_MS),
+      Animated.loop(
+        Animated.sequence([salto(true), salto(false), Animated.delay(PAUSA_MS)]),
+      ),
+    ]);
+    anim.start();
+    return () => anim.stop();
   }, []);
 
-  return <Animated.View style={[styles.punto, { opacity }]} />;
+  return <Animated.View style={[styles.punto, { transform: [{ translateY }] }]} />;
 }
 
 export default function TypingIndicator() {
@@ -38,9 +41,9 @@ export default function TypingIndicator() {
   return (
     <View style={styles.fila}>
       <View style={styles.burbuja}>
-        <Punto delay={0} styles={styles} />
-        <Punto delay={120} styles={styles} />
-        <Punto delay={240} styles={styles} />
+        <Punto orden={0} styles={styles} />
+        <Punto orden={1} styles={styles} />
+        <Punto orden={2} styles={styles} />
       </View>
     </View>
   );

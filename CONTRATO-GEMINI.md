@@ -29,7 +29,8 @@ Escrito por el Agente D (Guardrails); A, B y C construyen contra esto.
   "historial": [
     { "autor": "usuario", "texto": "..." },
     { "autor": "bot", "texto": "..." }
-  ]
+  ],
+  "continuar": false
 }
 ```
 
@@ -38,6 +39,7 @@ Escrito por el Agente D (Guardrails); A, B y C construyen contra esto.
 | `mood` | string | **Obligatorio.** Uno de los 6 `MOOD_KEYS`: `FELIZ`, `TRISTE`, `ANSIOSO`, `CALMADO`, `ENOJADO`, `NEUTRO` (misma lista que `theme/tokens.js` y `VALID_MOODS` del backend). |
 | `mensaje` | string | **Obligatorio, no vacío** (tras trim). |
 | `historial` | array | Opcional. Turnos previos en orden cronológico, cada uno `{ autor: "usuario"\|"bot", texto: string }`. Máximo **8 mensajes**; si llega más largo, el backend **trunca conservando los últimos 8** (regla de brevedad: 2-4 intercambios). |
+| `continuar` | boolean | Opcional (Fase 9, conversación extendida). `true` cuando la sesión **ya registró su MoodEntry** y el usuario sigue charlando: el backend **nunca fuerza `terminar`** ni pide cierre a Gemini (`esUltimo: false`). Los guardrails (doble escudo de crisis, system prompt de tono, validador post-respuesta) corren **igual en cada turno**. Solo el booleano `true` activa el modo; cualquier otro valor se ignora. |
 
 ### Response `200` — siempre que la petición sea válida
 
@@ -53,7 +55,7 @@ Escrito por el Agente D (Guardrails); A, B y C construyen contra esto.
 |---|---|---|
 | `respuesta` | string | Texto que el frontend muestra como mensaje del bot. |
 | `fuente` | `"gemini"` \| `"plantilla"` | De dónde salió la respuesta. **El fallo del modelo NUNCA es un 5xx**: si Gemini falla, hay rate-limit (la capa gratuita da ~1.500 req/día) o la respuesta viola tono, el backend responde por plantilla y lo declara aquí. |
-| `terminar` | boolean | `true` cuando el backend decide cerrar la conversación (alcanzado `MAX_INTERCAMBIOS = 4`, el mismo del reducer `conversacion.js`). El frontend pasa entonces al registro del MoodEntry, como hoy. |
+| `terminar` | boolean | `true` cuando el backend decide cerrar la conversación (alcanzado `MAX_INTERCAMBIOS = 4`, el mismo del reducer `conversacion.js`). El frontend pasa entonces al registro del MoodEntry, como hoy. Con `continuar: true` en el request es **siempre `false`**: la conversación extendida no tiene cierre por conteo. |
 
 ### Errores
 
@@ -111,6 +113,11 @@ Nada más. Todo problema con el modelo es **fallback transparente**, no error.
 - `fuente` no se muestra al usuario (es telemetría/debug).
 - Con `terminar: true`, disparar el flujo de cierre existente (fase
   `creandoEntrada` → `POST /api/mood-entries`).
+- **Fase 9 — conversación extendida:** tras crear el MoodEntry la conversación
+  sigue en fase `charla` (reducer `conversacion.js`): el frontend manda
+  `continuar: true` en cada turno posterior y **sigue pasando cada texto por el
+  escudo** (`useCrisisShield`) antes de llamar. La charla extendida no crea
+  MoodEntries nuevos; "Registrar otra emoción" (REINICIAR) inicia otra sesión.
 - **Antes de CADA llamada**, pasar el texto por el escudo:
 
   ```js

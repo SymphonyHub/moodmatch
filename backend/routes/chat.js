@@ -30,6 +30,9 @@ function sanearHistorial(historial) {
 router.post('/respond', requireAuth, async (req, res) => {
   const { mood, historial } = req.body;
   const mensaje = typeof req.body.mensaje === 'string' ? req.body.mensaje.trim() : '';
+  // Conversación extendida (Fase 9): la sesión ya registró su MoodEntry y el
+  // usuario sigue charlando — el backend no fuerza el cierre por conteo.
+  const continuar = req.body.continuar === true;
 
   if (!VALID_MOODS.includes(mood)) {
     return res.status(400).json({ error: `mood debe ser uno de: ${VALID_MOODS.join(', ')}` });
@@ -42,7 +45,7 @@ router.post('/respond', requireAuth, async (req, res) => {
   // `terminar` se calcula sobre el historial completo: truncar antes de
   // contar subestimaría los intercambios.
   const turnosUsuario = turnos.filter((t) => t.autor === 'usuario').length + 1;
-  const terminar = turnosUsuario >= MAX_INTERCAMBIOS;
+  const terminar = !continuar && turnosUsuario >= MAX_INTERCAMBIOS;
 
   // Segunda capa del escudo de crisis: el mensaje no sale hacia Gemini.
   // Sí entrega los recursos de ayuda, por si el frontend viejo no trae la

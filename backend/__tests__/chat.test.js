@@ -216,6 +216,69 @@ describe('terminar — tope de MAX_INTERCAMBIOS (4, como el reducer)', () => {
   });
 });
 
+describe('continuar — conversación extendida (Fase 9)', () => {
+  const turnoUsuario = (texto) => ({ autor: 'usuario', texto });
+  const turnoBot = (texto) => ({ autor: 'bot', texto });
+
+  const historialLargo = () => {
+    const historial = [];
+    for (let i = 0; i < 10; i++) {
+      historial.push(turnoUsuario(`mensaje ${i}`), turnoBot(`respuesta ${i}`));
+    }
+    return historial;
+  };
+
+  test('con continuar:true nunca fuerza el cierre, aun con historial largo', async () => {
+    generarRespuesta.mockResolvedValue('Te sigo leyendo con calma.');
+    const res = await post({
+      mood: 'TRISTE',
+      mensaje: 'sigo pensando en eso',
+      historial: historialLargo(),
+      continuar: true,
+    });
+    expect(res.body.terminar).toBe(false);
+    expect(generarRespuesta).toHaveBeenCalledWith(expect.objectContaining({ esUltimo: false }));
+  });
+
+  test('el fallback por plantilla en modo continuar usa la variante seguir (nunca cierre)', async () => {
+    generarRespuesta.mockRejectedValue(new Error('Timeout de Gemini'));
+    const res = await post({
+      mood: 'ANSIOSO',
+      mensaje: 'todavía me da vueltas',
+      historial: historialLargo(),
+      continuar: true,
+    });
+    expect(res.body.fuente).toBe('plantilla');
+    expect(res.body.terminar).toBe(false);
+    expect(PLANTILLAS.ANSIOSO.seguir).toContain(res.body.respuesta);
+  });
+
+  test('la segunda capa del escudo de crisis sigue activa con continuar:true', async () => {
+    const res = await post({
+      mood: 'TRISTE',
+      mensaje: 'ya no le veo sentido a la vida',
+      historial: historialLargo(),
+      continuar: true,
+    });
+    expect(res.body.respuesta).toBe(MENSAJE_CRISIS);
+    expect(res.body.terminar).toBe(false);
+    expect(generarRespuesta).not.toHaveBeenCalled();
+  });
+
+  test('continuar no booleano o ausente conserva el tope actual', async () => {
+    generarRespuesta.mockResolvedValue('Gracias por contarme.');
+    for (const continuar of [undefined, 'true', 1]) {
+      const res = await post({
+        mood: 'NEUTRO',
+        mensaje: 'y eso',
+        historial: historialLargo(),
+        continuar,
+      });
+      expect(res.body.terminar).toBe(true);
+    }
+  });
+});
+
 describe('tono de las plantillas de fallback (verificación mecánica, como guiones.test.js)', () => {
   for (const [mood, set] of Object.entries(PLANTILLAS)) {
     test.each([...set.seguir, ...set.cierre])(`${mood}: %s`, (frase) => {

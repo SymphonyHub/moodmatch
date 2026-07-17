@@ -8,10 +8,12 @@
 const fs = require('fs');
 const path = require('path');
 const backend = require('../lib/tonoCrisis');
+const { PLANTILLAS } = require('../lib/plantillas');
 
 const EMOCIONES = path.join(__dirname, '..', '..', 'app', 'features', 'emociones');
 const srcCrisis = fs.readFileSync(path.join(EMOCIONES, 'crisis.js'), 'utf8');
 const srcTono = fs.readFileSync(path.join(EMOCIONES, 'tono.js'), 'utf8');
+const srcPlantillas = fs.readFileSync(path.join(EMOCIONES, 'plantillas.js'), 'utf8');
 
 // Extrae los literales string de un array `const NOMBRE = [...]` del fuente.
 function stringsDeArray(src, nombre) {
@@ -51,6 +53,26 @@ describe('paridad con app/features/emociones/crisis.js', () => {
     // Frases por patrón, nunca palabras sueltas (docblock de crisis.js):
     expect(backend.detectarCrisis('estoy muerto de risa')).toBe(false);
     expect(backend.detectarCrisis('me muero de cansancio')).toBe(false);
+  });
+});
+
+describe('paridad con app/features/emociones/plantillas.js', () => {
+  // El espejo del frontend (Fase 8, integración) debe traer exactamente los
+  // mismos moods, claves y textos que lib/plantillas.js, en el mismo orden.
+  test('las plantillas del frontend son idénticas a las del backend', () => {
+    const m = srcPlantillas.match(/PLANTILLAS = \{([\s\S]*?)\n\};/);
+    expect(m).not.toBeNull();
+    const frontend = [...m[1].matchAll(/'((?:[^'\\]|\\.)*)'/g)].map((x) => x[1]);
+    const replica = Object.values(PLANTILLAS).flatMap((set) => [
+      ...set.seguir,
+      ...set.cierre,
+    ]);
+    expect(replica).toEqual(frontend);
+  });
+
+  test('el frontend declara los mismos moods y en el mismo orden', () => {
+    const declarados = [...srcPlantillas.matchAll(/^  ([A-Z]+): \{/gm)].map((x) => x[1]);
+    expect(declarados).toEqual(Object.keys(PLANTILLAS));
   });
 });
 

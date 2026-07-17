@@ -34,6 +34,7 @@ export const ETIQUETAS = {
   reintentar: 'Intentar de nuevo',
   reiniciar: 'Registrar otra emoción',
   verSugerencia: 'Ver mi sugerencia',
+  seguirSinConexion: 'Seguir sin conexión',
   placeholderTextoLibre: '…o cuéntame con tus palabras',
 };
 

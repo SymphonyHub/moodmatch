@@ -1,23 +1,24 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
-import {
-  View, Text, ScrollView, KeyboardAvoidingView, Platform,
-} from 'react-native';
+import { useEffect, useReducer, useState } from 'react';
+import { ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
-import { apiCreateMoodEntry } from '../../services/api';
+import { apiCreateMoodEntry, apiChatRespond } from '../../services/api';
 import { MOODS } from '../../constants/moods';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import {
   crearConversacion,
   reducer,
-  pasoActual,
   quickRepliesDe,
 } from '../../features/emociones/conversacion';
 import { ETIQUETAS } from '../../features/emociones/guiones';
+import { useCrisisShield } from '../../features/emociones/useCrisisShield';
+import { useRetry } from '../../features/emociones/useRetry';
 import { RUTA_WELLNESS } from '../../features/wellness/paraMi';
 import ChatBubble from '../../components/chat/ChatBubble';
 import QuickReplies from '../../components/chat/QuickReplies';
 import TypingIndicator from '../../components/chat/TypingIndicator';
 import ChatInput from '../../components/chat/ChatInput';
+import FallbackMessage from '../../components/chat/FallbackMessage';
+import useAutoScroll from '../../components/chat/useAutoScroll';
 
 // Pausa de "escribiendo" antes de cada burbuja del bot: apenas por encima de
 // durations.gentle (380 ms) — presencia sin latencia fingida.
@@ -31,7 +32,9 @@ export default function HomeScreen() {
   // Revelado escalonado: cuántos mensajes del stream ya se muestran.
   const [visibles, setVisibles] = useState(0);
   const [escribiendo, setEscribiendo] = useState(false);
-  const scrollRef = useRef(null);
+  const { ref, onScroll, onContentSizeChange, scrollToEnd } = useAutoScroll();
+  const escudo = useCrisisShield();
+  const { ejecutar, reset: resetRetry } = useRetry();
 
   // Revela los mensajes de a uno: los del usuario al instante, los del bot
   // tras una pausa breve de "escribiendo".
@@ -57,6 +60,30 @@ export default function HomeScreen() {
     }, TYPING_MS);
     return () => clearTimeout(timer);
   }, [visibles, conv.mensajes.length]);
+
+  // Turno en vuelo hacia la IA. El escudo de crisis ya corrió en onEnviar:
+  // a esta fase solo llegan textos sin señales de crisis. useRetry reintenta
+  // con backoff y NUNCA lanza; un 200 con fuente:"plantilla" es éxito.
+  useEffect(() => {
+    if (conv.fase !== 'esperandoIA') return undefined;
+    let cancelado = false;
+    const { texto, historial } = conv.pendienteIA;
+    ejecutar(() => apiChatRespond(conv.mood, texto, historial)).then((r) => {
+      if (cancelado) return;
+      if (r.ok) {
+        dispatch({
+          tipo: 'IA_RESPONDIO',
+          respuesta: r.valor.respuesta,
+          terminar: r.valor.terminar === true,
+        });
+      } else {
+        dispatch({ tipo: 'IA_FALLO' });
+      }
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [conv.fase]);
 
   // Al terminar la conversación se crea el (único) MoodEntry, con el texto
   // libre acumulado como nota. Si el usuario abandona antes, no se registra.
@@ -97,8 +124,8 @@ export default function HomeScreen() {
         emoji: m.emoji,
         tint: theme.colors.moods[m.value],
       }));
-    } else if (qr.tipo === 'guion') {
-      chips = qr.replies.map((r) => ({ id: r.id, label: r.label }));
+    } else if (qr.tipo === 'iaFallo') {
+      chips = [{ id: 'seguirSinIA', label: ETIQUETAS.seguirSinConexion }];
     } else if (qr.tipo === 'reintentar') {
       chips = [{ id: 'reintentar', label: ETIQUETAS.reintentar }];
     } else if (qr.tipo === 'puente') {
@@ -112,18 +139,33 @@ export default function HomeScreen() {
   }
 
   const onChip = (id) => {
+    scrollToEnd();
     if (qr.tipo === 'moods') dispatch({ tipo: 'ELEGIR_MOOD', mood: id });
-    else if (qr.tipo === 'guion') dispatch({ tipo: 'QUICK_REPLY', replyId: id });
+    else if (id === 'seguirSinIA') dispatch({ tipo: 'SEGUIR_SIN_IA' });
     else if (qr.tipo === 'reintentar') dispatch({ tipo: 'REINTENTAR_ENTRADA' });
     else if (id === 'verSugerencia') {
       // Cierra el chat (despedida) y lleva a la pestaña Para mí del Hub.
       dispatch({ tipo: 'VER_HUB' });
       router.push(RUTA_WELLNESS);
-    } else if (id === 'reiniciar') dispatch({ tipo: 'REINICIAR' });
+    } else if (id === 'reiniciar') {
+      escudo.reset();
+      resetRetry();
+      dispatch({ tipo: 'REINICIAR' });
+    }
   };
 
-  const paso = pasoActual(conv);
-  const mostrarInput = turnoUsuario && !!paso?.textoLibre;
+  // El escudo corre SIEMPRE antes de la API (CONTRATO-GEMINI.md §2.1): con
+  // omitirIA el reducer responde por plantilla local sin pasar por
+  // 'esperandoIA', y el texto nunca sale del dispositivo.
+  const onEnviar = (texto) => {
+    const { omitirIA, mensajeCrisis } = escudo.evaluar(texto);
+    dispatch({ tipo: 'ENVIAR_TEXTO_IA', texto, omitirIA, mensajeCrisis });
+    scrollToEnd();
+  };
+
+  // En conversación el texto libre está siempre disponible; se oculta
+  // mientras la IA responde ('esperandoIA') o espera decisión ('iaFallo').
+  const mostrarInput = turnoUsuario && conv.fase === 'conversando' && !!conv.mood;
 
   return (
     <KeyboardAvoidingView
@@ -131,9 +173,11 @@ export default function HomeScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
-        ref={scrollRef}
+        ref={ref}
         contentContainerStyle={styles.chat}
-        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+        onScroll={onScroll}
+        scrollEventThrottle={32}
+        onContentSizeChange={onContentSizeChange}
         keyboardShouldPersistTaps="handled"
       >
         {conv.mensajes.slice(0, visibles).map((mensaje) => (
@@ -146,13 +190,16 @@ export default function HomeScreen() {
           />
         ))}
 
-        {escribiendo && <TypingIndicator />}
+        {(escribiendo || conv.fase === 'esperandoIA') && <TypingIndicator />}
+        {turnoUsuario && conv.fase === 'iaFallo' && (
+          <FallbackMessage onReintentar={() => dispatch({ tipo: 'IA_REINTENTAR' })} />
+        )}
         {chips && <QuickReplies items={chips} onSelect={onChip} />}
       </ScrollView>
 
       {mostrarInput && (
         <ChatInput
-          onSend={(texto) => dispatch({ tipo: 'TEXTO_LIBRE', texto })}
+          onSend={onEnviar}
           placeholder={ETIQUETAS.placeholderTextoLibre}
         />
       )}

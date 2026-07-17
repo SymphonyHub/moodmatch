@@ -18,6 +18,7 @@ import { Baloo2_400Regular } from '@expo-google-fonts/baloo-2/400Regular';
 import { Baloo2_500Medium } from '@expo-google-fonts/baloo-2/500Medium';
 import { Baloo2_600SemiBold } from '@expo-google-fonts/baloo-2/600SemiBold';
 import { Baloo2_700Bold } from '@expo-google-fonts/baloo-2/700Bold';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { ThemeProvider, ThemeVeil, useTheme } from '../theme/ThemeContext';
 import { FriendsCountProvider } from '../friends/FriendsCountContext';
 
@@ -78,10 +79,15 @@ function ThemedStack() {
 
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <FriendsCountProvider>
-        <ThemedStack />
-      </FriendsCountProvider>
-    </ThemeProvider>
+    // KeyboardProvider alimenta useKeyboardOffset con WindowInsets nativos
+    // (edge-to-edge no redimensiona la ventana y los eventos Keyboard de RN
+    // fallan en MIUI) — lo más alto posible, como recomienda la librería.
+    <KeyboardProvider>
+      <ThemeProvider>
+        <FriendsCountProvider>
+          <ThemedStack />
+        </FriendsCountProvider>
+      </ThemeProvider>
+    </KeyboardProvider>
   );
 }

@@ -1,7 +1,7 @@
 // Máquina de estados de la conversación de emociones. Pura y sin efectos:
 // la UI (home.jsx) despacha acciones y ejecuta los llamados a la API cuando
 // la fase lo indica (fase 'creandoEntrada' → POST /api/mood-entries).
-import { GUIONES, SALUDO, DESPEDIDA, ERROR_ENTRADA, ETIQUETAS, SUGERENCIA } from './guiones';
+import { GUIONES, SALUDO, ERROR_ENTRADA, SUGERENCIA } from './guiones';
 import { detectarCrisis, MENSAJE_CRISIS } from './crisis';
 import { respuestaPlantilla } from './plantillas';
 import { MOOD_INFO } from '../../constants/moods';
@@ -16,7 +16,7 @@ export const MAX_HISTORIAL_IA = 8;
 export function crearConversacion(seed = Math.floor(Math.random() * 997)) {
   const base = {
     // saludo | conversando | esperandoIA | iaFallo | creandoEntrada |
-    // errorEntrada | puente | cerrado
+    // errorEntrada | charla
     fase: 'saludo',
     mood: null,
     pasoId: null,
@@ -25,6 +25,7 @@ export function crearConversacion(seed = Math.floor(Math.random() * 997)) {
     notas: [], // texto libre acumulado → `nota` del MoodEntry
     crisisMostrada: false,
     moodEntryId: null,
+    registrada: false, // true desde ENTRADA_CREADA: la charla sigue sin cierre
     pendienteIA: null, // { texto, historial } del turno en vuelo / a reintentar
     seed,
     usos: {}, // clave de variante → cuántas veces se usó (rotación)
@@ -81,11 +82,13 @@ function avanzar(estado, next) {
 
 // Responde el turno con la plantilla local (crisis con omitirIA, o "Seguir
 // sin conexión"): misma rotación determinista del backend. Si se alcanzó el
-// tope, la plantilla es de cierre y se pasa al registro del MoodEntry.
+// tope, la plantilla es de cierre y se pasa al registro del MoodEntry — salvo
+// en la charla extendida (registrada), que nunca cierra: variante `seguir`.
 function responderConPlantilla(estado) {
-  const terminar = estado.intercambios >= MAX_INTERCAMBIOS;
+  const terminar = !estado.registrada && estado.intercambios >= MAX_INTERCAMBIOS;
   const texto = respuestaPlantilla(estado.mood, estado.intercambios, terminar);
   const s = agregarMensaje(estado, 'bot', 'texto', texto);
+  if (estado.registrada) return { ...s, pendienteIA: null, fase: 'charla' };
   return { ...s, pendienteIA: null, fase: terminar ? 'creandoEntrada' : 'conversando' };
 }
 
@@ -127,18 +130,23 @@ export function reducer(estado, accion) {
       return avanzar(s, paso.textoLibreNext ?? 'cierre');
     }
 
-    // ── Chat con IA (Fase 8) ───────────────────────────────────────────
+    // ── Chat con IA (Fase 8; charla extendida en Fase 9) ───────────────
     // El escudo de crisis corre en la UI ANTES de despachar: aquí solo
     // llegan sus resultados (omitirIA, mensajeCrisis). Con omitirIA el
     // estado nunca pasa por 'esperandoIA', así que el effect que llama a
     // /api/chat/respond no corre y el texto no sale del dispositivo.
     case 'ENVIAR_TEXTO_IA': {
-      if (estado.fase !== 'conversando') return estado;
+      if (estado.fase !== 'conversando' && estado.fase !== 'charla') return estado;
       const texto = String(accion.texto ?? '').trim();
       if (!texto) return estado;
       const historial = historialParaIA(estado.mensajes);
       let s = agregarMensaje(estado, 'usuario', 'texto', texto);
-      s = { ...s, intercambios: s.intercambios + 1, notas: [...s.notas, texto] };
+      // Las notas alimentan el MoodEntry: en charla ya se creó, no acumulan.
+      s = {
+        ...s,
+        intercambios: s.intercambios + 1,
+        notas: estado.registrada ? s.notas : [...s.notas, texto],
+      };
       if (accion.mensajeCrisis && !s.crisisMostrada) {
         s = agregarMensaje(s, 'bot', 'crisis', accion.mensajeCrisis);
         s = { ...s, crisisMostrada: true };
@@ -150,6 +158,9 @@ export function reducer(estado, accion) {
     case 'IA_RESPONDIO': {
       if (estado.fase !== 'esperandoIA') return estado;
       const s = agregarMensaje(estado, 'bot', 'texto', accion.respuesta);
+      // En charla el backend no debería mandar terminar (continuar:true);
+      // si llegara igual, se ignora: la charla extendida no tiene cierre.
+      if (estado.registrada) return { ...s, pendienteIA: null, fase: 'charla' };
       return {
         ...s,
         pendienteIA: null,
@@ -175,10 +186,11 @@ export function reducer(estado, accion) {
 
     case 'ENTRADA_CREADA': {
       if (estado.fase !== 'creandoEntrada') return estado;
-      // La sugerencia ya no se muestra aquí: vive en la pestaña "Para mí"
-      // del Wellness Hub. El cierre del guion hizo de puente y la UI ofrece
-      // los chips "Ver mi sugerencia" / "Registrar otra emoción".
-      return { ...estado, moodEntryId: accion.moodEntryId, fase: 'puente' };
+      // La sugerencia vive en la pestaña "Para mí" del Wellness Hub. Desde
+      // aquí la conversación sigue abierta (fase 'charla', Fase 9): el
+      // usuario escribe libremente y los chips "Ver mi sugerencia" /
+      // "Registrar otra emoción" quedan disponibles sin ser obligatorios.
+      return { ...estado, moodEntryId: accion.moodEntryId, registrada: true, fase: 'charla' };
     }
 
     case 'ENTRADA_FALLO': {
@@ -190,15 +202,6 @@ export function reducer(estado, accion) {
     case 'REINTENTAR_ENTRADA': {
       if (estado.fase !== 'errorEntrada') return estado;
       return { ...estado, fase: 'creandoEntrada' };
-    }
-
-    case 'VER_HUB': {
-      if (estado.fase !== 'puente') return estado;
-      // El usuario partió al Hub: el chat queda cerrado y despedido, para
-      // que al volver encuentre el chip "Registrar otra emoción".
-      let s = agregarMensaje(estado, 'usuario', 'texto', ETIQUETAS.verSugerencia);
-      s = agregarBot(s, 'despedida', DESPEDIDA);
-      return { ...s, fase: 'cerrado' };
     }
 
     case 'REINICIAR':
@@ -225,7 +228,8 @@ export function quickRepliesDe(estado) {
   }
   if (estado.fase === 'iaFallo') return { tipo: 'iaFallo' };
   if (estado.fase === 'errorEntrada') return { tipo: 'reintentar' };
-  if (estado.fase === 'puente') return { tipo: 'puente' };
-  if (estado.fase === 'cerrado') return { tipo: 'reiniciar' };
+  // Charla extendida: chips disponibles pero no obligatorios — el usuario
+  // también puede simplemente seguir escribiendo.
+  if (estado.fase === 'charla') return { tipo: 'charla' };
   return null;
 }

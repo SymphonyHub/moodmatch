@@ -5,7 +5,7 @@ import {
   quickRepliesDe,
   MAX_INTERCAMBIOS,
 } from '../features/emociones/conversacion';
-import { GUIONES, ETIQUETAS } from '../features/emociones/guiones';
+import { GUIONES } from '../features/emociones/guiones';
 import { MOOD_KEYS } from '../theme/tokens';
 
 function elegir(estado, mood) {
@@ -110,23 +110,24 @@ describe('tope duro de intercambios', () => {
   });
 });
 
-describe('puente al hub y cierre', () => {
-  function llegarAPuente() {
+describe('registro creado → charla extendida (Fase 9)', () => {
+  function llegarACharla() {
     let conv = elegir(crearConversacion(0), 'CALMADO');
     conv = reducer(conv, { tipo: 'QUICK_REPLY', replyId: 'reserva' });
     expect(conv.fase).toBe('creandoEntrada');
     return reducer(conv, { tipo: 'ENTRADA_CREADA', moodEntryId: 42 });
   }
 
-  test('ENTRADA_CREADA guarda el id y deja el chat en el puente, sin card adentro', () => {
-    const conv = llegarAPuente();
-    expect(conv.fase).toBe('puente');
+  test('ENTRADA_CREADA guarda el id y deja la charla abierta, sin card adentro', () => {
+    const conv = llegarACharla();
+    expect(conv.fase).toBe('charla');
+    expect(conv.registrada).toBe(true);
     expect(conv.moodEntryId).toBe(42);
     // La sugerencia vive en la pestaña Para mí: ningún mensaje de actividad.
     expect(conv.mensajes.some((m) => m.tipo === 'actividad')).toBe(false);
     // El último mensaje sigue siendo el cierre del guion (el puente).
     expect(ultimoMensaje(conv).autor).toBe('bot');
-    expect(quickRepliesDe(conv)).toEqual({ tipo: 'puente' });
+    expect(quickRepliesDe(conv)).toEqual({ tipo: 'charla' });
   });
 
   test('ENTRADA_FALLO ofrece reintentar y REINTENTAR_ENTRADA vuelve a crear', () => {
@@ -138,26 +139,14 @@ describe('puente al hub y cierre', () => {
     expect(reducer(fallo, { tipo: 'REINTENTAR_ENTRADA' }).fase).toBe('creandoEntrada');
   });
 
-  test('VER_HUB cierra con eco del usuario y despedida', () => {
-    const conv = reducer(llegarAPuente(), { tipo: 'VER_HUB' });
-    expect(conv.fase).toBe('cerrado');
-    expect(conv.mensajes.some((m) => m.autor === 'usuario' && m.texto === ETIQUETAS.verSugerencia)).toBe(true);
-    expect(ultimoMensaje(conv).autor).toBe('bot');
-    expect(quickRepliesDe(conv)).toEqual({ tipo: 'reiniciar' });
-  });
-
-  test('VER_HUB fuera del puente se ignora', () => {
-    const conv = elegir(crearConversacion(0), 'CALMADO');
-    expect(reducer(conv, { tipo: 'VER_HUB' })).toBe(conv);
-  });
-
-  test('REINICIAR desde el puente vuelve al estado inicial limpio', () => {
-    const conv = reducer(llegarAPuente(), { tipo: 'REINICIAR' });
+  test('REINICIAR desde la charla vuelve al estado inicial limpio', () => {
+    const conv = reducer(llegarACharla(), { tipo: 'REINICIAR' });
     expect(conv.fase).toBe('saludo');
     expect(conv.mensajes).toHaveLength(1);
     expect(conv.notas).toEqual([]);
     expect(conv.mood).toBeNull();
     expect(conv.moodEntryId).toBeNull();
+    expect(conv.registrada).toBe(false);
   });
 });
 

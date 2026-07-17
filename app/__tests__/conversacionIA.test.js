@@ -174,6 +174,81 @@ describe('IA_RESPONDIO / IA_FALLO / IA_REINTENTAR / SEGUIR_SIN_IA', () => {
   });
 });
 
+describe('charla extendida tras el registro (Fase 9)', () => {
+  // Arco inicial completo: mood → texto → cierre de la IA → MoodEntry creado.
+  function charla(mood = 'TRISTE') {
+    const enVuelo = enviar(conversando(mood), 'hoy fue un día pesado');
+    const cierre = reducer(enVuelo, { tipo: 'IA_RESPONDIO', ...respuestaTerminar() });
+    expect(cierre.fase).toBe('creandoEntrada');
+    return reducer(cierre, { tipo: 'ENTRADA_CREADA', moodEntryId: 42 });
+  }
+
+  test('ENTRADA_CREADA deja la charla abierta con los chips disponibles', () => {
+    const s = charla();
+    expect(s.fase).toBe('charla');
+    expect(s.registrada).toBe(true);
+    expect(quickRepliesDe(s)).toEqual({ tipo: 'charla' });
+  });
+
+  test('ENVIAR_TEXTO_IA en charla pone el turno en vuelo sin tocar las notas', () => {
+    const antes = charla();
+    const s = enviar(antes, 'todavía le doy vueltas');
+
+    expect(s.fase).toBe('esperandoIA');
+    expect(ultimo(s)).toMatchObject({ autor: 'usuario', texto: 'todavía le doy vueltas' });
+    expect(s.pendienteIA.texto).toBe('todavía le doy vueltas');
+    // El MoodEntry ya existe: las notas quedaron congeladas en el arco inicial.
+    expect(s.notas).toEqual(antes.notas);
+  });
+
+  test('IA_RESPONDIO en charla vuelve a charla e ignora terminar', () => {
+    const enVuelo = enviar(charla(), 'todavía le doy vueltas');
+    const s = reducer(enVuelo, { tipo: 'IA_RESPONDIO', ...respuestaTerminar() });
+
+    expect(s.fase).toBe('charla');
+    expect(s.moodEntryId).toBe(42);
+    expect(ultimo(s)).toMatchObject({ autor: 'bot', tipo: 'texto' });
+  });
+
+  test('omitirIA en charla responde plantilla `seguir` con burbuja de crisis y nunca cierra', () => {
+    const antes = charla();
+    const s = enviar(antes, 'texto sensible', {
+      omitirIA: true, mensajeCrisis: MENSAJE_CRISIS,
+    });
+
+    expect(s.fase).toBe('charla');
+    expect(s.mensajes.filter((m) => m.tipo === 'crisis')).toHaveLength(1);
+    expect(ultimo(s).texto).toBe(respuestaPlantilla('TRISTE', s.intercambios, false));
+  });
+
+  test('SEGUIR_SIN_IA en charla también responde con `seguir` y sigue en charla', () => {
+    const fallo = reducer(enviar(charla(), 'sigo aquí'), { tipo: 'IA_FALLO' });
+    expect(quickRepliesDe(fallo)).toEqual({ tipo: 'iaFallo' });
+
+    const s = reducer(fallo, { tipo: 'SEGUIR_SIN_IA' });
+    expect(s.fase).toBe('charla');
+    expect(ultimo(s).texto).toBe(respuestaPlantilla('TRISTE', s.intercambios, false));
+  });
+
+  test('la charla no tiene tope: sigue viva pasado MAX_INTERCAMBIOS', () => {
+    let s = charla();
+    for (let i = 0; i < MAX_INTERCAMBIOS + 2; i++) {
+      s = reducer(enviar(s, `mensaje libre ${i}`), {
+        tipo: 'IA_RESPONDIO', ...respuestaGemini(),
+      });
+      expect(s.fase).toBe('charla');
+    }
+    expect(s.intercambios).toBeGreaterThan(MAX_INTERCAMBIOS);
+  });
+
+  test('REINICIAR desde la charla inicia una sesión nueva limpia', () => {
+    const s = reducer(charla(), { tipo: 'REINICIAR' });
+    expect(s.fase).toBe('saludo');
+    expect(s.registrada).toBe(false);
+    expect(s.moodEntryId).toBeNull();
+  });
+});
+
 describe('historialParaIA', () => {
   test('shape del contrato, sin burbujas de crisis y truncado a los últimos 8', () => {
     const mensajes = [

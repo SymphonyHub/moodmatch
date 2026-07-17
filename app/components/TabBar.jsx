@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { Animated, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { BottomTabBarHeightCallbackContext } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { makeThemedStyles, useTheme } from '../theme/ThemeContext';
 import { springs } from '../theme/motion';
@@ -84,6 +85,10 @@ export default function TabBar({ state, descriptors, navigation }) {
   const { theme } = useTheme();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
+  // Barra custom: hay que reportar la altura medida para que
+  // useBottomTabBarHeight() entregue el valor real (lo consume el
+  // bottomOffset de ChatInputBar en el chat de Emociones) y no un estimado.
+  const reportarAltura = useContext(BottomTabBarHeightCallbackContext);
   const [barWidth, setBarWidth] = useState(0);
   // La píldora recién se muestra cuando su posición inicial ya está fijada,
   // para que no aparezca un frame en x=0 antes del primer onLayout.
@@ -107,7 +112,10 @@ export default function TabBar({ state, descriptors, navigation }) {
   return (
     <View
       style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}
-      onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)}
+      onLayout={(e) => {
+        setBarWidth(e.nativeEvent.layout.width);
+        reportarAltura?.(e.nativeEvent.layout.height);
+      }}
     >
       {positioned && (
         <Animated.View

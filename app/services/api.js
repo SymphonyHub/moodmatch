@@ -144,12 +144,14 @@ export const apiGetFriendsCount = async () => {
 // Chat de emociones con IA (CONTRATO-GEMINI.md §3). A diferencia del resto,
 // LANZA en !res.ok o respuesta malformada: useRetry.ejecutar() detecta el
 // fallo por excepción y decide reintento/fallback.
-export const apiChatRespond = async (mood, mensaje, historial = []) => {
+export const apiChatRespond = async (mood, mensaje, historial = [], continuar = false) => {
   const headers = await authHeaders();
   const res = await fetch(`${API_URL}/api/chat/respond`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ mood, mensaje, historial }),
+    // `continuar: true` (charla extendida, Fase 9): el backend no fuerza el
+    // cierre por conteo. Solo viaja cuando aplica, por compatibilidad.
+    body: JSON.stringify({ mood, mensaje, historial, ...(continuar && { continuar: true }) }),
   });
   const data = await res.json();
   if (!res.ok || typeof data?.respuesta !== 'string') {

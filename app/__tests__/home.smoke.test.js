@@ -3,12 +3,13 @@
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
+jest.mock('@expo/vector-icons/Ionicons', () => 'Ionicons');
 
 import HomeScreen from '../app/(tabs)/home';
 import ChatBubble from '../components/chat/ChatBubble';
 import QuickReplies from '../components/chat/QuickReplies';
 import TypingIndicator from '../components/chat/TypingIndicator';
-import ChatInput from '../components/chat/ChatInput';
+import ChatInputBar from '../components/chat/ChatInputBar';
 import MarkdownText from '../components/chat/MarkdownText';
 import FallbackMessage from '../components/chat/FallbackMessage';
 import useAutoScroll from '../components/chat/useAutoScroll';
@@ -18,7 +19,7 @@ import { apiChatRespond } from '../services/api';
 
 test('la pantalla y los componentes del chat exportan componentes', () => {
   [
-    HomeScreen, ChatBubble, QuickReplies, TypingIndicator, ChatInput,
+    HomeScreen, ChatBubble, QuickReplies, TypingIndicator, ChatInputBar,
     MarkdownText, FallbackMessage,
   ].forEach((Componente) => {
     expect(typeof Componente).toBe('function');

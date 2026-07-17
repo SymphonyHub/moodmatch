@@ -56,6 +56,16 @@ describe('apiChatRespond', () => {
     expect(JSON.parse(opciones.body).historial).toEqual([]);
   });
 
+  test('continuar solo viaja cuando es true (charla extendida, Fase 9)', async () => {
+    global.fetch.mockResolvedValue(respuestaHttp(respuestaGemini()));
+
+    await apiChatRespond('NEUTRO', 'un día normal');
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).not.toHaveProperty('continuar');
+
+    await apiChatRespond('NEUTRO', 'sigo pensando en eso', [], true);
+    expect(JSON.parse(global.fetch.mock.calls[1][1].body).continuar).toBe(true);
+  });
+
   test('un 200 con fuente "plantilla" es éxito (fallback transparente, no error)', async () => {
     global.fetch.mockResolvedValue(respuestaHttp(respuestaPlantilla()));
 

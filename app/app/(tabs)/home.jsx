@@ -1,5 +1,6 @@
 import { useEffect, useReducer, useState } from 'react';
-import { ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { ScrollView, View } from 'react-native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { router } from 'expo-router';
 import { apiCreateMoodEntry, apiChatRespond } from '../../services/api';
 import { MOODS } from '../../constants/moods';
@@ -16,7 +17,7 @@ import { RUTA_WELLNESS } from '../../features/wellness/paraMi';
 import ChatBubble from '../../components/chat/ChatBubble';
 import QuickReplies from '../../components/chat/QuickReplies';
 import TypingIndicator from '../../components/chat/TypingIndicator';
-import ChatInput from '../../components/chat/ChatInput';
+import ChatInputBar from '../../components/chat/ChatInputBar';
 import FallbackMessage from '../../components/chat/FallbackMessage';
 import useAutoScroll from '../../components/chat/useAutoScroll';
 
@@ -35,6 +36,7 @@ export default function HomeScreen() {
   const { ref, onScroll, onContentSizeChange, scrollToEnd } = useAutoScroll();
   const escudo = useCrisisShield();
   const { ejecutar, reset: resetRetry } = useRetry();
+  const tabBarHeight = useBottomTabBarHeight();
 
   // Revela los mensajes de a uno: los del usuario al instante, los del bot
   // tras una pausa breve de "escribiendo".
@@ -68,7 +70,9 @@ export default function HomeScreen() {
     if (conv.fase !== 'esperandoIA') return undefined;
     let cancelado = false;
     const { texto, historial } = conv.pendienteIA;
-    ejecutar(() => apiChatRespond(conv.mood, texto, historial)).then((r) => {
+    // En charla extendida (registro ya creado) viaja continuar: true — el
+    // backend no fuerza el cierre por conteo (CONTRATO-GEMINI.md §1).
+    ejecutar(() => apiChatRespond(conv.mood, texto, historial, conv.registrada)).then((r) => {
       if (cancelado) return;
       if (r.ok) {
         dispatch({
@@ -128,13 +132,13 @@ export default function HomeScreen() {
       chips = [{ id: 'seguirSinIA', label: ETIQUETAS.seguirSinConexion }];
     } else if (qr.tipo === 'reintentar') {
       chips = [{ id: 'reintentar', label: ETIQUETAS.reintentar }];
-    } else if (qr.tipo === 'puente') {
+    } else if (qr.tipo === 'charla') {
+      // Disponibles pero no obligatorios: el usuario también puede seguir
+      // escribiendo en la barra (charla extendida, Fase 9).
       chips = [
         { id: 'verSugerencia', label: ETIQUETAS.verSugerencia },
         { id: 'reiniciar', label: ETIQUETAS.reiniciar },
       ];
-    } else if (qr.tipo === 'reiniciar') {
-      chips = [{ id: 'reiniciar', label: ETIQUETAS.reiniciar }];
     }
   }
 
@@ -144,8 +148,7 @@ export default function HomeScreen() {
     else if (id === 'seguirSinIA') dispatch({ tipo: 'SEGUIR_SIN_IA' });
     else if (qr.tipo === 'reintentar') dispatch({ tipo: 'REINTENTAR_ENTRADA' });
     else if (id === 'verSugerencia') {
-      // Cierra el chat (despedida) y lleva a la pestaña Para mí del Hub.
-      dispatch({ tipo: 'VER_HUB' });
+      // Solo navega: la conversación queda abierta y sigue al volver del Hub.
       router.push(RUTA_WELLNESS);
     } else if (id === 'reiniciar') {
       escudo.reset();
@@ -163,15 +166,15 @@ export default function HomeScreen() {
     scrollToEnd();
   };
 
-  // En conversación el texto libre está siempre disponible; se oculta
-  // mientras la IA responde ('esperandoIA') o espera decisión ('iaFallo').
-  const mostrarInput = turnoUsuario && conv.fase === 'conversando' && !!conv.mood;
+  // La barra vive fija desde que hay emoción elegida (continuidad visual del
+  // chat) y se apaga cuando el turno no es del usuario o la fase no acepta
+  // texto (esperandoIA, iaFallo, creandoEntrada, errorEntrada).
+  const mostrarInput = conv.fase !== 'saludo';
+  const inputHabilitado =
+    turnoUsuario && (conv.fase === 'conversando' || conv.fase === 'charla');
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={{ flex: 1 }}>
       <ScrollView
         ref={ref}
         contentContainerStyle={styles.chat}
@@ -198,12 +201,14 @@ export default function HomeScreen() {
       </ScrollView>
 
       {mostrarInput && (
-        <ChatInput
+        <ChatInputBar
           onSend={onEnviar}
           placeholder={ETIQUETAS.placeholderTextoLibre}
+          disabled={!inputHabilitado}
+          bottomOffset={tabBarHeight}
         />
       )}
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

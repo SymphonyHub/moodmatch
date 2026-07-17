@@ -1,0 +1,12 @@
+{
+  "name": "moodmatch-iconos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Generador de icono/splash de MoodMatch: SVG en codigo -> PNGs de app/assets (Fase 9, Prioridad 3)",
+  "scripts": {
+    "generar": "node generar.js"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2"
+  }
+}

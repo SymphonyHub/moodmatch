@@ -14,6 +14,7 @@ import ChatInputBar from '../../components/chat/ChatInputBar';
 import {
   crearOptimista, confirmar, marcarFallido, prepararReintento, reconciliar,
 } from '../../friends/mensajesChat';
+import { clasificar, crearRespuesta, estaRespondida } from '../../friends/invitacionSalida';
 
 const POLL_MS = 8000;
 const MAX_LENGTH = 500;
@@ -25,7 +26,8 @@ const formatHora = (iso) => {
   return `${hh}:${mm}`;
 };
 
-function Burbuja({ mensaje, onReintentar }) {
+function Burbuja({ mensaje, texto, esInvitacion, mostrarBotones, onReintentar, onResponder }) {
+  const { theme } = useTheme();
   const styles = useStyles();
   // Un mensaje fallido pierde el fondo primario: pasa a superficie con borde
   // de peligro, y toda la burbuja es tocable para reintentar (el texto solo
@@ -38,9 +40,31 @@ function Burbuja({ mensaje, onReintentar }) {
         mensaje.failed && styles.burbujaFallida,
       ]}
     >
+      {esInvitacion && (
+        <View style={styles.invEtiqueta}>
+          <Ionicons
+            name="calendar-outline"
+            size={13}
+            color={mensaje.mine && !mensaje.failed ? theme.colors.onPrimary : theme.colors.primary}
+          />
+          <Text style={[styles.invEtiquetaTxt, mensaje.mine && !mensaje.failed && styles.invEtiquetaTxtMia]}>
+            Invitación de salida
+          </Text>
+        </View>
+      )}
       <Text style={mensaje.mine && !mensaje.failed ? styles.textoMio : styles.textoAjeno}>
-        {mensaje.message}
+        {texto}
       </Text>
+      {mostrarBotones && (
+        <View style={styles.invBotones}>
+          <Tappable style={[styles.invBtn, styles.invBtnAceptar]} onPress={() => onResponder(true)}>
+            <Text style={styles.invBtnAceptarTxt}>Aceptar</Text>
+          </Tappable>
+          <Tappable style={[styles.invBtn, styles.invBtnRechazar]} onPress={() => onResponder(false)} haptic={false}>
+            <Text style={styles.invBtnRechazarTxt}>Rechazar</Text>
+          </Tappable>
+        </View>
+      )}
       {mensaje.failed ? (
         <Text style={styles.fallo}>No se envió — toca para reintentar</Text>
       ) : (
@@ -66,7 +90,7 @@ function Burbuja({ mensaje, onReintentar }) {
 }
 
 export default function ChatScreen() {
-  const { friendId, nombre, mood } = useLocalSearchParams();
+  const { friendId, nombre, mood, draft } = useLocalSearchParams();
   const { theme } = useTheme();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
@@ -125,6 +149,26 @@ export default function ChatScreen() {
     transmitir(mensaje);
   };
 
+  // Responder una invitación de salida = enviar un mensaje marcado (aceptar/
+  // rechazar) por el flujo optimista normal. Al aparecer, estaRespondida pasa a
+  // true y los botones desaparecen.
+  const responder = (acepta) => enviar(crearRespuesta(acepta));
+
+  const renderItem = ({ item }) => {
+    const { tipo, texto } = clasificar(item.message);
+    const esInvitacion = tipo === 'invitacion';
+    return (
+      <Burbuja
+        mensaje={item}
+        texto={texto}
+        esInvitacion={esInvitacion}
+        mostrarBotones={esInvitacion && !item.mine && !item.pending && !estaRespondida(mensajes, item)}
+        onReintentar={reintentar}
+        onResponder={responder}
+      />
+    );
+  };
+
   return (
     <View style={[styles.pantalla, { paddingTop: insets.top }]}>
       <View style={styles.header}>
@@ -148,7 +192,7 @@ export default function ChatScreen() {
           ref={listRef}
           data={mensajes}
           keyExtractor={(m) => String(m.id)}
-          renderItem={({ item }) => <Burbuja mensaje={item} onReintentar={reintentar} />}
+          renderItem={renderItem}
           contentContainerStyle={styles.lista}
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
           ListEmptyComponent={(
@@ -167,6 +211,7 @@ export default function ChatScreen() {
         placeholder="Escribe un mensaje…"
         maxLength={MAX_LENGTH}
         bottomOffset={0}
+        initialText={typeof draft === 'string' ? draft : ''}
         accessory={(
           <ScrollView
             horizontal
@@ -252,6 +297,47 @@ const useStyles = makeThemedStyles((t) => ({
     color: t.colors.danger,
     marginTop: 4,
     alignSelf: 'flex-end',
+  },
+  invEtiqueta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 5,
+  },
+  invEtiquetaTxt: {
+    fontSize: t.fontSize(11),
+    ...t.typography.fonts.semibold,
+    color: t.colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  invEtiquetaTxtMia: { color: t.colors.onPrimary, opacity: 0.9 },
+  invBotones: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  invBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: t.shape.radiusMd,
+    alignItems: 'center',
+  },
+  invBtnAceptar: { backgroundColor: t.colors.primary },
+  invBtnAceptarTxt: {
+    color: t.colors.onPrimary,
+    fontSize: t.fontSize(13),
+    ...t.typography.fonts.semibold,
+  },
+  invBtnRechazar: {
+    backgroundColor: t.colors.background,
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.border,
+  },
+  invBtnRechazarTxt: {
+    color: t.colors.textMuted,
+    fontSize: t.fontSize(13),
+    ...t.typography.fonts.medium,
   },
   vacio: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
   vacioEmoji: { fontSize: 44, marginBottom: 12 },

@@ -26,6 +26,8 @@ import useKeyboardOffset from './useKeyboardOffset';
  *     accessory={<Chips />}         // opcional, se renderiza sobre el input
  *                                   // dentro de la superficie que sube con el
  *                                   // teclado (chips de ánimos rápidos)
+ *     initialText="Hola 💛"         // opcional, siembra el campo al montar
+ *                                   // (mensaje precargado desde otra pantalla)
  *   />
  *
  * - La pantalla debe QUITAR su KeyboardAvoidingView al integrarla: la barra se
@@ -33,6 +35,8 @@ import useKeyboardOffset from './useKeyboardOffset';
  * - La barra ya incluye el inset inferior de safe-area en reposo; la pantalla
  *   no debe sumar su propio paddingBottom debajo de ella.
  * - El texto es estado interno: se limpia al enviar; enviar vacío no dispara.
+ *   `initialText` solo lo siembra una vez al montar (el usuario puede editarlo
+ *   o borrarlo); un chat abierto con mensaje precargado pasa por aquí.
  * - Reemplaza a ChatInput.jsx, que queda obsoleto cuando ambas pantallas
  *   migren (lo retira el integrador).
  */
@@ -43,10 +47,11 @@ export default function ChatInputBar({
   maxLength = 500,
   bottomOffset = 0,
   accessory,
+  initialText = '',
 }) {
   const { theme } = useTheme();
   const styles = useStyles();
-  const [texto, setTexto] = useState('');
+  const [texto, setTexto] = useState(initialText);
   const paddingInferior = useKeyboardOffset({ bottomOffset });
 
   const puedeEnviar = texto.trim().length > 0 && !disabled;

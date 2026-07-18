@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, ScrollView, Text } from 'react-native';
 import { apiGetSocialActivities } from '../services/api';
 import { makeThemedStyles, useTheme } from '../theme/ThemeContext';
 import { springs, durations, easings } from '../theme/motion';
+import AccionConAmigos from './AccionConAmigos';
 
 const MAX_ACTIVIDADES = 3;
 
@@ -18,26 +19,6 @@ const useStyles = makeThemedStyles((t) => ({
     color: t.colors.textFaint,
     textAlign: 'center',
     paddingVertical: 24,
-  },
-  actCard: {
-    backgroundColor: t.colors.surface,
-    borderRadius: t.shape.radiusLg,
-    padding: 16,
-    marginBottom: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: t.colors.categories.social,
-    ...t.shadows.card,
-  },
-  actNombre: {
-    fontSize: t.fontSize(15),
-    ...t.typography.fonts.bold,
-    color: t.colors.text,
-    marginBottom: 4,
-  },
-  actDesc: {
-    fontSize: t.fontSize(13),
-    color: t.colors.textMuted,
-    lineHeight: Math.round(t.fontSize(13) * 1.5),
   },
 }));
 
@@ -96,12 +77,7 @@ export default function ConAmigosPanel() {
             No pudimos cargar las actividades. Intenta de nuevo más tarde.
           </Text>
         ) : (
-          actividades.map((act) => (
-            <View key={act.id} style={styles.actCard}>
-              <Text style={styles.actNombre}>{act.nombre}</Text>
-              <Text style={styles.actDesc}>{act.descripcion}</Text>
-            </View>
-          ))
+          actividades.map((act) => <AccionConAmigos key={act.id} actividad={act} />)
         )}
       </ScrollView>
     </Animated.View>

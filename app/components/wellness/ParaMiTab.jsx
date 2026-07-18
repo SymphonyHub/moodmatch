@@ -1,15 +1,16 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { apiGetLatestMoodEntry, apiNextSuggestion } from '../../services/api';
 import { MOOD_INFO } from '../../constants/moods';
 import { ENCABEZADOS, tiempoRelativo } from '../../features/wellness/paraMi';
-import { RUTA_HISTORIAL } from '../../features/wellness/historial';
+import { estaCompletada, marcarCompletada } from '../../features/wellness/completadas';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../Tappable';
 import Entrance from '../Entrance';
 import ActivitySuggestionCard from './ActivitySuggestionCard';
+import RachaCard from './RachaCard';
+import WidgetInteractivo from '../../wellness/WidgetInteractivo';
 
 /**
  * Contenido de la pestaña "Para mí" del Wellness Hub, montado por
@@ -28,6 +29,12 @@ export default function ParaMiTab() {
   const [moodEntry, setMoodEntry] = useState(null);
   const [actividad, setActividad] = useState(null);
   const [loadingOtra, setLoadingOtra] = useState(false);
+  const [completada, setCompletada] = useState(false);
+
+  // Identidad de "esta sugerencia para este registro": una idea nueva (otra
+  // idea) o un registro nuevo produce una clave distinta → arranca sin marcar.
+  const claveActividad =
+    moodEntry && actividad ? `${moodEntry.id}:${actividad.id}` : null;
 
   const cargar = useCallback(async () => {
     try {
@@ -53,6 +60,27 @@ export default function ParaMiTab() {
       cargar();
     }, [cargar]),
   );
+
+  // Refleja el estado persistido de completada cada vez que cambia la clave.
+  useEffect(() => {
+    let activo = true;
+    if (!claveActividad) {
+      setCompletada(false);
+      return;
+    }
+    estaCompletada(claveActividad).then((val) => {
+      if (activo) setCompletada(val);
+    });
+    return () => {
+      activo = false;
+    };
+  }, [claveActividad]);
+
+  const handleCompletar = async () => {
+    if (!claveActividad) return;
+    setCompletada(true); // optimista: la celebración corre de inmediato
+    await marcarCompletada(claveActividad);
+  };
 
   const handleOtraIdea = async () => {
     if (!moodEntry) return;
@@ -131,19 +159,18 @@ export default function ParaMiTab() {
           actividad={actividad}
           onOtraIdea={handleOtraIdea}
           loadingOtra={loadingOtra}
+          completada={completada}
+          onCompletar={handleCompletar}
         />
       </Entrance>
 
+      {/* Slot del Agente B (widget interactivo). Hoy renderiza null. */}
       <Entrance index={3}>
-        <Tappable
-          style={styles.linkHistorial}
-          onPress={() => router.push(RUTA_HISTORIAL)}
-          haptic={false}
-        >
-          <Ionicons name="time-outline" size={16} color={theme.colors.primary} />
-          <Text style={styles.linkHistorialTexto}>Ver mi historial</Text>
-          <Ionicons name="chevron-forward" size={14} color={theme.colors.primary} />
-        </Tappable>
+        <WidgetInteractivo moodType={moodEntry.moodType} />
+      </Entrance>
+
+      <Entrance index={4}>
+        <RachaCard />
       </Entrance>
     </ScrollView>
   );
@@ -200,18 +227,5 @@ const useStyles = makeThemedStyles((t) => ({
     color: t.colors.textMuted,
     marginBottom: 16,
     paddingHorizontal: 8,
-  },
-  linkHistorial: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'center',
-    gap: 4,
-    marginTop: 24,
-    padding: 8,
-  },
-  linkHistorialTexto: {
-    ...t.typography.type.body,
-    ...t.typography.fonts.semibold,
-    color: t.colors.primary,
   },
 }));

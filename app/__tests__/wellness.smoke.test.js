@@ -11,10 +11,24 @@ jest.mock('@expo/vector-icons/Ionicons', () => 'Ionicons');
 import ParaMiPanel from '../wellness/ParaMiPanel';
 import ParaMiTab from '../components/wellness/ParaMiTab';
 import ActivitySuggestionCard from '../components/wellness/ActivitySuggestionCard';
+import RachaCard from '../components/wellness/RachaCard';
+import RecompensaCompletada from '../components/wellness/RecompensaCompletada';
+import AccionSocialCard from '../components/wellness/AccionSocialCard';
+import WidgetInteractivo from '../wellness/WidgetInteractivo';
+import AccionConAmigos from '../wellness/AccionConAmigos';
 import { RUTA_WELLNESS, ENCABEZADOS, tiempoRelativo } from '../features/wellness/paraMi';
 
 test('el panel y los componentes de wellness exportan componentes', () => {
-  [ParaMiPanel, ParaMiTab, ActivitySuggestionCard].forEach((Componente) => {
+  [
+    ParaMiPanel,
+    ParaMiTab,
+    ActivitySuggestionCard,
+    RachaCard,
+    RecompensaCompletada,
+    AccionSocialCard,
+    WidgetInteractivo,
+    AccionConAmigos,
+  ].forEach((Componente) => {
     expect(typeof Componente).toBe('function');
   });
 });

@@ -1,10 +1,14 @@
-// Fuente vectorial de la identidad de app de MoodMatch (Fase 9, Prioridad 3):
-// burbuja de diálogo minimalista con "onda de calma" — índigo dominante,
-// burbuja blanca, onda coral (colorway confirmado por el usuario).
+// Fuente vectorial de la identidad de app de MoodMatch (Fase 10, Prioridad 1):
+// ícono v2 "Eclipse de vínculo" — dos anillos entrelazados sobre índigo. El
+// anillo blanco tiene grosor de fase lunar (grueso a la izquierda, afinándose
+// a la derecha → se lee como creciente = calma / "Hora Azul"); el anillo coral
+// lo abraza por abajo con tejido real sobre-bajo (= vínculo / comunidad).
+// Colorway confirmado en Fase 9; variante elegida por el usuario en Fase 10.
 //
 // Único lugar donde vive el dibujo: los PNGs de app/assets/ se regeneran con
 //   node tools/iconos/generar.js
 // y NUNCA se editan a mano. app.json ya referencia estos nombres exactos.
+// (El ícono v1 "burbuja de diálogo" queda recuperable en el historial de git.)
 const fs = require('fs');
 const path = require('path');
 const { Resvg } = require('@resvg/resvg-js');
@@ -15,86 +19,96 @@ const BLANCO = '#FFFFFF';
 
 const ASSETS = path.join(__dirname, '..', '..', 'app', 'assets');
 
-// Burbuja: rectángulo redondeado 560×380 (r=130) con colita curva integrada
-// que baja del borde inferior izquierdo — swoosh suave, no triángulo duro.
-// Bounding box del arte completo: x 232..792, y 272..777.
-const BURBUJA = `<path fill="${BLANCO}" d="M 362 272 H 662 A 130 130 0 0 1 792 402 V 522 A 130 130 0 0 1 662 652 H 480 C 474 706 442 748 382 776 C 371 781 359 773 364 762 C 378 730 384 692 384 652 L 362 652 A 130 130 0 0 1 232 522 V 402 A 130 130 0 0 1 362 272 Z"/>`;
+// ── helpers geométricos ────────────────────────────────────────────────
+// Ángulos en grados de pantalla: 0=derecha, 90=abajo, 180=izquierda (y crece
+// hacia abajo, como en SVG).
+const rad = (deg) => (deg * Math.PI) / 180;
+const polar = (cx, cy, r, deg) => [cx + r * Math.cos(rad(deg)), cy + r * Math.sin(rad(deg))];
+const fmt = (pts) => pts.map((p) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' L ');
+const cerrado = (pts) => `M ${fmt(pts)} Z`;
 
-// Onda de calma (variante B, elegida por el usuario en la ronda 2): trazo
-// caligráfico de grosor variable sobre la senoidal de 2 crestas — 66 px en
-// el centro, afinándose hasta puntas finas en los extremos. El contorno se
-// calcula muestreando la curva y desplazando por la normal, para que el
-// dibujo siga siendo código puro y no un path pegado a mano.
-const CURVA_1 = [[352, 462], [402, 398], [462, 398], [512, 462]];
-const CURVA_2 = [[512, 462], [562, 526], [622, 526], [672, 462]];
-
-const bez = (c, t) => {
-  const u = 1 - t;
-  return [
-    u * u * u * c[0][0] + 3 * u * u * t * c[1][0] + 3 * u * t * t * c[2][0] + t * t * t * c[3][0],
-    u * u * u * c[0][1] + 3 * u * u * t * c[1][1] + 3 * u * t * t * c[2][1] + t * t * t * c[3][1],
-  ];
-};
-const derivada = (c, t) => {
-  const u = 1 - t;
-  return [
-    3 * u * u * (c[1][0] - c[0][0]) + 6 * u * t * (c[2][0] - c[1][0]) + 3 * t * t * (c[3][0] - c[2][0]),
-    3 * u * u * (c[1][1] - c[0][1]) + 6 * u * t * (c[2][1] - c[1][1]) + 3 * t * t * (c[3][1] - c[2][1]),
-  ];
-};
-
-function pathOndaOrganica({ anchoMax = 66, exponente = 0.55, muestras = 64 } = {}) {
-  const arriba = [];
-  const abajo = [];
-  for (let i = 0; i <= muestras; i += 1) {
-    const t = i / muestras;
-    const [curva, tl] = t < 0.5 ? [CURVA_1, t * 2] : [CURVA_2, (t - 0.5) * 2];
-    const [x, y] = bez(curva, tl);
-    const [dx, dy] = derivada(curva, tl);
-    const largo = Math.hypot(dx, dy) || 1;
-    const w = (anchoMax / 2) * Math.sin(Math.PI * t) ** exponente;
-    arriba.push([x + (-dy / largo) * w, y + (dx / largo) * w]);
-    abajo.push([x - (-dy / largo) * w, y - (dx / largo) * w]);
+// Anillo cerrado de grosor variable: dos contornos concéntricos con fill-rule
+// evenodd (el hueco queda transparente). Devuelve el path y los puntos del
+// contorno EXTERIOR (para el cálculo de bounding box).
+function anillo(cx, cy, r, anchoDe, n = 140) {
+  const ext = [];
+  const int = [];
+  for (let i = 0; i < n; i += 1) {
+    const deg = (i / n) * 360;
+    const w = anchoDe(deg) / 2;
+    ext.push(polar(cx, cy, r + w, deg));
+    int.push(polar(cx, cy, r - w, deg));
   }
-  const p = (pt) => `${pt[0].toFixed(1)} ${pt[1].toFixed(1)}`;
-  return (
-    `M ${p(arriba[0])} ` +
-    arriba.slice(1).map((pt) => `L ${p(pt)}`).join(' ') +
-    ' ' +
-    abajo.reverse().map((pt) => `L ${p(pt)}`).join(' ') +
-    ' Z'
-  );
+  return { d: `${cerrado(ext)} ${cerrado(int.reverse())}`, borde: ext };
 }
 
-const ONDA = `<path fill="${CORAL}" d="${pathOndaOrganica()}"/>`;
+// Arco muestreado degIni→degFin (grados, con signo).
+function arco(cx, cy, r, degIni, degFin, n = 64) {
+  const pts = [];
+  for (let i = 0; i <= n; i += 1) pts.push(polar(cx, cy, r, degIni + ((degFin - degIni) * i) / n));
+  return pts;
+}
 
-// El centro visual del arte está en (512, 524) por la colita: se recentra y
-// escala respecto de ese punto para que la burbuja quede ópticamente centrada.
-const arte = (escala) =>
-  `<g transform="translate(512 512) scale(${escala}) translate(-512 -524)">${BURBUJA}${ONDA}</g>`;
+// ── El dibujo (Eclipse de vínculo) ─────────────────────────────────────
+const LUNA = { cx: 472, cy: 482, R: 205 };
+// Grosor de fase lunar: máximo a la izquierda (deg 200), mínimo a la derecha.
+const anchoLunar = (deg) => 34 + 74 * (0.5 + 0.5 * Math.cos(rad(deg - 200))) ** 1.15;
+const ANILLO_CORAL = { cx: 688, cy: 636, r: 118, grosor: 34 };
+
+function construirArte() {
+  const blanco = anillo(LUNA.cx, LUNA.cy, LUNA.R, anchoLunar);
+  const { cx, cy, r, grosor } = ANILLO_CORAL;
+  // Base del anillo coral (círculo trazado) + el tramo que mira al centro de
+  // la luna re-dibujado encima → tejido sobre-bajo real en el cruce.
+  const coralBase = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${CORAL}" stroke-width="${grosor}"/>`;
+  const encima = arco(cx, cy, r, 195, 275, 48);
+  const coralEncima = `<path fill="none" stroke="${CORAL}" stroke-width="${grosor}" stroke-linecap="round" d="M ${fmt(encima)}"/>`;
+  const svg = coralBase + `<path fill-rule="evenodd" fill="${BLANCO}" d="${blanco.d}"/>` + coralEncima;
+
+  // Bounding box y radio máximo desde el centro visual, contando el envelope
+  // exterior del anillo coral (r + grosor/2). Alimenta el auto-centrado y el
+  // escalado que garantiza la zona segura del adaptive icon.
+  const puntos = blanco.borde.concat(arco(cx, cy, r + grosor / 2, 0, 360, 72));
+  const xs = puntos.map((p) => p[0]);
+  const ys = puntos.map((p) => p[1]);
+  const centro = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
+  const radioMax = Math.max(...puntos.map((p) => Math.hypot(p[0] - centro[0], p[1] - centro[1])));
+  return { svg, centro, radioMax };
+}
+
+const ARTE = construirArte();
+
+// Recentra el arte en el lienzo y lo escala al diámetro objetivo pedido.
+const arteAEscala = (diametroObjetivo) => {
+  const escala = diametroObjetivo / (2 * ARTE.radioMax);
+  return `<g transform="translate(512 512) scale(${escala.toFixed(4)}) translate(${-ARTE.centro[0]} ${-ARTE.centro[1]})">${ARTE.svg}</g>`;
+};
 
 const svgDoc = (contenido) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">${contenido}</svg>`;
-
 const FONDO_INDIGO = `<rect width="1024" height="1024" fill="${INDIGO}"/>`;
 
+// Diámetros objetivo (fracción del lienzo de 1024):
+const D_ICONO = 0.82 * 1024; // lleno, con aire para la máscara redondeada
+const D_FOREGROUND = 0.60 * 1024; // dentro de la zona segura (radio 307 < 338)
+const D_SPLASH = 0.64 * 1024; // respira centrado en pantalla
+
 const VARIANTES = [
-  // Ícono principal (iOS/general): índigo full-bleed, arte apenas ampliado.
-  { archivo: 'icon.png', tam: 1024, svg: svgDoc(FONDO_INDIGO + arte(1.06)) },
-  // Android adaptive: el arte va en el foreground TRANSPARENTE y debe caber
-  // en la zona segura (círculo central del 66%); el fondo es índigo sólido.
+  { archivo: 'icon.png', tam: 1024, svg: svgDoc(FONDO_INDIGO + arteAEscala(D_ICONO)) },
+  // Android adaptive: arte en foreground TRANSPARENTE, dentro de la zona
+  // segura (círculo central del 66%); fondo índigo sólido aparte.
   {
     archivo: 'adaptive-icon-foreground.png',
     tam: 1024,
-    svg: svgDoc(arte(1)),
+    svg: svgDoc(arteAEscala(D_FOREGROUND)),
     zonaSegura: true,
   },
   { archivo: 'adaptive-icon-background.png', tam: 1024, svg: svgDoc(FONDO_INDIGO) },
   // Splash clásico (resizeMode contain): transparente, el fondo #232A3D lo
-  // pone app.json. Arte con aire para que respire centrado en pantalla.
-  { archivo: 'splash-icon.png', tam: 1024, svg: svgDoc(arte(0.95)) },
-  // Favicon web (app.json lo referencia y no existía hasta este rebrand).
-  { archivo: 'favicon.png', tam: 64, svg: svgDoc(FONDO_INDIGO + arte(1.06)) },
+  // pone app.json.
+  { archivo: 'splash-icon.png', tam: 1024, svg: svgDoc(arteAEscala(D_SPLASH)) },
+  // Favicon web (app.json lo referencia).
+  { archivo: 'favicon.png', tam: 64, svg: svgDoc(FONDO_INDIGO + arteAEscala(D_ICONO)) },
 ];
 
 // La zona segura del adaptive icon es el círculo central de diámetro 66%:

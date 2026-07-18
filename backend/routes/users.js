@@ -14,22 +14,67 @@ const VALID_THEME_PREFERENCES = [
   'personalizado',
 ];
 
-// Debe coincidir con isValidCustomConfig del frontend (app/theme/customTheme.js).
+// Debe coincidir con los validadores del frontend (app/theme/customTheme.js):
+// isValidPaletteConfig / isValidPalette / isValidCustomTheme. El valor
+// persistido es el contenedor { activeId, palettes[] }; también se acepta el
+// objeto legacy de 4 claves para la transición (clientes viejos).
 const HEX_RE = /^#[0-9a-f]{6}$/i;
-const VALID_BODY_FONTS = ['manrope', 'nunito', 'baloo2'];
-const CUSTOM_THEME_KEYS = ['primary', 'accent', 'background', 'bodyFont'];
+const VALID_BODY_FONTS = ['manrope', 'nunito', 'baloo2', 'rubik', 'lora', 'bitter', 'fraunces'];
+const CONFIG_KEYS = ['primary', 'accent', 'background', 'bodyFont'];
+const PALETTE_KEYS = ['id', 'name', ...CONFIG_KEYS];
+const CONTAINER_KEYS = ['activeId', 'palettes'];
+const MAX_PALETAS = 5;
+const NAME_MAX = 24;
 
-function isValidCustomTheme(value) {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+function esObjeto(v) {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+function isValidPaletteConfig(value) {
+  if (!esObjeto(value)) return false;
   const keys = Object.keys(value);
-  if (keys.length !== CUSTOM_THEME_KEYS.length) return false;
-  if (!CUSTOM_THEME_KEYS.every((k) => keys.includes(k))) return false;
+  if (keys.length !== CONFIG_KEYS.length || !CONFIG_KEYS.every((k) => keys.includes(k))) {
+    return false;
+  }
   return (
     HEX_RE.test(value.primary) &&
     HEX_RE.test(value.accent) &&
     HEX_RE.test(value.background) &&
     VALID_BODY_FONTS.includes(value.bodyFont)
   );
+}
+
+function isValidPalette(value) {
+  if (!esObjeto(value)) return false;
+  const keys = Object.keys(value);
+  if (keys.length !== PALETTE_KEYS.length || !PALETTE_KEYS.every((k) => keys.includes(k))) {
+    return false;
+  }
+  if (typeof value.id !== 'string' || value.id.length === 0) return false;
+  if (typeof value.name !== 'string') return false;
+  const name = value.name.trim();
+  if (name.length === 0 || value.name.length > NAME_MAX) return false;
+  const { id, name: _n, ...config } = value;
+  return isValidPaletteConfig(config);
+}
+
+function isValidContainer(value) {
+  if (!esObjeto(value)) return false;
+  const keys = Object.keys(value);
+  if (keys.length !== CONTAINER_KEYS.length || !CONTAINER_KEYS.every((k) => keys.includes(k))) {
+    return false;
+  }
+  if (!Array.isArray(value.palettes)) return false;
+  if (value.palettes.length < 1 || value.palettes.length > MAX_PALETAS) return false;
+  if (!value.palettes.every(isValidPalette)) return false;
+  const ids = value.palettes.map((p) => p.id);
+  if (new Set(ids).size !== ids.length) return false;
+  return typeof value.activeId === 'string' && ids.includes(value.activeId);
+}
+
+// Acepta el contenedor nuevo o el objeto legacy de 4 claves.
+function isValidCustomTheme(value) {
+  return isValidContainer(value) || isValidPaletteConfig(value);
 }
 
 const USER_SELECT = {

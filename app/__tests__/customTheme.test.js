@@ -5,7 +5,7 @@ import {
   SWATCHES,
   DEFAULT_CUSTOM_CONFIG,
   AA_MIN,
-  isValidCustomConfig,
+  isValidPaletteConfig,
   makeCustomTheme,
   evaluateCustomTheme,
   mix,
@@ -30,10 +30,16 @@ const configOscura = {
   bodyFont: 'nunito',
 };
 
-describe('isValidCustomConfig', () => {
+describe('isValidPaletteConfig', () => {
   test('acepta la config por defecto y una oscura', () => {
-    expect(isValidCustomConfig(DEFAULT_CUSTOM_CONFIG)).toBe(true);
-    expect(isValidCustomConfig(configOscura)).toBe(true);
+    expect(isValidPaletteConfig(DEFAULT_CUSTOM_CONFIG)).toBe(true);
+    expect(isValidPaletteConfig(configOscura)).toBe(true);
+  });
+
+  test('acepta las fuentes nuevas de Fase 10', () => {
+    ['rubik', 'lora', 'bitter', 'fraunces'].forEach((bodyFont) => {
+      expect(isValidPaletteConfig({ ...DEFAULT_CUSTOM_CONFIG, bodyFont })).toBe(true);
+    });
   });
 
   test.each([
@@ -49,7 +55,7 @@ describe('isValidCustomConfig', () => {
       { primary: '#4a5fc1', accent: '#b34c30', background: '#f5f6fa' },
     ],
   ])('rechaza %s', (_caso, value) => {
-    expect(isValidCustomConfig(value)).toBe(false);
+    expect(isValidPaletteConfig(value)).toBe(false);
   });
 });
 

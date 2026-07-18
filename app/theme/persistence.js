@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DEFAULT_THEME_ID, VALID_THEME_CHOICES } from './themes';
-import { isValidCustomConfig } from './customTheme';
+import { normalizeCustomTheme } from './customTheme';
 
 const STORAGE_KEY = 'moodmatch.themeChoice';
 const CUSTOM_THEME_KEY = 'moodmatch.customTheme';
@@ -22,22 +22,22 @@ export async function saveThemeChoice(choice) {
   }
 }
 
-// Paleta del tema personalizado. null = no hay paleta guardada (o está
-// corrupta): el ThemeProvider cae a DEFAULT_CUSTOM_CONFIG.
+// Contenedor de paletas del tema personalizado ({ activeId, palettes }). null =
+// no hay nada guardado (o está corrupto): el ThemeProvider cae a
+// DEFAULT_CUSTOM_THEME. normalizeCustomTheme migra el objeto legacy de 4 claves.
 export async function loadCustomThemeConfig() {
   try {
     const stored = await AsyncStorage.getItem(CUSTOM_THEME_KEY);
     if (!stored) return null;
-    const parsed = JSON.parse(stored);
-    return isValidCustomConfig(parsed) ? parsed : null;
+    return normalizeCustomTheme(JSON.parse(stored));
   } catch {
     return null;
   }
 }
 
-export async function saveCustomThemeConfig(config) {
+export async function saveCustomThemeConfig(container) {
   try {
-    await AsyncStorage.setItem(CUSTOM_THEME_KEY, JSON.stringify(config));
+    await AsyncStorage.setItem(CUSTOM_THEME_KEY, JSON.stringify(container));
   } catch {
     // Igual que el choice: sin storage la paleta queda aplicada en memoria.
   }

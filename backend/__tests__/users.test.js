@@ -36,6 +36,15 @@ const paletaValida = {
   bodyFont: 'manrope',
 };
 
+// Contenedor multi-paleta (Fase 10 P2): forma nueva que persiste el frontend.
+const contenedorValido = {
+  activeId: 'p1',
+  palettes: [
+    { id: 'p1', name: 'Día', ...paletaValida },
+    { id: 'p2', name: 'Noche', primary: '#93a3f0', accent: '#f0977a', background: '#12141c', bodyFont: 'lora' },
+  ],
+};
+
 beforeEach(() => jest.clearAllMocks());
 
 describe('GET /api/users/me — preferencia de tema', () => {
@@ -220,6 +229,18 @@ describe('PATCH /api/users/me — paleta personalizada', () => {
     expect(prisma.user.update.mock.calls[0][0].data).toEqual({ customTheme: Prisma.DbNull });
   });
 
+  test('acepta el contenedor multi-paleta y lo guarda tal cual', async () => {
+    prisma.user.update.mockResolvedValue({ ...usuarioBase, customTheme: contenedorValido });
+
+    const res = await request(app)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ customTheme: contenedorValido });
+
+    expect(res.status).toBe(200);
+    expect(prisma.user.update.mock.calls[0][0].data).toEqual({ customTheme: contenedorValido });
+  });
+
   test.each([
     ['hex inválido', { ...paletaValida, primary: '#12g' }],
     ['hex corto', { ...paletaValida, background: '#fff' }],
@@ -228,6 +249,9 @@ describe('PATCH /api/users/me — paleta personalizada', () => {
     ['clave faltante', { primary: '#4a5fc1', accent: '#b34c30', background: '#f5f6fa' }],
     ['array', ['#4a5fc1']],
     ['string', 'no-un-objeto'],
+    ['contenedor sin paletas', { activeId: 'p1', palettes: [] }],
+    ['contenedor con activeId ausente', { activeId: 'z', palettes: [{ id: 'p1', name: 'Día', ...paletaValida }] }],
+    ['paleta sin nombre en el contenedor', { activeId: 'p1', palettes: [{ id: 'p1', ...paletaValida }] }],
   ])('rechaza paleta inválida (%s) con 400', async (_caso, customTheme) => {
     const res = await request(app)
       .patch('/api/users/me')

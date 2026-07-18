@@ -7,7 +7,15 @@ import {
   loadCustomThemeConfig,
   saveCustomThemeConfig,
 } from './persistence';
-import { makeCustomTheme, DEFAULT_CUSTOM_CONFIG } from './customTheme';
+import {
+  makeCustomTheme,
+  DEFAULT_CUSTOM_CONFIG,
+  DEFAULT_CUSTOM_THEME,
+  activePalette,
+  upsertPalette,
+  removePalette,
+  setActive,
+} from './customTheme';
 import { apiUpdateThemePreference, apiUpdateMe } from '../services/api';
 
 const ThemeContext = createContext(null);
@@ -15,7 +23,8 @@ const ThemeContext = createContext(null);
 export function ThemeProvider({ children }) {
   // null = aún no se hidrató la elección guardada; el root layout no renderiza hasta entonces.
   const [choice, setChoice] = useState(null);
-  // Paleta del tema personalizado (null = nunca configurada → default).
+  // Contenedor de paletas personalizadas { activeId, palettes } (null = nunca
+  // configurado → DEFAULT_CUSTOM_THEME).
   const [customConfig, setCustomConfigState] = useState(null);
   // Velo de transición al aplicar un tema: { color, opacity } mientras anima.
   const [veil, setVeil] = useState(null);
@@ -42,34 +51,52 @@ export function ThemeProvider({ children }) {
     if (sync) apiUpdateThemePreference(next).catch(() => {});
   }, []);
 
-  // Paleta personalizada: persiste local y sincroniza best-effort, con la
+  // Contenedor de paletas: persiste local y sincroniza best-effort, con la
   // misma semántica de sync que setThemeChoice.
-  const setCustomConfig = useCallback((next, { sync = true } = {}) => {
+  const setCustomContainer = useCallback((next, { sync = true } = {}) => {
     setCustomConfigState(next);
     saveCustomThemeConfig(next);
     if (sync) apiUpdateMe({ customTheme: next }).catch(() => {});
   }, []);
 
-  // El tema personalizado se construye una sola vez por config: makeThemedStyles
+  // Gestión de paletas: parten del contenedor actual (o el default) y aplican
+  // una operación pura antes de persistir. Alta/edición, borrado y activación.
+  const base = () => customConfig ?? DEFAULT_CUSTOM_THEME;
+  const savePalette = useCallback(
+    (palette) => setCustomContainer(upsertPalette(base(), palette)),
+    [customConfig, setCustomContainer],
+  );
+  const deletePalette = useCallback(
+    (id) => setCustomContainer(removePalette(base(), id)),
+    [customConfig, setCustomContainer],
+  );
+  const setActivePalette = useCallback(
+    (id) => setCustomContainer(setActive(base(), id)),
+    [customConfig, setCustomContainer],
+  );
+
+  // El tema personalizado se construye desde la paleta activa. makeThemedStyles
   // cachea estilos por identidad del objeto tema (WeakMap).
   const customTheme = useMemo(
-    () => makeCustomTheme(customConfig ?? DEFAULT_CUSTOM_CONFIG),
+    () => makeCustomTheme(activePalette(customConfig ?? DEFAULT_CUSTOM_THEME) ?? DEFAULT_CUSTOM_CONFIG),
     [customConfig],
   );
 
   // Aplica un tema con transición suave: sube un velo del color de fondo del tema
   // entrante, conmuta el tema debajo del velo y lo desvanece. Para el modo
-  // personalizado, `custom` trae la paleta a aplicar junto con la elección.
+  // personalizado, `custom` (opcional) es un contenedor a persistir junto con
+  // la elección.
   const applyThemeChoice = useCallback(
     (next, { custom } = {}) => {
+      const container = custom ?? customConfig ?? DEFAULT_CUSTOM_THEME;
       const target =
         next === CUSTOM_THEME_ID
-          ? makeCustomTheme(custom ?? customConfig ?? DEFAULT_CUSTOM_CONFIG)
+          ? makeCustomTheme(activePalette(container) ?? DEFAULT_CUSTOM_CONFIG)
           : THEMES[resolveThemeId(next, systemScheme)];
       const opacity = new Animated.Value(0);
       setVeil({ color: target.colors.background, opacity });
       Animated.timing(opacity, { toValue: 1, duration: 160, useNativeDriver: true }).start(() => {
-        if (custom) setCustomConfig(custom);
+        if (custom) setCustomContainer(custom);
         setThemeChoice(next);
         Animated.timing(opacity, {
           toValue: 0,
@@ -79,7 +106,7 @@ export function ThemeProvider({ children }) {
         }).start(() => setVeil(null));
       });
     },
-    [systemScheme, setThemeChoice, setCustomConfig, customConfig],
+    [systemScheme, setThemeChoice, setCustomContainer, customConfig],
   );
 
   const hydrated = choice !== null;
@@ -96,9 +123,12 @@ export function ThemeProvider({ children }) {
       hydrated,
       setThemeChoice,
       applyThemeChoice,
-      customConfig,
+      customConfig: customConfig ?? DEFAULT_CUSTOM_THEME,
       customTheme,
-      setCustomConfig,
+      setCustomContainer,
+      savePalette,
+      deletePalette,
+      setActivePalette,
       isApplying: veil !== null,
       veil,
     }),
@@ -110,7 +140,10 @@ export function ThemeProvider({ children }) {
       applyThemeChoice,
       customConfig,
       customTheme,
-      setCustomConfig,
+      setCustomContainer,
+      savePalette,
+      deletePalette,
+      setActivePalette,
       veil,
     ],
   );

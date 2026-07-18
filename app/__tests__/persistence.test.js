@@ -10,7 +10,7 @@ import {
   saveCustomThemeConfig,
 } from '../theme/persistence';
 import { DEFAULT_THEME_ID } from '../theme/themes';
-import { DEFAULT_CUSTOM_CONFIG } from '../theme/customTheme';
+import { DEFAULT_CUSTOM_CONFIG, DEFAULT_CUSTOM_THEME } from '../theme/customTheme';
 
 const STORAGE_KEY = 'moodmatch.themeChoice';
 const CUSTOM_KEY = 'moodmatch.customTheme';
@@ -60,9 +60,17 @@ describe('saveThemeChoice', () => {
 });
 
 describe('load/saveCustomThemeConfig', () => {
-  test('roundtrip de una paleta válida', async () => {
-    await saveCustomThemeConfig(DEFAULT_CUSTOM_CONFIG);
-    expect(await loadCustomThemeConfig()).toEqual(DEFAULT_CUSTOM_CONFIG);
+  test('roundtrip del contenedor de paletas', async () => {
+    await saveCustomThemeConfig(DEFAULT_CUSTOM_THEME);
+    expect(await loadCustomThemeConfig()).toEqual(DEFAULT_CUSTOM_THEME);
+  });
+
+  test('migra al vuelo un objeto legacy de 4 claves a un contenedor', async () => {
+    await AsyncStorage.setItem(CUSTOM_KEY, JSON.stringify(DEFAULT_CUSTOM_CONFIG));
+    const cargado = await loadCustomThemeConfig();
+    expect(cargado.palettes).toHaveLength(1);
+    expect(cargado.activeId).toBe(cargado.palettes[0].id);
+    expect(cargado.palettes[0]).toMatchObject(DEFAULT_CUSTOM_CONFIG);
   });
 
   test('devuelve null si no hay nada guardado', async () => {
@@ -86,6 +94,6 @@ describe('load/saveCustomThemeConfig', () => {
 
   test('save no lanza si el almacenamiento falla', async () => {
     AsyncStorage.setItem.mockRejectedValueOnce(new Error('storage roto'));
-    await expect(saveCustomThemeConfig(DEFAULT_CUSTOM_CONFIG)).resolves.toBeUndefined();
+    await expect(saveCustomThemeConfig(DEFAULT_CUSTOM_THEME)).resolves.toBeUndefined();
   });
 });

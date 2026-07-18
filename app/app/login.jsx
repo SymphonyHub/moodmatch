@@ -11,12 +11,12 @@ import { apiLogin, apiRegister, apiUpdateThemePreference, apiUpdateMe } from '..
 import { getPendingInvite, clearPendingInvite } from '../utils/pendingInvite';
 import { useTheme, makeThemedStyles } from '../theme/ThemeContext';
 import { VALID_THEME_CHOICES } from '../theme/themes';
-import { isValidCustomConfig } from '../theme/customTheme';
+import { normalizeCustomTheme } from '../theme/customTheme';
 
 const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
 export default function LoginScreen() {
-  const { theme, themeChoice, setThemeChoice, customConfig, setCustomConfig } = useTheme();
+  const { theme, themeChoice, setThemeChoice, customConfig, setCustomContainer } = useTheme();
   const styles = useStyles();
 
   const [modo, setModo] = useState('login');
@@ -93,12 +93,12 @@ export default function LoginScreen() {
         apiUpdateThemePreference(themeChoice).catch(() => {});
       }
 
-      // Lo mismo con la paleta personalizada: se valida SIEMPRE lo que venga
-      // del servidor antes de derivarle un tema (un hex corrupto rompería la
-      // derivación de colores).
-      const serverCustom = data.user?.customTheme;
-      if (isValidCustomConfig(serverCustom)) {
-        setCustomConfig(serverCustom, { sync: false });
+      // Lo mismo con las paletas personalizadas: se normaliza SIEMPRE lo que
+      // venga del servidor (migra un objeto legacy y descarta datos corruptos)
+      // antes de derivar un tema.
+      const serverCustom = normalizeCustomTheme(data.user?.customTheme);
+      if (serverCustom) {
+        setCustomContainer(serverCustom, { sync: false });
       } else if (customConfig) {
         apiUpdateMe({ customTheme: customConfig }).catch(() => {});
       }

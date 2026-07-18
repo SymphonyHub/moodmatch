@@ -18,6 +18,22 @@ import { Baloo2_400Regular } from '@expo-google-fonts/baloo-2/400Regular';
 import { Baloo2_500Medium } from '@expo-google-fonts/baloo-2/500Medium';
 import { Baloo2_600SemiBold } from '@expo-google-fonts/baloo-2/600SemiBold';
 import { Baloo2_700Bold } from '@expo-google-fonts/baloo-2/700Bold';
+import { Rubik_400Regular } from '@expo-google-fonts/rubik/400Regular';
+import { Rubik_500Medium } from '@expo-google-fonts/rubik/500Medium';
+import { Rubik_600SemiBold } from '@expo-google-fonts/rubik/600SemiBold';
+import { Rubik_700Bold } from '@expo-google-fonts/rubik/700Bold';
+import { Lora_400Regular } from '@expo-google-fonts/lora/400Regular';
+import { Lora_500Medium } from '@expo-google-fonts/lora/500Medium';
+import { Lora_600SemiBold } from '@expo-google-fonts/lora/600SemiBold';
+import { Lora_700Bold } from '@expo-google-fonts/lora/700Bold';
+import { Bitter_400Regular } from '@expo-google-fonts/bitter/400Regular';
+import { Bitter_500Medium } from '@expo-google-fonts/bitter/500Medium';
+import { Bitter_600SemiBold } from '@expo-google-fonts/bitter/600SemiBold';
+import { Bitter_700Bold } from '@expo-google-fonts/bitter/700Bold';
+import { Fraunces_400Regular } from '@expo-google-fonts/fraunces/400Regular';
+import { Fraunces_500Medium } from '@expo-google-fonts/fraunces/500Medium';
+import { Fraunces_600SemiBold } from '@expo-google-fonts/fraunces/600SemiBold';
+import { Fraunces_700Bold } from '@expo-google-fonts/fraunces/700Bold';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { ThemeProvider, ThemeVeil, useTheme } from '../theme/ThemeContext';
 import { FriendsCountProvider } from '../friends/FriendsCountContext';
@@ -45,6 +61,22 @@ function ThemedStack() {
     Baloo2_500Medium,
     Baloo2_600SemiBold,
     Baloo2_700Bold,
+    Rubik_400Regular,
+    Rubik_500Medium,
+    Rubik_600SemiBold,
+    Rubik_700Bold,
+    Lora_400Regular,
+    Lora_500Medium,
+    Lora_600SemiBold,
+    Lora_700Bold,
+    Bitter_400Regular,
+    Bitter_500Medium,
+    Bitter_600SemiBold,
+    Bitter_700Bold,
+    Fraunces_400Regular,
+    Fraunces_500Medium,
+    Fraunces_600SemiBold,
+    Fraunces_700Bold,
   });
 
   // Si una fuente fallara (no debería: son assets locales), seguimos con la del sistema.

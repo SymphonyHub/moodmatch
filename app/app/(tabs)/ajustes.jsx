@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, Text, ScrollView, useColorScheme } from 'react-native';
+import { View, Text, TextInput, ScrollView, useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { THEMES, AUTO_THEME_ID, CUSTOM_THEME_ID, resolveThemeId } from '../../theme/themes';
@@ -9,17 +9,28 @@ import {
   BODY_FONT_IDS,
   BODY_FONTS,
   DEFAULT_CUSTOM_CONFIG,
+  MAX_PALETAS,
+  NAME_MAX,
   makeCustomTheme,
   evaluateCustomTheme,
+  configDe,
+  nuevaPaletaId,
+  upsertPalette,
+  setActive,
 } from '../../theme/customTheme';
 import { MOODS } from '../../constants/moods';
 import Tappable from '../../components/Tappable';
+import { HueBar, LumBar } from '../../components/color/HueBar';
 
 const THEME_OPTIONS = [
   { id: AUTO_THEME_ID, name: 'Automático', tagline: 'Sigue el modo del sistema' },
   ...Object.values(THEMES).map((t) => ({ id: t.id, name: t.name, tagline: t.tagline })),
   { id: CUSTOM_THEME_ID, name: 'Personalizado', tagline: 'Tus colores y tu fuente' },
 ];
+
+// La paleta que el contenedor marca como activa (o la primera como red de red).
+const paletaActiva = (container) =>
+  container.palettes.find((p) => p.id === container.activeId) ?? container.palettes[0];
 
 // Mini-mock de la app: dentro de un ThemeScope muestra cómo se vería el tema
 // candidato sin aplicarlo globalmente.
@@ -64,7 +75,6 @@ function ThemeOptionRow({ option, selected, onPress, customDraft }) {
   const swatchTheme =
     option.id === AUTO_THEME_ID || isCustomOption ? null : THEMES[option.id];
 
-  // Personalizado muestra la paleta del borrador actual; los temas base, la suya.
   const swatchColors = isCustomOption
     ? [customDraft.primary, customDraft.background, customDraft.accent]
     : swatchTheme
@@ -99,28 +109,47 @@ function ThemeOptionRow({ option, selected, onPress, customDraft }) {
   );
 }
 
-function SwatchGrid({ label, colors, selected, onSelect }) {
+// Fila de swatches sin etiqueta: atajos rápidos que fijan un color (y de paso
+// reposicionan los thumbs de hue/luminosidad, que se derivan del hex).
+function SwatchRow({ colors, selected, onSelect, label }) {
+  const styles = useStyles();
+  return (
+    <View style={styles.swatchGrid}>
+      {colors.map((color) => {
+        const isSelected = color === selected;
+        return (
+          <Tappable
+            key={color}
+            onPress={() => onSelect(color)}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: isSelected }}
+            accessibilityLabel={`${label}: color ${color}`}
+            style={[styles.swatchOuter, isSelected && styles.swatchOuterSelected]}
+          >
+            <View style={[styles.swatchPick, { backgroundColor: color }]} />
+          </Tappable>
+        );
+      })}
+    </View>
+  );
+}
+
+// Un color de marca (primario/acento): matiz y luminosidad continuos + atajos.
+function ColorField({ label, value, onChange, swatches, sliderId }) {
   const styles = useStyles();
   return (
     <View style={styles.swatchBlock}>
-      <Text style={styles.swatchLabel}>{label}</Text>
-      <View style={styles.swatchGrid}>
-        {colors.map((color) => {
-          const isSelected = color === selected;
-          return (
-            <Tappable
-              key={color}
-              onPress={() => onSelect(color)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={`${label}: color ${color}`}
-              style={[styles.swatchOuter, isSelected && styles.swatchOuterSelected]}
-            >
-              <View style={[styles.swatchPick, { backgroundColor: color }]} />
-            </Tappable>
-          );
-        })}
+      <View style={styles.colorHead}>
+        <Text style={styles.swatchLabel}>{label}</Text>
+        <View style={[styles.colorPreview, { backgroundColor: value }]} />
       </View>
+      <Text style={styles.sliderCap}>Matiz</Text>
+      <HueBar value={value} onChange={onChange} id={sliderId} />
+      <View style={styles.sliderGap} />
+      <Text style={styles.sliderCap}>Luminosidad</Text>
+      <LumBar value={value} onChange={onChange} id={sliderId} />
+      <View style={styles.sliderGap} />
+      <SwatchRow colors={swatches} selected={value} onSelect={onChange} label={label} />
     </View>
   );
 }
@@ -139,7 +168,7 @@ function FontPicker({ selected, onSelect }) {
               onPress={() => onSelect(id)}
               accessibilityRole="radio"
               accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={`Fuente ${BODY_FONTS[id].label}`}
+              accessibilityLabel={`Fuente ${BODY_FONTS[id].label}: ${BODY_FONTS[id].tagline}`}
               style={[styles.fontChip, isSelected && styles.fontChipSelected]}
             >
               <Text
@@ -190,39 +219,144 @@ function ContrastNotice({ issues }) {
   );
 }
 
-function CustomThemeEditor({ draft, onChange, issues }) {
+// Lista de paletas guardadas: cada tarjeta se puede seleccionar (editar +
+// previsualizar) o borrar; "＋ Nueva" hasta MAX_PALETAS.
+function PaletteList({ palettes, draftId, activeId, applied, onSelect, onDelete, onNew }) {
   const styles = useStyles();
   return (
-    <View style={styles.editor}>
-      <SwatchGrid
-        label="Fondo"
-        colors={SWATCHES.background}
-        selected={draft.background}
-        onSelect={(background) => onChange({ ...draft, background })}
-      />
-      <SwatchGrid
-        label="Color primario"
-        colors={SWATCHES.primary}
-        selected={draft.primary}
-        onSelect={(primary) => onChange({ ...draft, primary })}
-      />
-      <SwatchGrid
-        label="Acento"
-        colors={SWATCHES.accent}
-        selected={draft.accent}
-        onSelect={(accent) => onChange({ ...draft, accent })}
-      />
-      <FontPicker
-        selected={draft.bodyFont}
-        onSelect={(bodyFont) => onChange({ ...draft, bodyFont })}
-      />
-      <ContrastNotice issues={issues} />
+    <View style={styles.swatchBlock}>
+      <Text style={styles.swatchLabel}>Mis paletas</Text>
+      {palettes.map((p) => {
+        const isDraft = p.id === draftId;
+        const enUso = applied && p.id === activeId;
+        return (
+          <View key={p.id} style={[styles.palRow, isDraft && styles.palRowSelected]}>
+            <Tappable
+              style={styles.palMain}
+              onPress={() => onSelect(p)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: isDraft }}
+              accessibilityLabel={`Paleta ${p.name}${enUso ? ', en uso' : ''}`}
+            >
+              <View style={styles.palSwatches}>
+                {[p.primary, p.background, p.accent].map((c, i) => (
+                  <View key={`${c}-${i}`} style={[styles.palSwatch, { backgroundColor: c }]} />
+                ))}
+              </View>
+              <View style={styles.palInfo}>
+                <Text style={styles.palName} numberOfLines={1}>{p.name}</Text>
+                <Text style={styles.palFont}>
+                  {BODY_FONTS[p.bodyFont]?.label ?? p.bodyFont}
+                  {enUso ? '  ·  en uso' : ''}
+                </Text>
+              </View>
+            </Tappable>
+            {palettes.length > 1 ? (
+              <Tappable
+                style={styles.palDelete}
+                onPress={() => onDelete(p.id)}
+                haptic={false}
+                accessibilityLabel={`Borrar paleta ${p.name}`}
+              >
+                <Text style={styles.palDeleteTxt}>Borrar</Text>
+              </Tappable>
+            ) : null}
+          </View>
+        );
+      })}
+      {palettes.length < MAX_PALETAS ? (
+        <Tappable style={styles.palNew} onPress={onNew} accessibilityLabel="Crear paleta nueva">
+          <Text style={styles.palNewTxt}>＋ Nueva paleta</Text>
+        </Tappable>
+      ) : (
+        <Text style={styles.palLimit}>Máximo {MAX_PALETAS} paletas guardadas.</Text>
+      )}
     </View>
   );
 }
 
-// Tarjeta de sección: agrupa visualmente Apariencia / Cuenta con la misma
-// jerarquía tipográfica del resto de la app.
+function CustomThemeEditor({
+  draft,
+  onChangeConfig,
+  onRename,
+  issues,
+  palettes,
+  activeId,
+  applied,
+  onSelectPalette,
+  onDeletePalette,
+  onNewPalette,
+  onSavePalette,
+  canSave,
+}) {
+  const styles = useStyles();
+  return (
+    <View style={styles.editor}>
+      <PaletteList
+        palettes={palettes}
+        draftId={draft.id}
+        activeId={activeId}
+        applied={applied}
+        onSelect={onSelectPalette}
+        onDelete={onDeletePalette}
+        onNew={onNewPalette}
+      />
+
+      <View style={styles.swatchBlock}>
+        <Text style={styles.swatchLabel}>Nombre</Text>
+        <TextInput
+          style={styles.nameInput}
+          value={draft.name}
+          onChangeText={onRename}
+          maxLength={NAME_MAX}
+          placeholder="Mi paleta"
+          placeholderTextColor={styles.placeholder.color}
+          accessibilityLabel="Nombre de la paleta"
+        />
+      </View>
+
+      <ColorField
+        label="Color primario"
+        value={draft.primary}
+        onChange={(primary) => onChangeConfig({ primary })}
+        swatches={SWATCHES.primary}
+        sliderId="primary"
+      />
+      <ColorField
+        label="Acento"
+        value={draft.accent}
+        onChange={(accent) => onChangeConfig({ accent })}
+        swatches={SWATCHES.accent}
+        sliderId="accent"
+      />
+      <View style={styles.swatchBlock}>
+        <Text style={styles.swatchLabel}>Fondo</Text>
+        <SwatchRow
+          colors={SWATCHES.background}
+          selected={draft.background}
+          onSelect={(background) => onChangeConfig({ background })}
+          label="Fondo"
+        />
+      </View>
+      <FontPicker
+        selected={draft.bodyFont}
+        onSelect={(bodyFont) => onChangeConfig({ bodyFont })}
+      />
+
+      <ContrastNotice issues={issues} />
+
+      <Tappable
+        style={[styles.btnGuardar, !canSave && styles.btnGuardarDisabled]}
+        onPress={onSavePalette}
+        disabled={!canSave}
+        accessibilityLabel="Guardar paleta"
+      >
+        <Text style={styles.btnGuardarTxt}>Guardar paleta</Text>
+      </Tappable>
+    </View>
+  );
+}
+
 function SectionCard({ title, hint, children }) {
   const styles = useStyles();
   return (
@@ -235,14 +369,16 @@ function SectionCard({ title, hint, children }) {
 }
 
 export default function AjustesScreen() {
-  const { themeChoice, applyThemeChoice, isApplying, customConfig } = useTheme();
+  const { themeChoice, applyThemeChoice, isApplying, customConfig, savePalette, deletePalette } =
+    useTheme();
   const styles = useStyles();
   const systemScheme = useColorScheme();
   const [candidate, setCandidate] = useState(themeChoice);
-  const [draft, setDraft] = useState(customConfig ?? DEFAULT_CUSTOM_CONFIG);
+  // draft = paleta en edición (copia local con id/name/config). Arranca en la activa.
+  const [draft, setDraft] = useState(() => ({ ...paletaActiva(customConfig) }));
 
   const isCustomCandidate = candidate === CUSTOM_THEME_ID;
-  const draftTheme = useMemo(() => makeCustomTheme(draft), [draft]);
+  const draftTheme = useMemo(() => makeCustomTheme(configDe(draft)), [draft]);
   const contrastIssues = useMemo(() => evaluateCustomTheme(draftTheme), [draftTheme]);
 
   const previewTheme = isCustomCandidate
@@ -250,13 +386,45 @@ export default function AjustesScreen() {
     : THEMES[resolveThemeId(candidate, systemScheme)];
   const candidateName = THEME_OPTIONS.find((o) => o.id === candidate)?.name ?? candidate;
 
-  const savedDraft = customConfig ?? DEFAULT_CUSTOM_CONFIG;
+  // La versión guardada de la paleta en edición (si ya existe en el contenedor).
+  const saved = customConfig.palettes.find((p) => p.id === draft.id);
+  const draftDiverge = !saved || JSON.stringify(saved) !== JSON.stringify(draft);
+  const applied = themeChoice === CUSTOM_THEME_ID;
+
+  const changeConfig = (patch) => setDraft((d) => ({ ...d, ...patch }));
+  const renameDraft = (name) => setDraft((d) => ({ ...d, name }));
+
+  const selectPalette = (p) => setDraft({ ...p });
+  const newPalette = () =>
+    setDraft({ id: nuevaPaletaId(), name: `Paleta ${customConfig.palettes.length + 1}`, ...DEFAULT_CUSTOM_CONFIG });
+  const removePaletteById = (id) => {
+    deletePalette(id);
+    if (id === draft.id) {
+      const restantes = customConfig.palettes.filter((p) => p.id !== id);
+      if (restantes.length) setDraft({ ...restantes[0] });
+    }
+  };
+  // Guardar exige un nombre no vacío; el resto siempre es válido (hex derivado).
+  const nameOk = draft.name.trim().length > 0;
+  const canSave = draftDiverge && nameOk;
+  const savePaletteDraft = () => savePalette({ ...draft, name: draft.name.trim() });
+
+  // isDirty del botón Aplicar: cambió el tema elegido, o (en custom) hay una
+  // paleta distinta a la aplicada / con ediciones sin guardar.
   const isDirty =
     candidate !== themeChoice ||
-    (isCustomCandidate && JSON.stringify(draft) !== JSON.stringify(savedDraft));
+    (isCustomCandidate && (draft.id !== customConfig.activeId || draftDiverge));
 
-  const handleAplicar = () =>
-    applyThemeChoice(candidate, isCustomCandidate ? { custom: draft } : undefined);
+  const handleAplicar = () => {
+    if (isCustomCandidate) {
+      const limpio = { ...draft, name: draft.name.trim() || 'Mi paleta' };
+      // Guarda la paleta en edición y la deja activa antes de aplicar el tema.
+      const container = setActive(upsertPalette(customConfig, limpio), limpio.id);
+      applyThemeChoice(candidate, { custom: container });
+    } else {
+      applyThemeChoice(candidate);
+    }
+  };
 
   const handleCerrarSesion = async () => {
     await AsyncStorage.removeItem('token');
@@ -264,7 +432,7 @@ export default function AjustesScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <SectionCard
         title="Apariencia"
         hint="Toca un tema para previsualizarlo. Nada cambia hasta que lo apliques."
@@ -286,7 +454,20 @@ export default function AjustesScreen() {
         </View>
 
         {isCustomCandidate && (
-          <CustomThemeEditor draft={draft} onChange={setDraft} issues={contrastIssues} />
+          <CustomThemeEditor
+            draft={draft}
+            onChangeConfig={changeConfig}
+            onRename={renameDraft}
+            issues={contrastIssues}
+            palettes={customConfig.palettes}
+            activeId={customConfig.activeId}
+            applied={applied}
+            onSelectPalette={selectPalette}
+            onDeletePalette={removePaletteById}
+            onNewPalette={newPalette}
+            onSavePalette={savePaletteDraft}
+            canSave={canSave}
+          />
         )}
 
         <Tappable
@@ -320,16 +501,8 @@ const useStyles = makeThemedStyles((t) => ({
     marginBottom: 20,
     ...t.shadows.card,
   },
-  seccion: {
-    ...t.typography.type.section,
-    color: t.colors.text,
-    marginBottom: 6,
-  },
-  seccionHint: {
-    ...t.typography.type.caption,
-    color: t.colors.textMuted,
-    marginBottom: 14,
-  },
+  seccion: { ...t.typography.type.section, color: t.colors.text, marginBottom: 6 },
+  seccionHint: { ...t.typography.type.caption, color: t.colors.textMuted, marginBottom: 14 },
   opciones: { marginTop: 16, marginBottom: 4 },
   optionRow: {
     flexDirection: 'row',
@@ -357,12 +530,7 @@ const useStyles = makeThemedStyles((t) => ({
     justifyContent: 'center',
   },
   radioSelected: { borderColor: t.colors.primary },
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: t.colors.primary,
-  },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: t.colors.primary },
   optionInfo: { flex: 1 },
   optionName: {
     fontSize: t.fontSize(15),
@@ -372,13 +540,7 @@ const useStyles = makeThemedStyles((t) => ({
   },
   optionTagline: { fontSize: t.fontSize(12), color: t.colors.textMuted },
   swatches: { flexDirection: 'row', gap: 4, marginLeft: 10 },
-  swatch: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: t.colors.border,
-  },
+  swatch: { width: 18, height: 18, borderRadius: 9, borderWidth: 1, borderColor: t.colors.border },
   editor: {
     marginBottom: 16,
     borderRadius: t.shape.radiusLg,
@@ -387,13 +549,28 @@ const useStyles = makeThemedStyles((t) => ({
     backgroundColor: t.colors.background,
     padding: 14,
   },
-  swatchBlock: { marginBottom: 14 },
+  swatchBlock: { marginBottom: 18 },
   swatchLabel: {
     fontSize: t.fontSize(13),
     ...t.typography.fonts.semibold,
     color: t.colors.text,
     marginBottom: 8,
   },
+  colorHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  colorPreview: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.border,
+  },
+  sliderCap: {
+    fontSize: t.fontSize(11),
+    color: t.colors.textMuted,
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  sliderGap: { height: 10 },
   swatchGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   swatchOuter: {
     width: 36,
@@ -412,10 +589,21 @@ const useStyles = makeThemedStyles((t) => ({
     borderWidth: 1,
     borderColor: t.colors.border,
   },
-  fontRow: { flexDirection: 'row', gap: 8 },
-  fontChip: {
-    flex: 1,
+  nameInput: {
+    ...t.typography.type.body,
+    color: t.colors.text,
+    backgroundColor: t.colors.surface,
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.border,
+    borderRadius: t.shape.radiusMd,
+    paddingHorizontal: 14,
     paddingVertical: 10,
+  },
+  placeholder: { color: t.colors.textFaint },
+  fontRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  fontChip: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: t.shape.radiusMd,
     borderWidth: t.shape.borderThin,
     borderColor: t.colors.border,
@@ -429,14 +617,44 @@ const useStyles = makeThemedStyles((t) => ({
   },
   fontChipTxt: { fontSize: t.fontSize(14), color: t.colors.textMuted },
   fontChipTxtSelected: { color: t.colors.primary },
-  contrastOk: {
-    ...t.typography.type.caption,
-    color: t.colors.textMuted,
+  palRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: t.colors.surface,
+    borderRadius: t.shape.radiusMd,
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.border,
+    marginBottom: 8,
   },
+  palRowSelected: { borderColor: t.colors.primary, borderWidth: t.shape.borderThick },
+  palMain: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: 10 },
+  palSwatches: { flexDirection: 'row', gap: 3, marginRight: 10 },
+  palSwatch: { width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: t.colors.border },
+  palInfo: { flex: 1 },
+  palName: {
+    fontSize: t.fontSize(14),
+    ...t.typography.fonts.semibold,
+    color: t.colors.text,
+  },
+  palFont: { fontSize: t.fontSize(11), color: t.colors.textMuted, marginTop: 1 },
+  palDelete: { paddingHorizontal: 12, paddingVertical: 10 },
+  palDeleteTxt: { fontSize: t.fontSize(12), color: t.colors.danger },
+  palNew: {
+    borderWidth: t.shape.borderMedium,
+    borderColor: t.colors.primarySoftBorder,
+    borderRadius: t.shape.radiusMd,
+    paddingVertical: 11,
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  palNewTxt: { fontSize: t.fontSize(14), ...t.typography.fonts.semibold, color: t.colors.primary },
+  palLimit: { fontSize: t.fontSize(12), color: t.colors.textMuted, marginTop: 2 },
+  contrastOk: { ...t.typography.type.caption, color: t.colors.textMuted, marginBottom: 14 },
   contrastWarn: {
     backgroundColor: t.colors.dangerSoft,
     borderRadius: t.shape.radiusMd,
     padding: 12,
+    marginBottom: 14,
   },
   contrastWarnTitle: {
     fontSize: t.fontSize(13),
@@ -444,15 +662,19 @@ const useStyles = makeThemedStyles((t) => ({
     color: t.colors.danger,
     marginBottom: 6,
   },
-  contrastWarnItem: {
-    fontSize: t.fontSize(12),
-    color: t.colors.danger,
-    marginBottom: 2,
+  contrastWarnItem: { fontSize: t.fontSize(12), color: t.colors.danger, marginBottom: 2 },
+  contrastWarnHint: { fontSize: t.fontSize(12), color: t.colors.danger, marginTop: 6 },
+  btnGuardar: {
+    backgroundColor: t.colors.accent,
+    borderRadius: t.shape.radiusMd,
+    paddingVertical: 13,
+    alignItems: 'center',
   },
-  contrastWarnHint: {
-    fontSize: t.fontSize(12),
-    color: t.colors.danger,
-    marginTop: 6,
+  btnGuardarDisabled: { backgroundColor: t.colors.primaryDisabled },
+  btnGuardarTxt: {
+    color: t.colors.onPrimary,
+    fontSize: t.fontSize(14),
+    ...t.typography.fonts.bold,
   },
   btnAplicar: {
     backgroundColor: t.colors.primary,
@@ -485,11 +707,7 @@ const usePreviewStyles = makeThemedStyles((t) => ({
     borderColor: t.colors.border,
     backgroundColor: t.colors.background,
   },
-  header: {
-    backgroundColor: t.colors.headerBackground,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
+  header: { backgroundColor: t.colors.headerBackground, paddingVertical: 12, paddingHorizontal: 16 },
   headerTxt: {
     color: t.colors.onHeader,
     fontFamily: t.typography.type.title.fontFamily,
@@ -506,10 +724,7 @@ const usePreviewStyles = makeThemedStyles((t) => ({
     alignItems: 'center',
     paddingVertical: 10,
   },
-  chipActive: {
-    borderColor: t.colors.primary,
-    backgroundColor: t.colors.primarySoft,
-  },
+  chipActive: { borderColor: t.colors.primary, backgroundColor: t.colors.primarySoft },
   chipEmoji: { fontSize: 22, marginBottom: 2 },
   chipLabel: {
     fontSize: t.fontSize(11),
@@ -547,9 +762,5 @@ const usePreviewStyles = makeThemedStyles((t) => ({
     paddingVertical: 11,
     alignItems: 'center',
   },
-  btnTxt: {
-    color: t.colors.onPrimary,
-    ...t.typography.fonts.bold,
-    fontSize: t.fontSize(13),
-  },
+  btnTxt: { color: t.colors.onPrimary, ...t.typography.fonts.bold, fontSize: t.fontSize(13) },
 }));

@@ -15,41 +15,67 @@ export const AA_MIN = 4.5;
 const HEX_RE = /^#[0-9a-f]{6}$/i;
 const CONFIG_KEYS = ['primary', 'accent', 'background', 'bodyFont'];
 
-export const BODY_FONT_IDS = ['manrope', 'nunito', 'baloo2'];
+// 7 fuentes de cuerpo con personalidades distintas (Fase 10 P2). Cada una trae
+// los 4 pesos que exige el contrato de tokens; Sora sigue fija en títulos. Las
+// serif usan su peso regular en captionFamily para legibilidad a tamaño chico.
+export const BODY_FONT_IDS = ['manrope', 'nunito', 'baloo2', 'rubik', 'lora', 'bitter', 'fraunces'];
+
+const familiaDe = (prefijo) => ({
+  regular: { fontFamily: `${prefijo}_400Regular` },
+  medium: { fontFamily: `${prefijo}_500Medium` },
+  semibold: { fontFamily: `${prefijo}_600SemiBold` },
+  bold: { fontFamily: `${prefijo}_700Bold` },
+});
 
 export const BODY_FONTS = {
   manrope: {
     label: 'Manrope',
-    fonts: {
-      regular: { fontFamily: 'Manrope_400Regular' },
-      medium: { fontFamily: 'Manrope_500Medium' },
-      semibold: { fontFamily: 'Manrope_600SemiBold' },
-      bold: { fontFamily: 'Manrope_700Bold' },
-    },
+    tagline: 'Geométrica y neutra',
+    fonts: familiaDe('Manrope'),
     bodyFamily: 'Manrope_500Medium',
     captionFamily: 'Manrope_400Regular',
   },
   nunito: {
     label: 'Nunito',
-    fonts: {
-      regular: { fontFamily: 'Nunito_400Regular' },
-      medium: { fontFamily: 'Nunito_500Medium' },
-      semibold: { fontFamily: 'Nunito_600SemiBold' },
-      bold: { fontFamily: 'Nunito_700Bold' },
-    },
+    tagline: 'Humanista y amable',
+    fonts: familiaDe('Nunito'),
     bodyFamily: 'Nunito_500Medium',
     captionFamily: 'Nunito_400Regular',
   },
   baloo2: {
     label: 'Baloo 2',
-    fonts: {
-      regular: { fontFamily: 'Baloo2_400Regular' },
-      medium: { fontFamily: 'Baloo2_500Medium' },
-      semibold: { fontFamily: 'Baloo2_600SemiBold' },
-      bold: { fontFamily: 'Baloo2_700Bold' },
-    },
+    tagline: 'Redondeada y juguetona',
+    fonts: familiaDe('Baloo2'),
     bodyFamily: 'Baloo2_500Medium',
     captionFamily: 'Baloo2_400Regular',
+  },
+  rubik: {
+    label: 'Rubik',
+    tagline: 'Geométrica de esquinas suaves',
+    fonts: familiaDe('Rubik'),
+    bodyFamily: 'Rubik_500Medium',
+    captionFamily: 'Rubik_400Regular',
+  },
+  lora: {
+    label: 'Lora',
+    tagline: 'Serif editorial de lectura',
+    fonts: familiaDe('Lora'),
+    bodyFamily: 'Lora_500Medium',
+    captionFamily: 'Lora_400Regular',
+  },
+  bitter: {
+    label: 'Bitter',
+    tagline: 'Slab serif firme',
+    fonts: familiaDe('Bitter'),
+    bodyFamily: 'Bitter_500Medium',
+    captionFamily: 'Bitter_400Regular',
+  },
+  fraunces: {
+    label: 'Fraunces',
+    tagline: 'Serif expresiva con carácter',
+    fonts: familiaDe('Fraunces'),
+    bodyFamily: 'Fraunces_500Medium',
+    captionFamily: 'Fraunces_400Regular',
   },
 };
 
@@ -80,7 +106,27 @@ export const DEFAULT_CUSTOM_CONFIG = {
   bodyFont: 'manrope',
 };
 
-export function isValidCustomConfig(value) {
+// Múltiples paletas guardadas (Fase 10 P2). El valor persistido pasó de un
+// objeto de 4 claves a un contenedor { activeId, palettes[] }; cada paleta es
+// una config de 4 claves + id/name. makeCustomTheme sigue recibiendo solo la
+// config (activePalette la extrae). normalizeCustomTheme migra el objeto legacy
+// al vuelo, así los datos viejos (locales o del backend) siguen funcionando.
+export const MAX_PALETAS = 5;
+export const NAME_MAX = 24;
+const PALETTE_KEYS = ['id', 'name', ...CONFIG_KEYS];
+const CONTAINER_KEYS = ['activeId', 'palettes'];
+
+// Solo los 4 campos que consume makeCustomTheme (descarta id/name).
+export const configDe = ({ primary, accent, background, bodyFont }) => ({
+  primary,
+  accent,
+  background,
+  bodyFont,
+});
+
+// Valida la config de 4 claves (entrada de makeCustomTheme; antes se llamaba
+// isValidCustomConfig). Debe coincidir con isValidPaletteConfig del backend.
+export function isValidPaletteConfig(value) {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const keys = Object.keys(value);
   if (keys.length !== CONFIG_KEYS.length) return false;
@@ -91,6 +137,93 @@ export function isValidCustomConfig(value) {
     HEX_RE.test(value.background) &&
     BODY_FONT_IDS.includes(value.bodyFont)
   );
+}
+
+export function isValidPalette(value) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  if (keys.length !== PALETTE_KEYS.length || !PALETTE_KEYS.every((k) => keys.includes(k))) {
+    return false;
+  }
+  if (typeof value.id !== 'string' || value.id.length === 0) return false;
+  if (typeof value.name !== 'string') return false;
+  const name = value.name.trim();
+  if (name.length === 0 || value.name.length > NAME_MAX) return false;
+  return isValidPaletteConfig(configDe(value));
+}
+
+// Contenedor persistido: { activeId, palettes: [1..MAX] } con ids únicos y
+// activeId apuntando a una paleta existente.
+export function isValidCustomTheme(value) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  if (keys.length !== CONTAINER_KEYS.length || !CONTAINER_KEYS.every((k) => keys.includes(k))) {
+    return false;
+  }
+  if (!Array.isArray(value.palettes)) return false;
+  if (value.palettes.length < 1 || value.palettes.length > MAX_PALETAS) return false;
+  if (!value.palettes.every(isValidPalette)) return false;
+  const ids = value.palettes.map((p) => p.id);
+  if (new Set(ids).size !== ids.length) return false;
+  return typeof value.activeId === 'string' && ids.includes(value.activeId);
+}
+
+// Acepta el contenedor nuevo, migra el objeto legacy de 4 claves a un
+// contenedor de una paleta, o devuelve null si no es ninguno.
+export function normalizeCustomTheme(value) {
+  if (isValidCustomTheme(value)) return value;
+  if (isValidPaletteConfig(value)) {
+    return { activeId: 'p_base', palettes: [{ id: 'p_base', name: 'Mi paleta', ...value }] };
+  }
+  return null;
+}
+
+// Config de la paleta activa del contenedor (para makeCustomTheme), o null.
+export function activePalette(container) {
+  if (!isValidCustomTheme(container)) return null;
+  const paleta = container.palettes.find((p) => p.id === container.activeId);
+  return paleta ? configDe(paleta) : null;
+}
+
+// Id corto y único para una paleta nueva.
+export function nuevaPaletaId() {
+  return `p_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+// Contenedor por defecto: una sola paleta con la config base.
+export const DEFAULT_CUSTOM_THEME = {
+  activeId: 'p_base',
+  palettes: [{ id: 'p_base', name: 'Mi paleta', ...DEFAULT_CUSTOM_CONFIG }],
+};
+
+// Operaciones puras sobre el contenedor (las usa ThemeContext; testeables
+// directo). Nunca mutan; devuelven un contenedor nuevo.
+
+// Alta o edición por id. Una paleta nueva queda activa; editar una existente
+// conserva la activa. Respeta el tope MAX_PALETAS al agregar.
+export function upsertPalette(container, palette) {
+  const idx = container.palettes.findIndex((p) => p.id === palette.id);
+  if (idx === -1) {
+    if (container.palettes.length >= MAX_PALETAS) return container;
+    return { activeId: palette.id, palettes: [...container.palettes, palette] };
+  }
+  const palettes = container.palettes.slice();
+  palettes[idx] = palette;
+  return { ...container, palettes };
+}
+
+// Borra por id; nunca deja el contenedor sin paletas. Si se borra la activa,
+// pasa a la primera restante.
+export function removePalette(container, id) {
+  if (container.palettes.length <= 1) return container;
+  const palettes = container.palettes.filter((p) => p.id !== id);
+  const activeId = container.activeId === id ? palettes[0].id : container.activeId;
+  return { activeId, palettes };
+}
+
+export function setActive(container, id) {
+  if (!container.palettes.some((p) => p.id === id)) return container;
+  return { ...container, activeId: id };
 }
 
 const clamp255 = (n) => Math.max(0, Math.min(255, Math.round(n)));

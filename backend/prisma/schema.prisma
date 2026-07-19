@@ -24,6 +24,8 @@ model User {
   qrCode          String       @unique @default(uuid())
   themePreference String?
   customTheme     Json?
+  avatarUrl       String?
+  perfilPersonalidad Json?
   createdAt       DateTime     @default(now())
 
   moodEntries    MoodEntry[]
@@ -82,6 +84,8 @@ model Friendship {
   user   User @relation("FriendshipUser",   fields: [userId],   references: [id], onDelete: Cascade)
   friend User @relation("FriendshipFriend", fields: [friendId], references: [id], onDelete: Cascade)
 
+  mascota MascotaAmistad?
+
   @@unique([userId, friendId])
 }
 
@@ -95,4 +99,14 @@ model Cheer {
 
   fromUser User @relation("CheerFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
   toUser   User @relation("CheerTo",   fields: [toUserId],   references: [id], onDelete: Cascade)
+}
+
+model MascotaAmistad {
+  id          String     @id @default(cuid())
+  amistadId   Int        @unique
+  amistad     Friendship @relation(fields: [amistadId], references: [id], onDelete: Cascade)
+  nombre      String
+  nivelCarino Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 }

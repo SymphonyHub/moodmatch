@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, Modal, ActivityIndicator, Alert } from 'react-native';
 import { router } from 'expo-router';
 import AccionSocialCard from '../components/wellness/AccionSocialCard';
@@ -7,13 +7,24 @@ import { apiGetFriendships, apiSendMessage } from '../services/api';
 import { MOOD_INFO } from '../constants/moods';
 import { useTheme, makeThemedStyles } from '../theme/ThemeContext';
 import Tappable from '../components/Tappable';
-import { tipoDeAccion, elegirSugerencia, MENSAJES_PRECARGA } from '../friends/accionesConAmigos';
+import {
+  tipoDeActividadSocial,
+  elegirSugerencia,
+  MENSAJES_PRECARGA,
+} from '../friends/accionesConAmigos';
 import { crearInvitacion } from '../friends/invitacionSalida';
+import {
+  claveCompletadaSocial,
+  estaCompletada,
+  marcarCompletada,
+} from '../features/wellness/completadas';
 
 /**
  * AccionConAmigos — SLOT del Agente C en la pestaña "Con amigos" (Fase 10).
  *
- * ConAmigosPanel monta una instancia por cada una de las 3 acciones sociales.
+ * ConAmigosPanel monta una instancia por cada acción fija y por la sugerencia
+ * dinámica. Las acciones conocidas conservan su interacción; una sugerencia
+ * nueva queda como tarjeta informativa que igualmente puede marcarse hecha.
  * Cada acción se identifica por `actividad.nombre` (mapeo en [accionesConAmigos]);
  * un nombre desconocido cae en tarjeta informativa (sin onPress), como antes.
  *
@@ -28,18 +39,42 @@ import { crearInvitacion } from '../friends/invitacionSalida';
  * el chip de ánimo que cada amigo YA comparte y que hoy se ve en la lista de
  * amigos. No infiere ni expone ningún dato nuevo. (Ver elegirSugerencia.)
  *
- * No toca ConAmigosPanel.jsx ni actividades.jsx.
- *
  * @param {{ id, nombre, descripcion, categoria }} actividad
  */
 export default function AccionConAmigos({ actividad }) {
   const styles = useStyles();
-  const tipo = tipoDeAccion(actividad.nombre);
+  const tipo = tipoDeActividadSocial(actividad);
 
   // Estado del selector de amigo (salida / aprecias / "elegir otro" de energía)
   const [selectorAbierto, setSelectorAbierto] = useState(false);
   // Estado de la sugerencia de energía positiva
   const [energia, setEnergia] = useState(null); // null | 'cargando' | { amigos, sugerido }
+  const [completada, setCompletada] = useState(false);
+  const claveActividad = claveCompletadaSocial(actividad?.id);
+
+  useEffect(() => {
+    let activo = true;
+    setCompletada(false);
+    if (!claveActividad) {
+      return () => {
+        activo = false;
+      };
+    }
+    estaCompletada(claveActividad).then((valor) => {
+      // Si se tocó "La hice" mientras AsyncStorage respondía, nunca revertir
+      // el estado optimista de true a un valor viejo false.
+      if (activo) setCompletada((actual) => actual || valor);
+    });
+    return () => {
+      activo = false;
+    };
+  }, [claveActividad]);
+
+  const completar = async () => {
+    if (!claveActividad) return;
+    setCompletada(true);
+    await marcarCompletada(claveActividad);
+  };
 
   const abrirChat = (amigo, draft) => {
     const params = { friendId: String(amigo.id), nombre: amigo.nombre };
@@ -87,7 +122,15 @@ export default function AccionConAmigos({ actividad }) {
   };
 
   // Fallback informativo para nombres desconocidos (sin interacción)
-  if (!tipo) return <AccionSocialCard actividad={actividad} />;
+  if (!tipo) {
+    return (
+      <AccionSocialCard
+        actividad={actividad}
+        completada={completada}
+        onCompletar={completar}
+      />
+    );
+  }
 
   const onPress =
     tipo === 'energia' ? abrirEnergia : () => setSelectorAbierto(true);
@@ -96,7 +139,12 @@ export default function AccionConAmigos({ actividad }) {
 
   return (
     <>
-      <AccionSocialCard actividad={actividad} onPress={onPress} />
+      <AccionSocialCard
+        actividad={actividad}
+        onPress={onPress}
+        completada={completada}
+        onCompletar={completar}
+      />
 
       {tipo !== 'energia' && (
         <SelectorAmigoModal

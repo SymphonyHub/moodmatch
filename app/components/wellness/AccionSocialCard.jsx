@@ -1,8 +1,13 @@
+import { useState } from 'react';
 import { Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
-import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../../constants/categories';
+import {
+  CATEGORY_IONICONS,
+  DEFAULT_CATEGORY_IONICON,
+} from '../../constants/categories';
 import Tappable from '../Tappable';
+import RecompensaCompletada from './RecompensaCompletada';
 
 /**
  * AccionSocialCard — tarjeta visual de una acción de "Con amigos". Presenta
@@ -11,15 +16,23 @@ import Tappable from '../Tappable';
  * - Sin `onPress`: tarjeta informativa (equivale al estado estático actual).
  * - Con `onPress`: se vuelve táctil (Tappable) y muestra el chevron.
  *
- * Así el Agente C puede volver interactivas las 3 acciones pasando `onPress`
- * (y opcionalmente `icon`/`accessory`) sin cambiar esta pieza de presentación.
+ * En ambos modos incluye el estado persistible "La hice" / "Hecha".
  */
-export default function AccionSocialCard({ actividad, onPress, icon, accessory, disabled }) {
+export default function AccionSocialCard({
+  actividad,
+  onPress,
+  icon,
+  accessory,
+  disabled,
+  completada = false,
+  onCompletar,
+}) {
   const { theme } = useTheme();
   const styles = useStyles();
+  const [celebrando, setCelebrando] = useState(false);
 
   const color = theme.colors.categories[actividad.categoria] ?? theme.colors.textMuted;
-  const emoji = icon ?? CATEGORY_ICONS[actividad.categoria] ?? DEFAULT_CATEGORY_ICON;
+  const iconName = icon ?? CATEGORY_IONICONS[actividad.categoria] ?? DEFAULT_CATEGORY_IONICON;
 
   const derecha =
     accessory ??
@@ -28,8 +41,10 @@ export default function AccionSocialCard({ actividad, onPress, icon, accessory, 
     ) : null);
 
   const contenido = (
-    <View style={[styles.card, { borderLeftColor: color }]}>
-      <Text style={styles.icono}>{emoji}</Text>
+    <View style={styles.principal}>
+      <View style={[styles.icono, { backgroundColor: theme.colors.primarySoft }]}>
+        <Ionicons name={iconName} size={22} color={color} />
+      </View>
       <View style={styles.textos}>
         <Text style={styles.nombre}>{actividad.nombre}</Text>
         <Text style={styles.desc}>{actividad.descripcion}</Text>
@@ -38,31 +53,66 @@ export default function AccionSocialCard({ actividad, onPress, icon, accessory, 
     </View>
   );
 
-  if (!onPress) return contenido;
+  const handleHice = () => {
+    if (completada) return;
+    setCelebrando(true);
+    onCompletar?.();
+  };
 
-  // El Tappable solo envuelve para la animación de presión; el margen inferior
-  // lo aporta la card, así el espaciado entre ítems es igual en ambos modos.
   return (
-    <Tappable onPress={onPress} disabled={disabled} haptic={false}>
-      {contenido}
-    </Tappable>
+    <View style={[styles.card, { borderLeftColor: color }]}>
+      {onPress ? (
+        <Tappable onPress={onPress} disabled={disabled} haptic={false}>
+          {contenido}
+        </Tappable>
+      ) : contenido}
+
+      <Tappable
+        style={[styles.btnHice, completada ? styles.btnHecha : { backgroundColor: color }]}
+        onPress={handleHice}
+        disabled={completada}
+      >
+        <Ionicons
+          name={completada ? 'checkmark' : 'checkmark-circle-outline'}
+          size={18}
+          color={completada ? color : theme.colors.onPrimary}
+        />
+        <Text style={[styles.btnHiceText, { color: completada ? color : theme.colors.onPrimary }]}>
+          {completada ? 'Hecha' : 'La hice'}
+        </Text>
+      </Tappable>
+
+      {celebrando && (
+        <View style={styles.overlay} pointerEvents="none">
+          <RecompensaCompletada onFin={() => setCelebrando(false)} />
+        </View>
+      )}
+    </View>
   );
 }
 
 const useStyles = makeThemedStyles((t) => ({
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    backgroundColor: t.colors.surface,
+    backgroundColor: t.colors.surfaceElevated,
     borderRadius: t.shape.radiusLg,
-    padding: 16,
+    padding: 20,
     marginBottom: 10,
     borderLeftWidth: 4,
     borderLeftColor: t.colors.categories.social,
     ...t.shadows.card,
   },
-  icono: { fontSize: t.fontSize(24) },
+  principal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  icono: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   textos: { flex: 1 },
   nombre: {
     fontSize: t.fontSize(15),
@@ -74,5 +124,28 @@ const useStyles = makeThemedStyles((t) => ({
     fontSize: t.fontSize(13),
     color: t.colors.textMuted,
     lineHeight: Math.round(t.fontSize(13) * 1.5),
+  },
+  btnHice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: t.shape.radiusMd,
+    paddingVertical: 12,
+    marginTop: 16,
+  },
+  btnHecha: { backgroundColor: t.colors.primarySoft },
+  btnHiceText: {
+    ...t.typography.fonts.semibold,
+    fontSize: t.fontSize(15),
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 }));

@@ -6,6 +6,7 @@ import {
   estaCompletada,
   marcarCompletada,
   recortar,
+  claveCompletadaSocial,
   MAX_COMPLETADAS,
 } from '../features/wellness/completadas';
 
@@ -60,5 +61,30 @@ describe('estaCompletada / marcarCompletada', () => {
     // la última marcada sobrevive; la primera fue desplazada
     expect(await estaCompletada(`id${MAX_COMPLETADAS + 4}`)).toBe(true);
     expect(await estaCompletada('id0')).toBe(false);
+  });
+
+  test('marcas concurrentes no se pisan entre sí', async () => {
+    await Promise.all([
+      marcarCompletada('social:a', 1001),
+      marcarCompletada('social:b', 1002),
+      marcarCompletada('social:c', 1003),
+    ]);
+
+    await expect(estaCompletada('social:a')).resolves.toBe(true);
+    await expect(estaCompletada('social:b')).resolves.toBe(true);
+    await expect(estaCompletada('social:c')).resolves.toBe(true);
+  });
+});
+
+describe('claveCompletadaSocial', () => {
+  test('separa las marcas sociales de las claves de Para mí', () => {
+    expect(claveCompletadaSocial(12)).toBe('social:12');
+    expect(claveCompletadaSocial('social-generada')).toBe('social:social-generada');
+  });
+
+  test('sin id no genera una clave compartida accidentalmente', () => {
+    expect(claveCompletadaSocial(null)).toBeNull();
+    expect(claveCompletadaSocial(undefined)).toBeNull();
+    expect(claveCompletadaSocial('')).toBeNull();
   });
 });

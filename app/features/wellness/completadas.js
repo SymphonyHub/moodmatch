@@ -12,6 +12,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const CLAVE = 'moodmatch:actividadesCompletadas';
 export const MAX_COMPLETADAS = 50;
+let colaEscritura = Promise.resolve();
+
+export function claveCompletadaSocial(activityId) {
+  return activityId === null || activityId === undefined || activityId === ''
+    ? null
+    : `social:${activityId}`;
+}
 
 async function leerMapa() {
   try {
@@ -47,7 +54,12 @@ export async function estaCompletada(clave) {
 
 export async function marcarCompletada(clave, ahora = Date.now()) {
   if (!clave) return;
-  const mapa = await leerMapa();
-  mapa[clave] = ahora;
-  await guardarMapa(recortar(mapa));
+  // Serializa el read-modify-write: dos tarjetas marcadas casi al mismo tiempo
+  // no pueden pisarse entre sí en AsyncStorage.
+  colaEscritura = colaEscritura.then(async () => {
+    const mapa = await leerMapa();
+    mapa[clave] = ahora;
+    await guardarMapa(recortar(mapa));
+  });
+  await colaEscritura;
 }

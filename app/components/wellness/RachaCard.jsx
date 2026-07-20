@@ -94,9 +94,9 @@ export default function RachaCard() {
 
 const useStyles = makeThemedStyles((t) => ({
   card: {
-    backgroundColor: t.colors.surface,
+    backgroundColor: t.colors.surfaceElevated,
     borderRadius: t.shape.radiusLg,
-    padding: 20,
+    padding: 24,
     marginTop: 24,
     ...t.shadows.card,
   },

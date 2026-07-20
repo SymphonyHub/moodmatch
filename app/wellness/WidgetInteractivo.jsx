@@ -103,7 +103,7 @@ export default function WidgetInteractivo({ moodType }) {
   const faseActual = FASES[faseIdx];
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { borderLeftColor: acento }]}>
       <View style={styles.encabezado}>
         <Ionicons name="leaf-outline" size={18} color={acento} />
         <Text style={styles.titulo}>Un momento para respirar</Text>
@@ -157,6 +157,7 @@ const useStyles = makeThemedStyles((t) => ({
     borderRadius: t.shape.radiusLg,
     padding: 24,
     marginTop: 24,
+    borderLeftWidth: 5,
     ...t.shadows.card,
   },
   encabezado: {

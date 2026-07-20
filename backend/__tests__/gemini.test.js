@@ -1,7 +1,14 @@
 // Unidad del wrapper de Gemini: construcción del system prompt y mapeo del
 // historial del contrato → `contents` de la API. Sin llamadas de red.
 
-const { systemPrompt, aContents, MAX_HISTORIAL } = require('../lib/gemini');
+const {
+  systemPrompt,
+  socialSystemPrompt,
+  aContents,
+  aSocialContents,
+  parseSocialSuggestion,
+  MAX_HISTORIAL,
+} = require('../lib/gemini');
 const { validarTono, MOODS_DIFICILES } = require('../lib/tonoCrisis');
 
 const VALID_MOODS = ['FELIZ', 'TRISTE', 'ANSIOSO', 'CALMADO', 'ENOJADO', 'NEUTRO'];
@@ -79,5 +86,45 @@ describe('coherencia prompt ↔ validador', () => {
     // Si el modelo ignora la regla 4, el validador la atrapa en moods difíciles.
     expect(validarTono('Anímate, mira el lado bueno.', 'TRISTE')).toBe(false);
     expect(validarTono('No es para tanto.', 'FELIZ')).toBe(false);
+  });
+});
+
+describe('contrato Gemini para sugerencias sociales', () => {
+  test('el prompt limita datos, inferencias, tono y formato', () => {
+    const prompt = socialSystemPrompt();
+    expect(prompt).toMatch(/Solo puedes usar la orientación de tono/);
+    expect(prompt).toMatch(/nunca infieras datos/);
+    expect(prompt).toMatch(/no fuerces positividad/);
+    expect(prompt).toMatch(/JSON válido/);
+    expect(prompt).toMatch(/capa separada para crisis/);
+  });
+
+  test('el contexto contiene solo moods y perfil propio, con fallback genérico', () => {
+    const conPerfil = aSocialContents({
+      orientacion: 'compartir_momento_agradable',
+      perfil: '{"planes":["cine"]}',
+    });
+    const data = JSON.parse(conPerfil[0].parts[0].text);
+    expect(data).toEqual({
+      orientacion: 'compartir_momento_agradable',
+      preferenciasPropias: '{"planes":["cine"]}',
+    });
+    expect(data).not.toHaveProperty('nombres');
+    expect(data).not.toHaveProperty('notas');
+    expect(data).not.toHaveProperty('animosVisibles');
+
+    const generico = JSON.parse(aSocialContents({})[0].parts[0].text);
+    expect(generico.preferenciasPropias).toMatch(/sin perfil/);
+  });
+
+  test('parsea JSON plano o fenced y deja el shape mínimo', () => {
+    const esperado = { nombre: 'Cocinen juntos', descripcion: 'Elijan una receta.' };
+    expect(parseSocialSuggestion(JSON.stringify(esperado))).toEqual(esperado);
+    const fenced = `\`\`\`json\n${JSON.stringify({ ...esperado, extra: true })}\n\`\`\``;
+    expect(parseSocialSuggestion(fenced)).toEqual(esperado);
+  });
+
+  test('JSON inválido lanza para que el route use plantilla', () => {
+    expect(() => parseSocialSuggestion('una idea sin JSON')).toThrow();
   });
 });

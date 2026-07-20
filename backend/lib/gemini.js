@@ -93,7 +93,7 @@ function aContents(historial, mensaje) {
   return contents;
 }
 
-async function generarRespuesta({ mood, mensaje, historial = [], esUltimo = false }) {
+async function ejecutarGemini({ systemInstruction, contents, temperature = 0.7 }) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY no configurada');
 
@@ -101,10 +101,10 @@ async function generarRespuesta({ mood, mensaje, historial = [], esUltimo = fals
 
   const llamada = ai.models.generateContent({
     model: MODELO,
-    contents: aContents(historial, mensaje),
+    contents,
     config: {
-      systemInstruction: systemPrompt(mood, esUltimo),
-      temperature: 0.7,
+      systemInstruction,
+      temperature,
       // Holgado a propósito: en modelos con razonamiento, los tokens de
       // pensamiento descuentan de este tope y un valor justo puede dejar el
       // texto vacío. La brevedad la imponen el prompt y validarTono (600 c).
@@ -122,4 +122,57 @@ async function generarRespuesta({ mood, mensaje, historial = [], esUltimo = fals
   return texto;
 }
 
-module.exports = { generarRespuesta, systemPrompt, aContents, MAX_HISTORIAL };
+async function generarRespuesta({ mood, mensaje, historial = [], esUltimo = false }) {
+  return ejecutarGemini({
+    systemInstruction: systemPrompt(mood, esUltimo),
+    contents: aContents(historial, mensaje),
+  });
+}
+
+function socialSystemPrompt() {
+  return [
+    'Eres el generador de actividades sociales de MoodMatch, una app de bienestar emocional.',
+    'Propón UNA actividad concreta, breve, segura y realizable entre amigos. No eres terapeuta ni profesional de salud.',
+    'Solo puedes usar la orientación de tono y las preferencias de la propia persona incluidas en el contexto. La orientación ya fue abstraída por el backend: nunca infieras datos, causas, diagnósticos ni información privada de sus amigos, y nunca menciones estados de ánimo de otras personas.',
+    'Si hay un ánimo difícil, prioriza compañía sin presión: no intentes arreglarlo, no fuerces positividad y no prometas que la actividad cambiará cómo se siente alguien.',
+    'No sugieras medicamentos, alcohol, sustancias, conductas peligrosas, gastos altos ni recursos de crisis. La app tiene una capa separada para crisis.',
+    'Responde exclusivamente como JSON válido con dos strings: {"nombre":"...","descripcion":"..."}. El nombre tiene máximo 80 caracteres y la descripción máximo 320. Sin markdown ni claves adicionales.',
+  ].join('\n\n');
+}
+
+function aSocialContents({ orientacion = 'plan_general', perfil = null }) {
+  const contexto = {
+    orientacion,
+    preferenciasPropias: perfil ?? 'sin perfil; usa una idea general',
+  };
+  return [{ role: 'user', parts: [{ text: JSON.stringify(contexto) }] }];
+}
+
+function parseSocialSuggestion(texto) {
+  const limpio = String(texto ?? '')
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/, '');
+  const parsed = JSON.parse(limpio);
+  return { nombre: parsed.nombre, descripcion: parsed.descripcion };
+}
+
+async function generarSugerenciaSocial({ orientacion = 'plan_general', perfil = null }) {
+  const texto = await ejecutarGemini({
+    systemInstruction: socialSystemPrompt(),
+    contents: aSocialContents({ orientacion, perfil }),
+    temperature: 0.65,
+  });
+  return parseSocialSuggestion(texto);
+}
+
+module.exports = {
+  generarRespuesta,
+  generarSugerenciaSocial,
+  systemPrompt,
+  socialSystemPrompt,
+  aContents,
+  aSocialContents,
+  parseSocialSuggestion,
+  MAX_HISTORIAL,
+};

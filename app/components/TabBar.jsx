@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { BottomTabBarHeightCallbackContext } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { makeThemedStyles, useTheme } from '../theme/ThemeContext';
-import { springs } from '../theme/motion';
+import { durations, easings, springs } from '../theme/motion';
 import Tappable from './Tappable';
 import { indicatorLayout, resolveTabIcon } from './tabBarLogic';
 
@@ -85,8 +85,63 @@ function TabBadge({ value, style, styles }) {
   );
 }
 
+function TabItem({ options, route, focused, color, onPress, label, compact, theme, styles }) {
+  const progreso = useRef(new Animated.Value(focused ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(progreso, {
+      toValue: focused ? 1 : 0,
+      duration: durations.quick,
+      easing: easings.standard,
+      useNativeDriver: true,
+    }).start();
+  }, [focused, progreso]);
+
+  const iconScale = progreso.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
+  const iconLift = progreso.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+  const labelOpacity = progreso.interpolate({ inputRange: [0, 1], outputRange: [0.72, 1] });
+
+  return (
+    <Tappable
+      wrapperStyle={{ flex: 1 }}
+      style={styles.item}
+      onPress={onPress}
+      activeOpacity={0.85}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: focused }}
+      accessibilityLabel={typeof label === 'string' ? label : route.name}
+    >
+      <Animated.View
+        style={[styles.iconBox, { transform: [{ translateY: iconLift }, { scale: iconScale }] }]}
+      >
+        {options.tabBarIconSet ? (
+          <Ionicons
+            name={resolveTabIcon(options.tabBarIconSet, theme.icons.variant, focused)}
+            size={ICON_SIZE}
+            color={color}
+          />
+        ) : null}
+        <TabBadge value={options.tabBarBadge} style={options.tabBarBadgeStyle} styles={styles} />
+      </Animated.View>
+      <Animated.Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
+        style={[
+          styles.label,
+          compact && styles.labelCompact,
+          focused && theme.typography.fonts.semibold,
+          { color, opacity: labelOpacity },
+        ]}
+      >
+        {label}
+      </Animated.Text>
+    </Tappable>
+  );
+}
+
 // Barra de tabs de la casa (prop `tabBar` de <Tabs>): una píldora suave se
-// desliza detrás del ícono activo con el mismo spring contenido de Tappable.
+// desliza detrás del ícono activo y el destino se eleva apenas al enfocarse.
 export default function TabBar({ state, descriptors, navigation }) {
   const { theme } = useTheme();
   const styles = useStyles();
@@ -150,40 +205,18 @@ export default function TabBar({ state, descriptors, navigation }) {
         };
 
         return (
-          <Tappable
+          <TabItem
             key={route.key}
-            wrapperStyle={{ flex: 1 }}
-            style={styles.item}
+            options={options}
+            route={route}
+            focused={focused}
+            color={color}
             onPress={onPress}
-            activeOpacity={0.85}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: focused }}
-            accessibilityLabel={typeof label === 'string' ? label : route.name}
-          >
-            <View style={styles.iconBox}>
-              {options.tabBarIconSet ? (
-                <Ionicons
-                  name={resolveTabIcon(options.tabBarIconSet, theme.icons.variant, focused)}
-                  size={ICON_SIZE}
-                  color={color}
-                />
-              ) : null}
-              <TabBadge value={options.tabBarBadge} style={options.tabBarBadgeStyle} styles={styles} />
-            </View>
-            <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.75}
-              style={[
-                styles.label,
-                compact && styles.labelCompact,
-                focused && theme.typography.fonts.semibold,
-                { color },
-              ]}
-            >
-              {label}
-            </Text>
-          </Tappable>
+            label={label}
+            compact={compact}
+            theme={theme}
+            styles={styles}
+          />
         );
         })}
       </View>

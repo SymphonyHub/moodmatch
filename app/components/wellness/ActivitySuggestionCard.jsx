@@ -86,7 +86,7 @@ export default function ActivitySuggestionCard({
 
         {celebrando && (
           <View style={styles.overlay} pointerEvents="none">
-            <RecompensaCompletada onFin={() => setCelebrando(false)} />
+            <RecompensaCompletada categoria={actividad.categoria} onFin={() => setCelebrando(false)} />
           </View>
         )}
       </View>

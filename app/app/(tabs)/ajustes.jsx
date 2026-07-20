@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { View, Text, TextInput, useColorScheme } from 'react-native';
+import { Switch, View, Text, TextInput, useColorScheme } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, useFocusEffect } from 'expo-router';
@@ -25,6 +25,7 @@ import Tappable from '../../components/Tappable';
 import { HueBar, LumBar } from '../../components/color/HueBar';
 import AvatarPicker from '../../components/profile/AvatarPicker';
 import { apiGetMe } from '../../services/api';
+import { LARGE_TEXT_SCALE } from '../../theme/persistence';
 
 const THEME_OPTIONS = [
   { id: AUTO_THEME_ID, name: 'Automático', tagline: 'Sigue el modo del sistema' },
@@ -372,8 +373,16 @@ function SectionCard({ title, hint, children }) {
 }
 
 export default function AjustesScreen() {
-  const { themeChoice, applyThemeChoice, isApplying, customConfig, savePalette, deletePalette } =
-    useTheme();
+  const {
+    themeChoice,
+    applyThemeChoice,
+    isApplying,
+    customConfig,
+    savePalette,
+    deletePalette,
+    textScale,
+    setTextScale,
+  } = useTheme();
   const styles = useStyles();
   const systemScheme = useColorScheme();
   const [candidate, setCandidate] = useState(themeChoice);
@@ -517,6 +526,23 @@ export default function AjustesScreen() {
                 : 'Este es tu tema actual'}
           </Text>
         </Tappable>
+      </SectionCard>
+
+      <SectionCard title="Accesibilidad" hint="Ajusta la lectura sin cambiar tu tema ni tu fuente.">
+        <View style={styles.accessibilityRow}>
+          <View style={styles.accessibilityCopy}>
+            <Text style={styles.accessibilityTitle}>Texto grande</Text>
+            <Text style={styles.accessibilityHint}>Aumenta los textos de toda la app.</Text>
+          </View>
+          <Switch
+            value={textScale === LARGE_TEXT_SCALE}
+            onValueChange={(enabled) => setTextScale(enabled ? LARGE_TEXT_SCALE : 1)}
+            trackColor={{ false: theme.colors.border, true: theme.colors.primarySoftBorder }}
+            thumbColor={textScale === LARGE_TEXT_SCALE ? theme.colors.primary : theme.colors.surface}
+            accessibilityLabel="Texto grande"
+            accessibilityHint="Aumenta el tamaño de los textos de la aplicación"
+          />
+        </View>
       </SectionCard>
 
       <SectionCard title="Cuenta">
@@ -741,6 +767,10 @@ const useStyles = makeThemedStyles((t) => ({
     fontSize: t.fontSize(15),
     ...t.typography.fonts.bold,
   },
+  accessibilityRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  accessibilityCopy: { flex: 1 },
+  accessibilityTitle: { ...t.typography.type.body, ...t.typography.fonts.semibold, color: t.colors.text },
+  accessibilityHint: { ...t.typography.type.caption, color: t.colors.textMuted, marginTop: 2 },
   btnSalir: {
     borderWidth: t.shape.borderMedium,
     borderColor: t.colors.border,

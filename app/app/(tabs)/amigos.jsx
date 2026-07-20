@@ -10,6 +10,7 @@ import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../../components/Tappable';
 import Entrance from '../../components/Entrance';
 import Avatar from '../../components/profile/Avatar';
+import EmptyFriendsIllustration from '../../components/friends/EmptyFriendsIllustration';
 
 function FriendCard({ amigo, index }) {
   const { theme } = useTheme();
@@ -95,7 +96,7 @@ export default function AmigosScreen() {
         <ActivityIndicator size="large" color={theme.colors.primary} style={styles.spinner} />
       ) : amigos.length === 0 ? (
         <Entrance style={styles.vacioCont}>
-          <Text style={styles.vacioEmoji}>👥</Text>
+          <EmptyFriendsIllustration />
           <Text style={styles.vacioTxt}>Aún no tienes amigos agregados</Text>
           <Text style={styles.vacioHint}>
             En la pestaña "Mi QR" puedes compartir tu link de invitación o escanear el código de alguien.
@@ -138,7 +139,6 @@ const useStyles = makeThemedStyles((t) => ({
   },
   spinner: { marginTop: 40 },
   vacioCont: { alignItems: 'center', marginTop: 32, marginBottom: 36, paddingHorizontal: 24 },
-  vacioEmoji: { fontSize: 52, marginBottom: 16 },
   vacioTxt: {
     fontSize: t.fontSize(16),
     ...t.typography.fonts.semibold,

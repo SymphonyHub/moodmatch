@@ -24,6 +24,7 @@ import Tappable from '../../components/Tappable';
 import { HueBar, LumBar } from '../../components/color/HueBar';
 import AvatarPicker from '../../components/profile/AvatarPicker';
 import { apiGetMe } from '../../services/api';
+import { unregisterPushTokenForLogout } from '../../notifications/pushRegistration';
 
 const THEME_OPTIONS = [
   { id: AUTO_THEME_ID, name: 'Automático', tagline: 'Sigue el modo del sistema' },
@@ -447,6 +448,7 @@ export default function AjustesScreen() {
   };
 
   const handleCerrarSesion = async () => {
+    await unregisterPushTokenForLogout();
     await AsyncStorage.removeItem('token');
     router.replace('/login');
   };
@@ -511,6 +513,23 @@ export default function AjustesScreen() {
                 ? `Aplicar tema ${candidateName}`
                 : 'Este es tu tema actual'}
           </Text>
+        </Tappable>
+      </SectionCard>
+
+      <SectionCard
+        title="Notificaciones"
+        hint="Elige qué avisos quieres recibir y cuándo prefieres silencio."
+      >
+        <Tappable
+          style={styles.settingsLink}
+          onPress={() => router.push('/ajustes/notificaciones')}
+          accessibilityLabel="Abrir preferencias de notificaciones"
+        >
+          <View style={styles.settingsLinkCopy}>
+            <Text style={styles.settingsLinkTitle}>Preferencias y no molestar</Text>
+            <Text style={styles.settingsLinkHint}>Mensajes, mascota, actividades y recordatorios</Text>
+          </View>
+          <Text style={styles.settingsLinkArrow}>›</Text>
         </Tappable>
       </SectionCard>
 
@@ -737,6 +756,23 @@ const useStyles = makeThemedStyles((t) => ({
   },
   accountDivider: { height: t.shape.borderThin, backgroundColor: t.colors.border, marginVertical: 16 },
   btnSalirTxt: { color: t.colors.textMuted, fontSize: t.fontSize(15) },
+  settingsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: t.colors.background,
+    borderRadius: t.shape.radiusMd,
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.border,
+    padding: 14,
+  },
+  settingsLinkCopy: { flex: 1 },
+  settingsLinkTitle: {
+    fontSize: t.fontSize(15),
+    ...t.typography.fonts.semibold,
+    color: t.colors.text,
+  },
+  settingsLinkHint: { fontSize: t.fontSize(12), color: t.colors.textMuted, marginTop: 3 },
+  settingsLinkArrow: { fontSize: t.fontSize(28), color: t.colors.primary, marginLeft: 12 },
 }));
 
 const usePreviewStyles = makeThemedStyles((t) => ({

@@ -155,6 +155,44 @@ export const apiGetUnreadCount = async () => {
   return fetch(`${API_URL}/api/messages/unread-count`, { headers }).then((r) => r.json());
 };
 
+export const apiGetNotificationPreferences = async () => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/notifications`, { headers }).then((r) => r.json());
+};
+
+export const apiRegisterPushToken = async (expoPushToken, timeZone) => {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_URL}/api/notifications/token`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ expoPushToken, timeZone }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? 'No se pudo registrar el dispositivo');
+  return data;
+};
+
+export const apiUnregisterPushToken = async (unregister) => {
+  const res = await fetch(`${API_URL}/api/notifications/token/unregister`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(unregister),
+  });
+  if (!res.ok) throw new Error('No se pudo desvincular el dispositivo');
+};
+
+export const apiUpdateNotificationPreferences = async (preferences) => {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_URL}/api/notifications/preferences`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify(preferences),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? 'No se pudieron guardar las preferencias');
+  return data;
+};
+
 export const apiGetSocialActivities = async () => {
   const headers = await authHeaders();
   return fetch(`${API_URL}/api/activities?categoria=social`, { headers }).then((r) => r.json());

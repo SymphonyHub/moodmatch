@@ -10,12 +10,18 @@ jest.mock('../lib/prisma', () => ({
     create: jest.fn(),
   },
 }));
+jest.mock('../lib/notificationEvents', () => ({
+  dispatchNotification: jest.fn(),
+  notifyFriendAccepted: jest.fn(),
+  notifyNewMessage: jest.fn(),
+}));
 
 const request = require('supertest');
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const friendshipsRouter = require('../routes/friendships');
 const prisma = require('../lib/prisma');
+const { notifyFriendAccepted, notifyNewMessage } = require('../lib/notificationEvents');
 
 const MY_USER_ID = 1;
 const token = jwt.sign({ userId: MY_USER_ID }, 'moodmatch-dev-secret');
@@ -98,6 +104,10 @@ describe('POST /api/friendships — par duplicado', () => {
         mascota: { create: { nombre: 'Lumi' } },
       },
       include: { mascota: true },
+    });
+    expect(notifyFriendAccepted).toHaveBeenCalledWith({
+      acceptedByUserId: MY_USER_ID,
+      invitationOwnerId: 2,
     });
   });
 });
@@ -256,6 +266,10 @@ describe('POST /api/friendships/:friendId/cheer — amistad simétrica', () => {
       .send({ message: '💚 Pensando en ti' });
 
     expect(res.status).toBe(201);
+    expect(notifyNewMessage).toHaveBeenCalledWith({
+      fromUserId: MY_USER_ID,
+      toUserId: 2,
+    });
   });
 
   test('403 si no hay vínculo en ninguna dirección', async () => {

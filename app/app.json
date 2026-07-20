@@ -46,7 +46,14 @@
           "microphonePermission": false
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "color": "#4A5FC1",
+          "defaultChannel": "hora-azul"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

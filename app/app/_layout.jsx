@@ -42,6 +42,7 @@ import { Macondo_400Regular } from '@expo-google-fonts/macondo/400Regular';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { ThemeProvider, ThemeVeil, useTheme } from '../theme/ThemeContext';
 import { FriendsCountProvider } from '../friends/FriendsCountContext';
+import { PushObserver } from '../notifications/pushRegistration';
 
 // El splash queda visible hasta tener el tema guardado y las fuentes cargadas:
 // así el arranque no muestra un flash del tema/tipografía por defecto.
@@ -100,6 +101,7 @@ function ThemedStack() {
 
   return (
     <View style={{ flex: 1 }}>
+      <PushObserver />
       <StatusBar style={theme.statusBar.onBackground} />
       <Stack
         screenOptions={{

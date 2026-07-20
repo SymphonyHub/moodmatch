@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "jest"
+    "test": "jest",
+    "notifications:due": "node jobs/sendDueNotifications.js"
   },
   "jest": {
     "testEnvironment": "node"

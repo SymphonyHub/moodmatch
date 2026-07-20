@@ -8,6 +8,7 @@ import {
   isValidPaletteConfig,
   makeCustomTheme,
   evaluateCustomTheme,
+  customThemePassesAA,
   mix,
 } from '../theme/customTheme';
 import { contrastRatio, relativeLuminance } from '../theme/contrast';
@@ -36,8 +37,8 @@ describe('isValidPaletteConfig', () => {
     expect(isValidPaletteConfig(configOscura)).toBe(true);
   });
 
-  test('acepta las fuentes nuevas de Fase 10', () => {
-    ['rubik', 'lora', 'bitter', 'fraunces'].forEach((bodyFont) => {
+  test('acepta todas las fuentes adicionales', () => {
+    ['rubik', 'lora', 'bitter', 'fraunces', 'grenzeGotisch', 'macondo'].forEach((bodyFont) => {
       expect(isValidPaletteConfig({ ...DEFAULT_CUSTOM_CONFIG, bodyFont })).toBe(true);
     });
   });
@@ -140,6 +141,12 @@ describe('derivación', () => {
       expect(theme.typography.fonts).toBe(BODY_FONTS[id].fonts);
     });
   });
+
+  test('incluye una fuente gótica y una decorativa con assets válidos', () => {
+    expect(BODY_FONTS.grenzeGotisch.bodyFamily).toBe('GrenzeGotisch_500Medium');
+    expect(BODY_FONTS.macondo.bodyFamily).toBe('Macondo_400Regular');
+    expect(BODY_FONT_IDS).toEqual(expect.arrayContaining(['grenzeGotisch', 'macondo']));
+  });
 });
 
 describe('evaluateCustomTheme', () => {
@@ -160,6 +167,12 @@ describe('evaluateCustomTheme', () => {
     const pares = issues.map((i) => i.pair);
     expect(pares).toContain('Color primario sobre las tarjetas');
     issues.forEach((i) => expect(i.ratio).toBeLessThan(AA_MIN));
+    expect(customThemePassesAA(malo)).toBe(false);
+  });
+
+  test.each(BODY_FONT_IDS)('el guardrail permite una paleta AA con fuente %s', (bodyFont) => {
+    const theme = makeCustomTheme({ ...DEFAULT_CUSTOM_CONFIG, bodyFont });
+    expect(customThemePassesAA(theme)).toBe(true);
   });
 });
 

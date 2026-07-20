@@ -27,6 +27,7 @@ const usuarioBase = {
   themePreference: 'nocturno',
   customTheme: null,
   perfilPersonalidad: null,
+  avatarUrl: null,
   createdAt: new Date(),
 };
 
@@ -71,6 +72,7 @@ describe('GET /api/users/me — preferencia de tema', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.user.themePreference).toBe('nocturno');
+    expect(res.body.user.avatarUrl).toBeNull();
   });
 
   test('rechaza sin token con 401', async () => {
@@ -121,6 +123,39 @@ describe('perfil de personalidad', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/personalidad inválido/i);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('PATCH /api/users/me — avatar', () => {
+  const avatarUrl = 'https://res.cloudinary.com/g0vemv0z/image/upload/v1/avatar.jpg';
+
+  test('persiste una URL HTTPS de imagen de Cloudinary', async () => {
+    prisma.user.update.mockResolvedValue({ ...usuarioBase, avatarUrl });
+
+    const res = await request(app)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ avatarUrl });
+
+    expect(res.status).toBe(200);
+    expect(res.body.user.avatarUrl).toBe(avatarUrl);
+    expect(prisma.user.update.mock.calls[0][0].data).toEqual({ avatarUrl });
+  });
+
+  test.each([
+    'http://res.cloudinary.com/demo/image/upload/avatar.jpg',
+    'https://example.com/avatar.jpg',
+    'https://res.cloudinary.com/otro-cloud/image/upload/avatar.jpg',
+    'https://res.cloudinary.com/demo/raw/upload/avatar.jpg',
+    'no-es-url',
+  ])('rechaza una URL ajena al almacenamiento permitido: %s', async (avatarUrlInvalida) => {
+    const res = await request(app)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ avatarUrl: avatarUrlInvalida });
+
+    expect(res.status).toBe(400);
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 });
@@ -297,6 +332,19 @@ describe('PATCH /api/users/me — paleta personalizada', () => {
 
     expect(res.status).toBe(200);
     expect(prisma.user.update.mock.calls[0][0].data).toEqual({ customTheme: contenedorValido });
+  });
+
+  test.each(['grenzeGotisch', 'macondo'])('acepta la fuente nueva %s', async (bodyFont) => {
+    const customTheme = { ...paletaValida, bodyFont };
+    prisma.user.update.mockResolvedValue({ ...usuarioBase, customTheme });
+
+    const res = await request(app)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ customTheme });
+
+    expect(res.status).toBe(200);
+    expect(prisma.user.update.mock.calls[0][0].data).toEqual({ customTheme });
   });
 
   test.each([

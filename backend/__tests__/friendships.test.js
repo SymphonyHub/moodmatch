@@ -113,7 +113,12 @@ describe('GET /api/friendships — vínculo simétrico', () => {
         userId: MY_USER_ID,
         friendId: 2,
         user: { id: MY_USER_ID, nombre: 'Yo', moodEntries: [] },
-        friend: { id: 2, nombre: 'Ana', moodEntries: entradaMood('FELIZ') },
+        friend: {
+          id: 2,
+          nombre: 'Ana',
+          avatarUrl: 'https://res.cloudinary.com/demo/image/upload/ana.jpg',
+          moodEntries: entradaMood('FELIZ'),
+        },
       },
       // 3 me agregó a mí
       {
@@ -143,6 +148,7 @@ describe('GET /api/friendships — vínculo simétrico', () => {
     expect(res.body.amigos.map((a) => a.id).sort()).toEqual([2, 3]);
     const ana = res.body.amigos.find((a) => a.id === 2);
     expect(ana.nombre).toBe('Ana');
+    expect(ana.avatarUrl).toBe('https://res.cloudinary.com/demo/image/upload/ana.jpg');
     expect(ana.moodReciente).toBe('FELIZ');
     expect(ana.amistadId).toBeDefined();
   });

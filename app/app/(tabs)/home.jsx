@@ -1,8 +1,8 @@
-import { useEffect, useReducer, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { useCallback, useEffect, useReducer, useState } from 'react';
+import { ScrollView, Text, View } from 'react-native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { router } from 'expo-router';
-import { apiCreateMoodEntry, apiChatRespond } from '../../services/api';
+import { router, useFocusEffect } from 'expo-router';
+import { apiCreateMoodEntry, apiChatRespond, apiGetMe } from '../../services/api';
 import { MOODS } from '../../constants/moods';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import {
@@ -20,6 +20,7 @@ import TypingIndicator from '../../components/chat/TypingIndicator';
 import ChatInputBar from '../../components/chat/ChatInputBar';
 import FallbackMessage from '../../components/chat/FallbackMessage';
 import useAutoScroll from '../../components/chat/useAutoScroll';
+import Avatar from '../../components/profile/Avatar';
 
 // Pausa de "escribiendo" antes de cada burbuja del bot: apenas por encima de
 // durations.gentle (380 ms) — presencia sin latencia fingida.
@@ -37,6 +38,21 @@ export default function HomeScreen() {
   const escudo = useCrisisShield();
   const { ejecutar, reset: resetRetry } = useRetry();
   const tabBarHeight = useBottomTabBarHeight();
+  const [profile, setProfile] = useState(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      apiGetMe()
+        .then((data) => {
+          if (active && data.user) setProfile(data.user);
+        })
+        .catch(() => {});
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
 
   // Revela los mensajes de a uno: los del usuario al instante, los del bot
   // tras una pausa breve de "escribiendo".
@@ -175,6 +191,13 @@ export default function HomeScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      <View style={styles.profileHeader}>
+        <Avatar avatarUrl={profile?.avatarUrl} nombre={profile?.nombre} size={44} />
+        <View style={styles.profileCopy}>
+          <Text style={styles.greeting}>{profile?.nombre ? `Hola, ${profile.nombre}` : 'Tu espacio de hoy'}</Text>
+          <Text style={styles.greetingHint}>¿Cómo estás hoy?</Text>
+        </View>
+      </View>
       <ScrollView
         ref={ref}
         contentContainerStyle={styles.chat}
@@ -213,9 +236,19 @@ export default function HomeScreen() {
 }
 
 const useStyles = makeThemedStyles((t) => ({
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 10,
+  },
+  profileCopy: { marginLeft: 11, flex: 1 },
+  greeting: { ...t.typography.type.section, color: t.colors.text },
+  greetingHint: { ...t.typography.type.caption, color: t.colors.textMuted, marginTop: 1 },
   chat: {
     padding: 16,
-    paddingTop: 18,
+    paddingTop: 8,
     paddingBottom: 28,
     flexGrow: 1,
   },

@@ -25,6 +25,14 @@ const PALETTE_KEYS = ['id', 'name', ...CONFIG_KEYS];
 const CONTAINER_KEYS = ['activeId', 'palettes'];
 const MAX_PALETAS = 5;
 const NAME_MAX = 24;
+const PERFIL_RESPUESTAS = {
+  compania: ['uno_a_uno', 'grupo_pequeno', 'grupo_grande'],
+  ritmo: ['tranquilo', 'equilibrado', 'activo'],
+  entorno: ['casa', 'aire_libre', 'indistinto'],
+  actividad: ['creativa', 'movimiento', 'entretenimiento', 'reflexion'],
+  recarga: ['musica', 'naturaleza', 'conversar', 'desconectar'],
+  novedad: ['conocido', 'mezcla', 'explorar'],
+};
 
 function esObjeto(v) {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -77,6 +85,32 @@ function isValidCustomTheme(value) {
   return isValidContainer(value) || isValidPaletteConfig(value);
 }
 
+// Contrato v1 compartido con app/features/onboarding/perfilPersonalidad.js:
+// { version: 1, completadoEn: ISO-8601, respuestas: { compania, ritmo,
+// entorno, actividad, recarga, novedad } }. Cada valor debe pertenecer al
+// enum declarado arriba; no se admiten claves extra para mantenerlo estable.
+function isValidPerfilPersonalidad(value) {
+  if (!esObjeto(value)) return false;
+  const keys = Object.keys(value);
+  if (keys.length !== 3 || !['version', 'completadoEn', 'respuestas'].every((k) => keys.includes(k))) {
+    return false;
+  }
+  if (value.version !== 1 || typeof value.completadoEn !== 'string') return false;
+  const timestamp = Date.parse(value.completadoEn);
+  if (
+    Number.isNaN(timestamp) ||
+    new Date(timestamp).toISOString() !== value.completadoEn ||
+    !esObjeto(value.respuestas)
+  ) return false;
+
+  const respuestaKeys = Object.keys(value.respuestas);
+  const expectedKeys = Object.keys(PERFIL_RESPUESTAS);
+  if (respuestaKeys.length !== expectedKeys.length || !expectedKeys.every((k) => respuestaKeys.includes(k))) {
+    return false;
+  }
+  return expectedKeys.every((key) => PERFIL_RESPUESTAS[key].includes(value.respuestas[key]));
+}
+
 const USER_SELECT = {
   id: true,
   nombre: true,
@@ -84,6 +118,7 @@ const USER_SELECT = {
   qrCode: true,
   themePreference: true,
   customTheme: true,
+  perfilPersonalidad: true,
   createdAt: true,
 };
 
@@ -101,12 +136,12 @@ router.get('/me', requireAuth, async (req, res) => {
   res.json({ user });
 });
 
-// PATCH /api/users/me — permite actualizar themePreference y/o customTheme.
-// null es válido en ambos: vuelve al tema por defecto / borra la paleta.
+// PATCH /api/users/me — actualiza preferencias permitidas del perfil.
+// null es válido en los campos de tema: vuelve al default / borra la paleta.
 router.patch('/me', requireAuth, async (req, res) => {
   const body = req.body ?? {};
 
-  if (!('themePreference' in body) && !('customTheme' in body)) {
+  if (!('themePreference' in body) && !('customTheme' in body) && !('perfilPersonalidad' in body)) {
     return res.status(400).json({ error: 'Nada que actualizar' });
   }
 
@@ -127,6 +162,14 @@ router.patch('/me', requireAuth, async (req, res) => {
     }
     // Prisma exige DbNull explícito para limpiar una columna Json.
     data.customTheme = customTheme === null ? Prisma.DbNull : customTheme;
+  }
+
+  if ('perfilPersonalidad' in body) {
+    const { perfilPersonalidad } = body;
+    if (!isValidPerfilPersonalidad(perfilPersonalidad)) {
+      return res.status(400).json({ error: 'Perfil de personalidad inválido' });
+    }
+    data.perfilPersonalidad = perfilPersonalidad;
   }
 
   const user = await prisma.user.update({

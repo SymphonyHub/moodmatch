@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView, Platform,
   ActivityIndicator, ScrollView,
 } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -12,6 +13,7 @@ import { getPendingInvite, clearPendingInvite } from '../utils/pendingInvite';
 import { useTheme, makeThemedStyles } from '../theme/ThemeContext';
 import { VALID_THEME_CHOICES } from '../theme/themes';
 import { normalizeCustomTheme } from '../theme/customTheme';
+import Tappable from '../components/Tappable';
 
 const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
@@ -103,7 +105,19 @@ export default function LoginScreen() {
         apiUpdateMe({ customTheme: customConfig }).catch(() => {});
       }
 
-      // Si se llegó acá desde un link de invitación, retomarlo ahora que hay sesión
+      if (modo === 'register') {
+        router.replace('/onboarding/bienvenida');
+        return;
+      }
+
+      // Usuarios existentes que aún no tienen perfil completan el cuestionario,
+      // pero no repiten la animación reservada al registro exitoso.
+      if (!data.user?.perfilPersonalidad) {
+        router.replace('/onboarding/cuestionario');
+        return;
+      }
+
+      // Si se llegó acá desde un link de invitación, retomarlo ahora que hay sesión.
       const pendingCode = await getPendingInvite().catch(() => null);
       if (pendingCode) {
         await clearPendingInvite().catch(() => {});
@@ -125,79 +139,124 @@ export default function LoginScreen() {
     >
       <StatusBar style={theme.statusBar.onBackground} />
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.titulo}>MoodMatch</Text>
-        <Text style={styles.subtitulo}>Tu bienestar, un ánimo a la vez</Text>
+        <View style={styles.orbe} />
+        <View style={styles.shell}>
+          <View style={styles.brand}>
+            <View style={styles.brandIcon}>
+              <Ionicons name="heart" size={27} color={theme.colors.onPrimary} />
+            </View>
+            <Text style={styles.marca}>MoodMatch</Text>
+            <Text style={styles.titulo}>
+              {modo === 'login' ? 'Qué bueno verte de nuevo' : 'Tu espacio empieza aquí'}
+            </Text>
+            <Text style={styles.subtitulo}>
+              {modo === 'login'
+                ? 'Vuelve a conectar con cómo te sientes.'
+                : 'Crea una cuenta y personaliza tu experiencia.'}
+            </Text>
+          </View>
 
-        <View style={styles.toggle}>
-          <TouchableOpacity
-            style={[styles.toggleBtn, modo === 'login' && styles.toggleActive]}
-            onPress={() => cambiarModo('login')}
-          >
-            <Text style={[styles.toggleText, modo === 'login' && styles.toggleTextActive]}>
-              Ingresar
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleBtn, modo === 'register' && styles.toggleActive]}
-            onPress={() => cambiarModo('register')}
-          >
-            <Text style={[styles.toggleText, modo === 'register' && styles.toggleTextActive]}>
-              Registrarse
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.formCard}>
+            <View style={styles.toggle}>
+              <TouchableOpacity
+                style={[styles.toggleBtn, modo === 'login' && styles.toggleActive]}
+                onPress={() => cambiarModo('login')}
+                accessibilityState={{ selected: modo === 'login' }}
+              >
+                <Text style={[styles.toggleText, modo === 'login' && styles.toggleTextActive]}>
+                  Ingresar
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleBtn, modo === 'register' && styles.toggleActive]}
+                onPress={() => cambiarModo('register')}
+                accessibilityState={{ selected: modo === 'register' }}
+              >
+                <Text style={[styles.toggleText, modo === 'register' && styles.toggleTextActive]}>
+                  Registrarse
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {modo === 'register' && (
+              <View style={styles.campo}>
+                <Text style={styles.label}>Nombre</Text>
+                <View style={[styles.inputShell, !!errNombre && styles.inputError]}>
+                  <Ionicons name="person-outline" size={20} color={theme.colors.textFaint} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Cómo quieres que te llamemos"
+                    placeholderTextColor={theme.colors.textFaint}
+                    value={nombre}
+                    onChangeText={(v) => { setNombre(v); setErrNombre(''); }}
+                    autoCapitalize="words"
+                  />
+                </View>
+                {!!errNombre && <Text style={styles.fieldError}>{errNombre}</Text>}
+              </View>
+            )}
+
+            <View style={styles.campo}>
+              <Text style={styles.label}>Email</Text>
+              <View style={[styles.inputShell, !!errEmail && styles.inputError]}>
+                <Ionicons name="mail-outline" size={20} color={theme.colors.textFaint} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="tu@email.com"
+                  placeholderTextColor={theme.colors.textFaint}
+                  value={email}
+                  onChangeText={(v) => { setEmail(v); setErrEmail(''); }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                />
+              </View>
+              {!!errEmail && <Text style={styles.fieldError}>{errEmail}</Text>}
+            </View>
+
+            <View style={styles.campo}>
+              <Text style={styles.label}>Contraseña</Text>
+              <View style={[styles.inputShell, !!errPassword && styles.inputError]}>
+                <Ionicons name="lock-closed-outline" size={20} color={theme.colors.textFaint} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Mínimo 6 caracteres"
+                  placeholderTextColor={theme.colors.textFaint}
+                  value={password}
+                  onChangeText={(v) => { setPassword(v); setErrPassword(''); }}
+                  secureTextEntry
+                  autoComplete={modo === 'login' ? 'current-password' : 'new-password'}
+                />
+              </View>
+              {!!errPassword && <Text style={styles.fieldError}>{errPassword}</Text>}
+            </View>
+
+            {!!errGeneral && (
+              <View style={styles.errorBox}>
+                <Ionicons name="alert-circle-outline" size={18} color={theme.colors.danger} />
+                <Text style={styles.errorGeneral}>{errGeneral}</Text>
+              </View>
+            )}
+
+            <Tappable
+              style={[styles.btn, loading && styles.btnDisabled]}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={theme.colors.onPrimary} />
+              ) : (
+                <>
+                  <Text style={styles.btnText}>
+                    {modo === 'login' ? 'Ingresar' : 'Registrarse'}
+                  </Text>
+                  <Ionicons name="arrow-forward" size={20} color={theme.colors.onPrimary} />
+                </>
+              )}
+            </Tappable>
+          </View>
         </View>
-
-        {modo === 'register' && (
-          <>
-            <TextInput
-              style={[styles.input, !!errNombre && styles.inputError]}
-              placeholder="Nombre"
-              placeholderTextColor={theme.colors.textFaint}
-              value={nombre}
-              onChangeText={(v) => { setNombre(v); setErrNombre(''); }}
-              autoCapitalize="words"
-            />
-            {!!errNombre && <Text style={styles.fieldError}>{errNombre}</Text>}
-          </>
-        )}
-
-        <TextInput
-          style={[styles.input, !!errEmail && styles.inputError]}
-          placeholder="Email"
-          placeholderTextColor={theme.colors.textFaint}
-          value={email}
-          onChangeText={(v) => { setEmail(v); setErrEmail(''); }}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {!!errEmail && <Text style={styles.fieldError}>{errEmail}</Text>}
-
-        <TextInput
-          style={[styles.input, !!errPassword && styles.inputError]}
-          placeholder="Contraseña"
-          placeholderTextColor={theme.colors.textFaint}
-          value={password}
-          onChangeText={(v) => { setPassword(v); setErrPassword(''); }}
-          secureTextEntry
-        />
-        {!!errPassword && <Text style={styles.fieldError}>{errPassword}</Text>}
-
-        {!!errGeneral && <Text style={styles.errorGeneral}>{errGeneral}</Text>}
-
-        <TouchableOpacity
-          style={[styles.btn, loading && styles.btnDisabled]}
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color={theme.colors.onPrimary} />
-          ) : (
-            <Text style={styles.btnText}>
-              {modo === 'login' ? 'Ingresar' : 'Crear cuenta'}
-            </Text>
-          )}
-        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -205,27 +264,71 @@ export default function LoginScreen() {
 
 const useStyles = makeThemedStyles((t) => ({
   flex: { flex: 1, backgroundColor: t.colors.background },
-  container: { flexGrow: 1, padding: 28, justifyContent: 'center' },
+  container: {
+    flexGrow: 1,
+    paddingHorizontal: 22,
+    paddingTop: 58,
+    paddingBottom: 32,
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  orbe: {
+    position: 'absolute',
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: t.colors.primarySoft,
+    top: -125,
+    right: -95,
+  },
+  shell: { width: '100%', maxWidth: 460, alignSelf: 'center' },
+  brand: { alignItems: 'center', marginBottom: 28 },
+  brandIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.colors.primary,
+    marginBottom: 14,
+    ...t.shadows.cardStrong,
+  },
+  marca: {
+    ...t.typography.fonts.bold,
+    color: t.colors.accent,
+    fontSize: t.fontSize(12),
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
   titulo: {
     ...t.typography.type.display,
-    fontSize: t.fontSize(34),
-    lineHeight: Math.round(t.fontSize(34) * 1.2),
+    fontSize: t.fontSize(29),
+    lineHeight: Math.round(t.fontSize(29) * 1.2),
     textAlign: 'center',
-    color: t.colors.primary,
-    marginBottom: 6,
+    color: t.colors.text,
+    marginBottom: 9,
   },
   subtitulo: {
     ...t.typography.type.body,
     color: t.colors.textMuted,
     textAlign: 'center',
-    marginBottom: 36,
+    maxWidth: 310,
+  },
+  formCard: {
+    backgroundColor: t.colors.surface,
+    borderRadius: t.shape.radiusXl,
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.border,
+    padding: 18,
+    ...t.shadows.cardStrong,
   },
   toggle: {
     flexDirection: 'row',
-    backgroundColor: t.colors.border,
+    backgroundColor: t.colors.background,
     borderRadius: t.shape.radiusMd,
     padding: 4,
-    marginBottom: 24,
+    marginBottom: 22,
   },
   toggleBtn: {
     flex: 1,
@@ -233,44 +336,74 @@ const useStyles = makeThemedStyles((t) => ({
     borderRadius: t.shape.radiusSm,
     alignItems: 'center',
   },
-  toggleActive: { backgroundColor: t.colors.surface },
+  toggleActive: {
+    backgroundColor: t.colors.surface,
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.primarySoftBorder,
+    ...t.shadows.card,
+  },
   toggleText: {
     color: t.colors.textMuted,
     ...t.typography.fonts.semibold,
     fontSize: t.fontSize(15),
   },
   toggleTextActive: { color: t.colors.primary },
-  input: {
-    backgroundColor: t.colors.surface,
-    borderRadius: t.shape.radiusMd,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    fontSize: t.fontSize(16),
-    marginBottom: 4,
-    borderWidth: t.shape.borderThin,
-    borderColor: t.colors.border,
+  campo: { marginBottom: 15 },
+  label: {
+    ...t.typography.fonts.semibold,
     color: t.colors.text,
+    fontSize: t.fontSize(13),
+    marginBottom: 7,
+    marginLeft: 2,
+  },
+  inputShell: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    backgroundColor: t.colors.background,
+    borderRadius: t.shape.radiusMd,
+    paddingHorizontal: 14,
+    borderWidth: t.shape.borderMedium,
+    borderColor: t.colors.border,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: t.fontSize(16),
+    color: t.colors.text,
+    ...t.typography.fonts.medium,
   },
   inputError: { borderColor: t.colors.danger },
   fieldError: {
     color: t.colors.danger,
     fontSize: t.fontSize(12),
-    marginBottom: 10,
-    marginLeft: 4,
+    marginTop: 5,
+    marginLeft: 3,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: t.colors.dangerSoft,
+    borderRadius: t.shape.radiusSm,
+    padding: 11,
+    marginBottom: 12,
   },
   errorGeneral: {
+    flex: 1,
     color: t.colors.danger,
-    marginBottom: 12,
-    textAlign: 'center',
     fontSize: t.fontSize(14),
-    marginTop: 4,
   },
   btn: {
+    minHeight: 54,
+    flexDirection: 'row',
+    gap: 9,
     backgroundColor: t.colors.primary,
     borderRadius: t.shape.radiusMd,
-    paddingVertical: 15,
     alignItems: 'center',
-    marginTop: 8,
+    justifyContent: 'center',
+    marginTop: 3,
   },
   btnDisabled: { backgroundColor: t.colors.primaryDisabled },
   btnText: {

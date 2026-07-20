@@ -100,6 +100,8 @@ function ThemedStack() {
       >
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
+        <Stack.Screen name="onboarding/bienvenida" />
+        <Stack.Screen name="onboarding/cuestionario" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="chat/[friendId]" animation="slide_from_right" />
         <Stack.Screen name="add-friend" />

@@ -26,7 +26,21 @@ const usuarioBase = {
   qrCode: 'uuid-123',
   themePreference: 'nocturno',
   customTheme: null,
+  perfilPersonalidad: null,
   createdAt: new Date(),
+};
+
+const perfilValido = {
+  version: 1,
+  completadoEn: '2026-07-20T12:00:00.000Z',
+  respuestas: {
+    compania: 'grupo_pequeno',
+    ritmo: 'equilibrado',
+    entorno: 'aire_libre',
+    actividad: 'creativa',
+    recarga: 'musica',
+    novedad: 'explorar',
+  },
 };
 
 const paletaValida = {
@@ -64,6 +78,50 @@ describe('GET /api/users/me — preferencia de tema', () => {
 
     expect(res.status).toBe(401);
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe('perfil de personalidad', () => {
+  test('GET /me expone perfilPersonalidad para otros consumidores', async () => {
+    prisma.user.findUnique.mockResolvedValue({ ...usuarioBase, perfilPersonalidad: perfilValido });
+
+    const res = await request(app)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.user.perfilPersonalidad).toEqual(perfilValido);
+    expect(prisma.user.findUnique.mock.calls[0][0].select.perfilPersonalidad).toBe(true);
+  });
+
+  test('PATCH /me persiste el shape v1 completo', async () => {
+    prisma.user.update.mockResolvedValue({ ...usuarioBase, perfilPersonalidad: perfilValido });
+
+    const res = await request(app)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ perfilPersonalidad: perfilValido });
+
+    expect(res.status).toBe(200);
+    expect(res.body.user.perfilPersonalidad).toEqual(perfilValido);
+    expect(prisma.user.update.mock.calls[0][0].data).toEqual({ perfilPersonalidad: perfilValido });
+  });
+
+  test.each([
+    ['versión desconocida', { ...perfilValido, version: 2 }],
+    ['respuesta inválida', { ...perfilValido, respuestas: { ...perfilValido.respuestas, ritmo: 'caotico' } }],
+    ['respuesta faltante', { ...perfilValido, respuestas: { ...perfilValido.respuestas, novedad: undefined } }],
+    ['fecha inválida', { ...perfilValido, completadoEn: 'ayer' }],
+    ['clave extra', { ...perfilValido, extra: true }],
+  ])('rechaza perfil inválido: %s', async (_caso, perfilPersonalidad) => {
+    const res = await request(app)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ perfilPersonalidad });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/personalidad inválido/i);
+    expect(prisma.user.update).not.toHaveBeenCalled();
   });
 });
 

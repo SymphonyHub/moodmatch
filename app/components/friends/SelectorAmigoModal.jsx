@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGetFriendships } from '../../services/api';
 import { MOOD_INFO } from '../../constants/moods';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
@@ -24,6 +25,7 @@ import Tappable from '../Tappable';
 export default function SelectorAmigoModal({ visible, titulo, onSelect, onClose, amigos: preload }) {
   const { theme } = useTheme();
   const styles = useStyles();
+  const insets = useSafeAreaInsets();
 
   const [amigos, setAmigos] = useState(preload ?? null);
 
@@ -55,9 +57,9 @@ export default function SelectorAmigoModal({ visible, titulo, onSelect, onClose,
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <View style={styles.hoja}>
+        <View style={[styles.hoja, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           <View style={styles.barra}>
-            <Text style={styles.titulo} numberOfLines={1}>{titulo}</Text>
+            <Text style={styles.titulo} numberOfLines={2}>{titulo}</Text>
             <Tappable style={styles.cerrar} onPress={onClose} accessibilityLabel="Cerrar" haptic={false}>
               <Ionicons name="close" size={22} color={theme.colors.textMuted} />
             </Tappable>
@@ -94,7 +96,7 @@ export default function SelectorAmigoModal({ visible, titulo, onSelect, onClose,
                       <Text style={styles.avatarTxt}>{amigo.nombre.charAt(0).toUpperCase()}</Text>
                     </View>
                     <View style={styles.info}>
-                      <Text style={styles.nombre}>{amigo.nombre}</Text>
+                      <Text style={styles.nombre} numberOfLines={1}>{amigo.nombre}</Text>
                       {mood ? (
                         <Text style={[styles.mood, { color: moodColor }]}>
                           {mood.emoji}{'  '}{mood.label}
@@ -123,11 +125,13 @@ const useStyles = makeThemedStyles((t) => ({
   },
   hoja: {
     backgroundColor: t.colors.background,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
     borderTopLeftRadius: t.shape.radiusXl,
     borderTopRightRadius: t.shape.radiusXl,
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 28,
     maxHeight: '80%',
   },
   barra: {
@@ -140,7 +144,7 @@ const useStyles = makeThemedStyles((t) => ({
     ...t.typography.type.section,
     color: t.colors.text,
   },
-  cerrar: { padding: 4 },
+  cerrar: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   centro: { paddingVertical: 48, alignItems: 'center' },
   vacio: { paddingVertical: 36, alignItems: 'center', paddingHorizontal: 24 },
   vacioEmoji: { fontSize: 48, marginBottom: 14 },
@@ -158,7 +162,7 @@ const useStyles = makeThemedStyles((t) => ({
     gap: 8,
     backgroundColor: t.colors.primary,
     borderRadius: t.shape.radiusMd,
-    paddingVertical: 12,
+    minHeight: 44,
     paddingHorizontal: 22,
   },
   btnQrTxt: {
@@ -190,7 +194,7 @@ const useStyles = makeThemedStyles((t) => ({
     ...t.typography.fonts.bold,
     color: t.colors.primary,
   },
-  info: { flex: 1 },
+  info: { flex: 1, minWidth: 0 },
   nombre: {
     fontSize: t.fontSize(15),
     ...t.typography.fonts.semibold,

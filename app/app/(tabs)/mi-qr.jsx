@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity,
-  ScrollView, ActivityIndicator, Alert, Modal, Share,
+  ScrollView, ActivityIndicator, Alert, Modal, Share, useWindowDimensions,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -12,11 +12,15 @@ import { buildInviteMessage } from '../../utils/invite';
 import { API_URL } from '../../config';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../../components/Tappable';
+import { qrSizeForWidth, scanSizeForViewport } from '../../utils/responsive';
 
 export default function MiQrScreen() {
   const { theme } = useTheme();
   const styles = useStyles();
+  const { width, height } = useWindowDimensions();
   const { refresh } = useFriendsCount();
+  const qrSize = qrSizeForWidth(width);
+  const scanSize = scanSizeForViewport(width, height);
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -81,7 +85,7 @@ export default function MiQrScreen() {
           <View style={styles.qrBox}>
             {/* El QR se mantiene oscuro sobre blanco en todos los temas: los lectores
                 necesitan ese contraste, y el recuadro blanco hace de zona de silencio. */}
-            <QRCode value={user.qrCode} size={210} color="#1a1a1a" backgroundColor="#ffffff" />
+            <QRCode value={user.qrCode} size={qrSize} color="#1a1a1a" backgroundColor="#ffffff" />
           </View>
           <Text style={styles.hint}>
             Muéstrale este código a tus amigos para que te agreguen
@@ -130,7 +134,7 @@ export default function MiQrScreen() {
             onBarcodeScanned={handleScan}
           />
           <View style={styles.cameraOverlay}>
-            <View style={styles.scanFrame} />
+            <View style={[styles.scanFrame, { width: scanSize, height: scanSize }]} />
             <Text style={styles.scanLabel}>Apunta al QR de tu amigo</Text>
           </View>
           <TouchableOpacity style={styles.btnCancelar} onPress={() => setScanning(false)}>
@@ -144,7 +148,14 @@ export default function MiQrScreen() {
 
 const useStyles = makeThemedStyles((t) => ({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  container: { padding: 24, alignItems: 'center', paddingBottom: 40 },
+  container: {
+    width: '100%',
+    maxWidth: 640,
+    alignSelf: 'center',
+    padding: 24,
+    alignItems: 'center',
+    paddingBottom: 40,
+  },
   titulo: {
     ...t.typography.type.title,
     color: t.colors.text,
@@ -231,8 +242,6 @@ const useStyles = makeThemedStyles((t) => ({
     alignItems: 'center',
   },
   scanFrame: {
-    width: 240,
-    height: 240,
     borderWidth: 3,
     borderColor: '#fff',
     borderRadius: 16,

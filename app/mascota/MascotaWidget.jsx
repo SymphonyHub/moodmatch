@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import {
+  ActivityIndicator, Text, useWindowDimensions, View,
+} from 'react-native';
 import { apiGetMascota } from '../services/api';
 import { useTheme, makeThemedStyles } from '../theme/ThemeContext';
 import Tappable from '../components/Tappable';
@@ -8,6 +10,8 @@ import { estadoMascota } from './estadoMascota';
 export default function MascotaWidget({ amistadId, refreshKey = 0 }) {
   const { theme } = useTheme();
   const styles = useStyles();
+  const { width } = useWindowDimensions();
+  const cardWidth = Math.min(640, width - 28);
   const [mascota, setMascota] = useState(null);
   const [estadoCarga, setEstadoCarga] = useState('loading');
   const [reintento, setReintento] = useState(0);
@@ -35,7 +39,7 @@ export default function MascotaWidget({ amistadId, refreshKey = 0 }) {
 
   if (!mascota && estadoCarga === 'loading') {
     return (
-      <View style={[styles.contenedor, styles.cargando]}>
+      <View style={[styles.contenedor, styles.cargando, { width: cardWidth }]}>
         <ActivityIndicator size="small" color={theme.colors.primary} />
         <Text style={styles.cargandoTxt}>Conociendo a su mascota…</Text>
       </View>
@@ -45,7 +49,7 @@ export default function MascotaWidget({ amistadId, refreshKey = 0 }) {
   if (!mascota) {
     return (
       <Tappable
-        style={[styles.contenedor, styles.error]}
+        style={[styles.contenedor, styles.error, { width: cardWidth }]}
         onPress={() => setReintento((valor) => valor + 1)}
         haptic={false}
         accessibilityLabel="Reintentar carga de la mascota compartida"
@@ -61,7 +65,7 @@ export default function MascotaWidget({ amistadId, refreshKey = 0 }) {
 
   return (
     <View
-      style={styles.contenedor}
+      style={[styles.contenedor, { width: cardWidth }]}
       accessibilityLabel={`${mascota.nombre}, mascota compartida. ${mascota.nivelCarino} puntos de cariño`}
     >
       <View style={styles.rostro}>
@@ -69,8 +73,11 @@ export default function MascotaWidget({ amistadId, refreshKey = 0 }) {
       </View>
       <View style={styles.info}>
         <View style={styles.filaTitulo}>
-          <Text style={styles.nombre}>{mascota.nombre}</Text>
+          <Text style={styles.nombre} numberOfLines={1}>{mascota.nombre}</Text>
           <Text style={styles.nivel}>{mascota.nivelCarino} cariño</Text>
+          {estadoCarga === 'refreshing' && (
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+          )}
         </View>
         <Text style={styles.estado}>{estado.etiqueta}</Text>
         <View style={styles.barra}>
@@ -80,9 +87,6 @@ export default function MascotaWidget({ amistadId, refreshKey = 0 }) {
           Conversen en ambos sentidos y hagan actividades juntos.
         </Text>
       </View>
-      {estadoCarga === 'refreshing' && (
-        <ActivityIndicator style={styles.refrescando} size="small" color={theme.colors.primary} />
-      )}
     </View>
   );
 }
@@ -91,7 +95,7 @@ const useStyles = makeThemedStyles((t) => ({
   contenedor: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 14,
+    alignSelf: 'center',
     marginTop: 12,
     padding: 12,
     borderRadius: t.shape.radiusLg,
@@ -115,7 +119,7 @@ const useStyles = makeThemedStyles((t) => ({
     marginRight: 12,
   },
   emoji: { fontSize: 32 },
-  info: { flex: 1 },
+  info: { flex: 1, minWidth: 0 },
   filaTitulo: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
   nombre: {
     flex: 1,
@@ -124,6 +128,7 @@ const useStyles = makeThemedStyles((t) => ({
     ...t.typography.fonts.bold,
   },
   nivel: {
+    flexShrink: 0,
     color: t.colors.primary,
     fontSize: t.fontSize(11),
     ...t.typography.fonts.semibold,
@@ -138,5 +143,4 @@ const useStyles = makeThemedStyles((t) => ({
   },
   progreso: { height: '100%', borderRadius: 3, backgroundColor: t.colors.accent },
   ayuda: { color: t.colors.textFaint, fontSize: t.fontSize(10), marginTop: 5 },
-  refrescando: { position: 'absolute', right: 8, bottom: 7 },
 }));

@@ -237,6 +237,9 @@ export default function HomeScreen() {
 
 const useStyles = makeThemedStyles((t) => ({
   profileHeader: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -247,6 +250,9 @@ const useStyles = makeThemedStyles((t) => ({
   greeting: { ...t.typography.type.section, color: t.colors.text },
   greetingHint: { ...t.typography.type.caption, color: t.colors.textMuted, marginTop: 1 },
   chat: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
     padding: 16,
     paddingTop: 8,
     paddingBottom: 28,

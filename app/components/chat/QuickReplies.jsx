@@ -27,7 +27,7 @@ export default function QuickReplies({ items, onSelect, disabled }) {
             {item.emoji ? <Text style={styles.emoji}>{item.emoji}</Text> : null}
             <Text
               style={[styles.label, item.tint && { color: item.tint.color }]}
-              numberOfLines={1}
+              numberOfLines={2}
             >
               {item.label}
             </Text>
@@ -48,6 +48,8 @@ const useStyles = makeThemedStyles((t) => ({
     marginBottom: 12,
   },
   chip: {
+    maxWidth: '100%',
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -61,6 +63,7 @@ const useStyles = makeThemedStyles((t) => ({
   },
   emoji: { fontSize: t.fontSize(16) },
   label: {
+    flexShrink: 1,
     ...t.typography.fonts.semibold,
     fontSize: t.fontSize(14),
     color: t.colors.primary,

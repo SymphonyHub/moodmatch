@@ -15,15 +15,20 @@ const ICON_SIZE = 22;
 
 const useStyles = makeThemedStyles((t) => ({
   bar: {
-    flexDirection: 'row',
     backgroundColor: t.colors.tabBarBackground,
     borderTopWidth: t.shape.borderThin,
     borderTopColor: t.colors.tabBarBorder,
     paddingTop: BAR_PADDING_TOP,
   },
+  items: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
+    flexDirection: 'row',
+  },
   pill: {
     position: 'absolute',
-    top: BAR_PADDING_TOP,
+    top: 0,
     left: 0,
     height: PILL_HEIGHT,
     borderRadius: t.shape.radiusXl,
@@ -44,6 +49,7 @@ const useStyles = makeThemedStyles((t) => ({
     ...t.typography.type.caption,
     marginTop: 3,
   },
+  labelCompact: { fontSize: 10 },
   badge: {
     position: 'absolute',
     top: 0,
@@ -95,8 +101,11 @@ export default function TabBar({ state, descriptors, navigation }) {
   const [positioned, setPositioned] = useState(false);
   const translateX = useRef(new Animated.Value(0)).current;
 
+  const segmentWidth = barWidth > 0 ? barWidth / state.routes.length : PILL_WIDTH;
+  const responsivePillWidth = Math.min(PILL_WIDTH, Math.max(48, segmentWidth - 8));
+  const compact = barWidth > 0 && barWidth <= 360;
   const { x, width: pillWidth } = indicatorLayout(barWidth, state.routes.length, state.index, {
-    pillWidth: PILL_WIDTH,
+    pillWidth: responsivePillWidth,
   });
 
   useEffect(() => {
@@ -113,17 +122,17 @@ export default function TabBar({ state, descriptors, navigation }) {
     <View
       style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}
       onLayout={(e) => {
-        setBarWidth(e.nativeEvent.layout.width);
         reportarAltura?.(e.nativeEvent.layout.height);
       }}
     >
-      {positioned && (
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.pill, { width: pillWidth, transform: [{ translateX }] }]}
-        />
-      )}
-      {state.routes.map((route, index) => {
+      <View style={styles.items} onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)}>
+        {positioned && (
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.pill, { width: pillWidth, transform: [{ translateX }] }]}
+          />
+        )}
+        {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
         const focused = state.index === index;
         const label = options.tabBarLabel ?? options.title ?? route.name;
@@ -163,13 +172,21 @@ export default function TabBar({ state, descriptors, navigation }) {
             </View>
             <Text
               numberOfLines={1}
-              style={[styles.label, focused && theme.typography.fonts.semibold, { color }]}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+              style={[
+                styles.label,
+                compact && styles.labelCompact,
+                focused && theme.typography.fonts.semibold,
+                { color },
+              ]}
             >
               {label}
             </Text>
           </Tappable>
         );
-      })}
+        })}
+      </View>
     </View>
   );
 }

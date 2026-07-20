@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import {
+  Alert, Text, useWindowDimensions, View,
+} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import { apiUpdateMe } from '../../services/api';
@@ -7,6 +9,7 @@ import { uploadAvatar } from '../../services/avatarUpload';
 import { makeThemedStyles, useTheme } from '../../theme/ThemeContext';
 import Tappable from '../Tappable';
 import Avatar from './Avatar';
+import { isCompactWidth } from '../../utils/responsive';
 
 const PICKER_OPTIONS = {
   mediaTypes: ['images'],
@@ -18,6 +21,8 @@ const PICKER_OPTIONS = {
 export default function AvatarPicker({ avatarUrl, nombre, onChange }) {
   const { theme } = useTheme();
   const styles = useStyles();
+  const { width } = useWindowDimensions();
+  const compact = isCompactWidth(width);
   const [uploading, setUploading] = useState(false);
 
   const saveResult = async (result) => {
@@ -80,7 +85,8 @@ export default function AvatarPicker({ avatarUrl, nombre, onChange }) {
         <Text style={styles.hint}>{uploading ? 'Subiendo imagen…' : 'Elige una foto cuadrada y clara.'}</Text>
         <View style={styles.buttons}>
           <Tappable
-            style={[styles.button, uploading && styles.buttonDisabled]}
+            wrapperStyle={compact && styles.buttonWrapperCompact}
+            style={[styles.button, compact && styles.buttonCompact, uploading && styles.buttonDisabled]}
             onPress={chooseFromGallery}
             disabled={uploading}
             accessibilityLabel="Elegir foto de la galería"
@@ -89,7 +95,8 @@ export default function AvatarPicker({ avatarUrl, nombre, onChange }) {
             <Text style={styles.buttonText}>Galería</Text>
           </Tappable>
           <Tappable
-            style={[styles.button, uploading && styles.buttonDisabled]}
+            wrapperStyle={compact && styles.buttonWrapperCompact}
+            style={[styles.button, compact && styles.buttonCompact, uploading && styles.buttonDisabled]}
             onPress={takePhoto}
             disabled={uploading}
             accessibilityLabel="Tomar foto con la cámara"
@@ -105,10 +112,11 @@ export default function AvatarPicker({ avatarUrl, nombre, onChange }) {
 
 const useStyles = makeThemedStyles((t) => ({
   container: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  actions: { flex: 1 },
+  actions: { flex: 1, minWidth: 0 },
   name: { ...t.typography.type.body, ...t.typography.fonts.semibold, color: t.colors.text },
   hint: { ...t.typography.type.caption, color: t.colors.textMuted, marginTop: 2, marginBottom: 9 },
-  buttons: { flexDirection: 'row', gap: 8 },
+  buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  buttonWrapperCompact: { width: '100%' },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -116,9 +124,10 @@ const useStyles = makeThemedStyles((t) => ({
     borderWidth: t.shape.borderThin,
     borderColor: t.colors.primarySoftBorder,
     borderRadius: t.shape.radiusMd,
-    paddingVertical: 9,
+    minHeight: 44,
     paddingHorizontal: 11,
   },
+  buttonCompact: { width: '100%', justifyContent: 'center' },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { ...t.typography.type.caption, ...t.typography.fonts.semibold, color: t.colors.primary },
 }));

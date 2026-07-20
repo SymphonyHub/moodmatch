@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Modal, ActivityIndicator, Alert } from 'react-native';
+import {
+  View, Text, Modal, ActivityIndicator, Alert, ScrollView,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import AccionSocialCard from '../components/wellness/AccionSocialCard';
 import SelectorAmigoModal from '../components/friends/SelectorAmigoModal';
@@ -172,6 +175,7 @@ export default function AccionConAmigos({ actividad }) {
 // reusa la lista ya cargada.
 function ModalEnergia({ estado, styles, onCerrar, onEscribir }) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const [selectorAbierto, setSelectorAbierto] = useState(false);
 
   const cargando = estado === 'cargando';
@@ -187,15 +191,25 @@ function ModalEnergia({ estado, styles, onCerrar, onEscribir }) {
 
   return (
     <Modal visible={abierto} animationType="fade" transparent onRequestClose={cerrarTodo}>
-      <View style={styles.backdrop}>
+      <View
+        style={[
+          styles.backdrop,
+          { paddingTop: Math.max(insets.top, 20), paddingBottom: Math.max(insets.bottom, 20) },
+        ]}
+      >
         {cargando ? (
           <View style={styles.tarjeta}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
           </View>
         ) : selectorAbierto ? null : (
-          <View style={styles.tarjeta}>
-            {sugerido ? (
-              <>
+          <ScrollView
+            style={styles.modalScroll}
+            contentContainerStyle={styles.modalScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.tarjeta}>
+              {sugerido ? (
+                <>
                 <Text style={styles.emoji}>🌤️</Text>
                 <Text style={styles.titulo}>Alégrale el día a {sugerido.nombre}</Text>
                 <Text style={styles.cuerpo}>
@@ -209,9 +223,9 @@ function ModalEnergia({ estado, styles, onCerrar, onEscribir }) {
                 <Tappable style={styles.btnSecundario} onPress={() => setSelectorAbierto(true)} haptic={false}>
                   <Text style={styles.btnSecundarioTxt}>Elegir a otra persona</Text>
                 </Tappable>
-              </>
-            ) : (
-              <>
+                </>
+              ) : (
+                <>
                 <Text style={styles.emoji}>💛</Text>
                 <Text style={styles.titulo}>Comparte tu energía</Text>
                 <Text style={styles.cuerpo}>
@@ -221,12 +235,13 @@ function ModalEnergia({ estado, styles, onCerrar, onEscribir }) {
                 <Tappable style={styles.btnPrimario} onPress={() => setSelectorAbierto(true)}>
                   <Text style={styles.btnPrimarioTxt}>Elegir un amigo</Text>
                 </Tappable>
-              </>
-            )}
-            <Tappable style={styles.btnTexto} onPress={cerrarTodo} haptic={false}>
-              <Text style={styles.btnTextoTxt}>Ahora no</Text>
-            </Tappable>
-          </View>
+                </>
+              )}
+              <Tappable style={styles.btnTexto} onPress={cerrarTodo} haptic={false}>
+                <Text style={styles.btnTextoTxt}>Ahora no</Text>
+              </Tappable>
+            </View>
+          </ScrollView>
         )}
 
         <SelectorAmigoModal
@@ -246,9 +261,14 @@ const useStyles = makeThemedStyles((t) => ({
     flex: 1,
     backgroundColor: t.colors.scrim ?? 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
-    padding: 28,
+    paddingHorizontal: 20,
   },
+  modalScroll: { width: '100%' },
+  modalScrollContent: { flexGrow: 1, justifyContent: 'center', alignItems: 'center' },
   tarjeta: {
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
     backgroundColor: t.colors.background,
     borderRadius: t.shape.radiusXl,
     padding: 24,
@@ -273,7 +293,8 @@ const useStyles = makeThemedStyles((t) => ({
     alignSelf: 'stretch',
     backgroundColor: t.colors.primary,
     borderRadius: t.shape.radiusMd,
-    paddingVertical: 13,
+    minHeight: 44,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   btnPrimarioTxt: {
@@ -283,8 +304,9 @@ const useStyles = makeThemedStyles((t) => ({
   },
   btnSecundario: {
     alignSelf: 'stretch',
-    paddingVertical: 12,
+    minHeight: 44,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 6,
   },
   btnSecundarioTxt: {
@@ -292,6 +314,6 @@ const useStyles = makeThemedStyles((t) => ({
     fontSize: t.fontSize(14),
     ...t.typography.fonts.medium,
   },
-  btnTexto: { paddingVertical: 10, marginTop: 2 },
+  btnTexto: { minHeight: 44, marginTop: 2, justifyContent: 'center' },
   btnTextoTxt: { color: t.colors.textFaint, fontSize: t.fontSize(13) },
 }));

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { View, Text, TextInput, ScrollView, useColorScheme } from 'react-native';
+import { View, Text, TextInput, useColorScheme } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, useFocusEffect } from 'expo-router';
 import { THEMES, AUTO_THEME_ID, CUSTOM_THEME_ID, resolveThemeId } from '../../theme/themes';
@@ -452,7 +453,11 @@ export default function AjustesScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <KeyboardAwareScrollView
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+      bottomOffset={24}
+    >
       <SectionCard
         title="Apariencia"
         hint="Toca un tema para previsualizarlo. Nada cambia hasta que lo apliques."
@@ -525,12 +530,18 @@ export default function AjustesScreen() {
           <Text style={styles.btnSalirTxt}>Cerrar sesión</Text>
         </Tappable>
       </SectionCard>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 
 const useStyles = makeThemedStyles((t) => ({
-  container: { padding: 20, paddingBottom: 40 },
+  container: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
+    padding: 20,
+    paddingBottom: 40,
+  },
   sectionCard: {
     backgroundColor: t.colors.surface,
     borderRadius: t.shape.radiusLg,
@@ -570,7 +581,7 @@ const useStyles = makeThemedStyles((t) => ({
   },
   radioSelected: { borderColor: t.colors.primary },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: t.colors.primary },
-  optionInfo: { flex: 1 },
+  optionInfo: { flex: 1, minWidth: 0 },
   optionName: {
     fontSize: t.fontSize(15),
     ...t.typography.fonts.semibold,
@@ -612,9 +623,9 @@ const useStyles = makeThemedStyles((t) => ({
   sliderGap: { height: 10 },
   swatchGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   swatchOuter: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 2,
     borderColor: 'transparent',
     alignItems: 'center',
@@ -641,13 +652,14 @@ const useStyles = makeThemedStyles((t) => ({
   placeholder: { color: t.colors.textFaint },
   fontRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   fontChip: {
-    paddingVertical: 10,
+    minHeight: 44,
     paddingHorizontal: 14,
     borderRadius: t.shape.radiusMd,
     borderWidth: t.shape.borderThin,
     borderColor: t.colors.border,
     backgroundColor: t.colors.surface,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   fontChipSelected: {
     borderColor: t.colors.primary,
@@ -669,20 +681,21 @@ const useStyles = makeThemedStyles((t) => ({
   palMain: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: 10 },
   palSwatches: { flexDirection: 'row', gap: 3, marginRight: 10 },
   palSwatch: { width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: t.colors.border },
-  palInfo: { flex: 1 },
+  palInfo: { flex: 1, minWidth: 0 },
   palName: {
     fontSize: t.fontSize(14),
     ...t.typography.fonts.semibold,
     color: t.colors.text,
   },
   palFont: { fontSize: t.fontSize(11), color: t.colors.textMuted, marginTop: 1 },
-  palDelete: { paddingHorizontal: 12, paddingVertical: 10 },
+  palDelete: { minHeight: 44, paddingHorizontal: 12, justifyContent: 'center' },
   palDeleteTxt: { fontSize: t.fontSize(12), color: t.colors.danger },
   palNew: {
     borderWidth: t.shape.borderMedium,
     borderColor: t.colors.primarySoftBorder,
     borderRadius: t.shape.radiusMd,
-    paddingVertical: 11,
+    minHeight: 44,
+    justifyContent: 'center',
     alignItems: 'center',
     marginTop: 2,
   },

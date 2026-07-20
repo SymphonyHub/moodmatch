@@ -7,7 +7,7 @@ import Tappable from './Tappable';
 import { indicatorLayout } from './tabBarLogic';
 
 const INSET = 4;
-const SEGMENT_HEIGHT = 40;
+const SEGMENT_HEIGHT = 44;
 
 const useStyles = makeThemedStyles((t) => ({
   container: {
@@ -105,6 +105,8 @@ export default function SegmentedTabs({ tabs, activeId, onChange }) {
           >
             <Text
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
               style={[styles.label, focused && theme.typography.fonts.semibold, { color }]}
             >
               {tab.label}

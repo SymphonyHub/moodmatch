@@ -1,8 +1,9 @@
-import { Text, View } from 'react-native';
+import { Text, useWindowDimensions, View } from 'react-native';
 import { makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../Tappable';
 import Entrance from '../Entrance';
 import { ETIQUETAS } from '../../features/emociones/guiones';
+import { chatBubbleMaxWidth } from '../../utils/responsive';
 
 // Burbuja para cuando la IA no está disponible (Fase 8) — pieza AISLADA:
 // ninguna pantalla la importa todavía; la integra el implementador del chat
@@ -16,10 +17,12 @@ export const TEXTO_FALLBACK =
 
 export default function FallbackMessage({ texto = TEXTO_FALLBACK, onReintentar }) {
   const styles = useStyles();
+  const { width } = useWindowDimensions();
+  const bubbleMaxWidth = chatBubbleMaxWidth(width, 0.84);
 
   return (
     <Entrance style={styles.fila} distance={12}>
-      <View style={styles.burbuja}>
+      <View style={[styles.burbuja, { maxWidth: bubbleMaxWidth }]}>
         <Text style={styles.texto}>{texto}</Text>
       </View>
       {onReintentar ? (
@@ -34,7 +37,6 @@ export default function FallbackMessage({ texto = TEXTO_FALLBACK, onReintentar }
 const useStyles = makeThemedStyles((t) => ({
   fila: { alignItems: 'flex-start', marginBottom: 10, gap: 8 },
   burbuja: {
-    maxWidth: '84%',
     paddingVertical: 11,
     paddingHorizontal: 15,
     borderRadius: t.shape.radiusLg,
@@ -45,13 +47,13 @@ const useStyles = makeThemedStyles((t) => ({
   },
   texto: { ...t.typography.type.body, color: t.colors.text },
   chip: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: t.colors.surface,
     borderWidth: t.shape.borderMedium,
     borderColor: t.colors.primarySoftBorder,
     borderRadius: t.shape.radiusXl,
-    paddingVertical: 9,
     paddingHorizontal: 14,
     ...t.shadows.card,
   },

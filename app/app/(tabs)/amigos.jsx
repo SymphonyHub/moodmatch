@@ -39,7 +39,7 @@ function FriendCard({ amigo, index }) {
           style={styles.avatar}
         />
         <View style={styles.info}>
-          <Text style={styles.nombre}>{amigo.nombre}</Text>
+          <Text style={styles.nombre} numberOfLines={1}>{amigo.nombre}</Text>
           {mood ? (
             <Text style={[styles.mood, { color: moodColor }]}>{mood.emoji}{'  '}{mood.label}</Text>
           ) : (
@@ -118,7 +118,13 @@ export default function AmigosScreen() {
 }
 
 const useStyles = makeThemedStyles((t) => ({
-  container: { padding: 20, paddingBottom: 40 },
+  container: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
+    padding: 20,
+    paddingBottom: 40,
+  },
   titulo: {
     ...t.typography.type.title,
     color: t.colors.text,
@@ -159,7 +165,7 @@ const useStyles = makeThemedStyles((t) => ({
   avatar: {
     marginRight: 14,
   },
-  info: { flex: 1 },
+  info: { flex: 1, minWidth: 0 },
   nombre: {
     fontSize: t.fontSize(16),
     ...t.typography.fonts.semibold,
@@ -189,7 +195,7 @@ const useStyles = makeThemedStyles((t) => ({
     gap: 8,
     backgroundColor: t.colors.primary,
     borderRadius: t.shape.radiusMd,
-    paddingVertical: 13,
+    minHeight: 44,
     paddingHorizontal: 24,
   },
   btnIrQrTxt: {

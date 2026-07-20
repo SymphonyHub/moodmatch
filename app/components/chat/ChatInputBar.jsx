@@ -64,27 +64,29 @@ export default function ChatInputBar({
 
   return (
     <Animated.View style={[styles.superficie, { paddingBottom: paddingInferior }]}>
-      {accessory}
-      <View style={styles.fila}>
-        <TextInput
-          style={styles.input}
-          value={texto}
-          onChangeText={setTexto}
-          placeholder={placeholder}
-          placeholderTextColor={theme.colors.textFaint}
-          multiline
-          maxLength={maxLength}
-          editable={!disabled}
-          onSubmitEditing={enviar}
-        />
-        <Tappable
-          style={[styles.botonEnviar, !puedeEnviar && styles.botonEnviarDisabled]}
-          onPress={enviar}
-          disabled={!puedeEnviar}
-          accessibilityLabel="Enviar mensaje"
-        >
-          <Ionicons name="arrow-up" size={22} color={theme.colors.onPrimary} />
-        </Tappable>
+      <View style={styles.contenido}>
+        {accessory}
+        <View style={styles.fila}>
+          <TextInput
+            style={styles.input}
+            value={texto}
+            onChangeText={setTexto}
+            placeholder={placeholder}
+            placeholderTextColor={theme.colors.textFaint}
+            multiline
+            maxLength={maxLength}
+            editable={!disabled}
+            onSubmitEditing={enviar}
+          />
+          <Tappable
+            style={[styles.botonEnviar, !puedeEnviar && styles.botonEnviarDisabled]}
+            onPress={enviar}
+            disabled={!puedeEnviar}
+            accessibilityLabel="Enviar mensaje"
+          >
+            <Ionicons name="arrow-up" size={22} color={theme.colors.onPrimary} />
+          </Tappable>
+        </View>
       </View>
     </Animated.View>
   );
@@ -95,8 +97,13 @@ const useStyles = makeThemedStyles((t) => ({
     backgroundColor: t.colors.surface,
     borderTopWidth: t.shape.borderThin,
     borderTopColor: t.colors.border,
-    paddingHorizontal: 16,
     paddingTop: 10,
+  },
+  contenido: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
+    paddingHorizontal: 16,
   },
   fila: {
     flexDirection: 'row',

@@ -310,6 +310,9 @@ const useStyles = makeThemedStyles((t) => ({
     marginTop: 16,
   },
   acciones: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
     flexDirection: 'row',
     gap: 12,
     paddingHorizontal: 24,

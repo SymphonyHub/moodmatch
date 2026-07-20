@@ -138,11 +138,12 @@ const useStyles = makeThemedStyles((t) => ({
     marginBottom: 16,
   },
   link: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'center',
     gap: 4,
-    padding: 8,
+    paddingHorizontal: 8,
   },
   linkTexto: {
     ...t.typography.type.body,

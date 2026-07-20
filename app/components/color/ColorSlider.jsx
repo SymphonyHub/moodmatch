@@ -10,6 +10,7 @@ import { xAFraccion } from './barMath';
 // aquí solo el gesto → fracción [0,1]. `stops` son los hex del degradado.
 const ALTO = 30;
 const THUMB = 28;
+const ALTO_TACTIL = 44;
 
 export default function ColorSlider({ stops, fraccion, onFraccion, thumbColor, gradientId }) {
   const styles = useStyles();
@@ -34,7 +35,7 @@ export default function ColorSlider({ stops, fraccion, onFraccion, thumbColor, g
 
   return (
     <View
-      style={styles.pista}
+      style={styles.areaTactil}
       onLayout={(e) => {
         const w = e.nativeEvent.layout.width;
         anchoRef.current = w;
@@ -42,26 +43,32 @@ export default function ColorSlider({ stops, fraccion, onFraccion, thumbColor, g
       }}
       {...responder.panHandlers}
     >
-      <Svg width="100%" height={ALTO}>
-        <Defs>
-          <LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0">
-            {stops.map((color, i) => (
-              <Stop
-                key={`${gradientId}-${i}`}
-                offset={stops.length === 1 ? 0 : i / (stops.length - 1)}
-                stopColor={color}
-              />
-            ))}
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height={ALTO} rx={ALTO / 2} fill={`url(#${gradientId})`} />
-      </Svg>
+      <View pointerEvents="none" style={styles.pista}>
+        <Svg width="100%" height={ALTO}>
+          <Defs>
+            <LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0">
+              {stops.map((color, i) => (
+                <Stop
+                  key={`${gradientId}-${i}`}
+                  offset={stops.length === 1 ? 0 : i / (stops.length - 1)}
+                  stopColor={color}
+                />
+              ))}
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height={ALTO} rx={ALTO / 2} fill={`url(#${gradientId})`} />
+        </Svg>
+      </View>
       {ancho > 0 ? <View style={[styles.thumb, { left, backgroundColor: thumbColor }]} /> : null}
     </View>
   );
 }
 
 const useStyles = makeThemedStyles((t) => ({
+  areaTactil: {
+    height: ALTO_TACTIL,
+    justifyContent: 'center',
+  },
   pista: {
     height: ALTO,
     borderRadius: ALTO / 2,
@@ -72,6 +79,7 @@ const useStyles = makeThemedStyles((t) => ({
   },
   thumb: {
     position: 'absolute',
+    top: (ALTO_TACTIL - THUMB) / 2,
     width: THUMB,
     height: THUMB,
     borderRadius: THUMB / 2,

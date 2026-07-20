@@ -194,7 +194,7 @@ const useStyles = makeThemedStyles((t) => ({
     paddingVertical: 12,
     backgroundColor: t.colors.headerBackground,
   },
-  btnVolver: { padding: 8 },
+  btnVolver: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   titulo: {
     ...t.typography.type.title,
     color: t.colors.onHeader,
@@ -224,7 +224,13 @@ const useStyles = makeThemedStyles((t) => ({
     ...t.typography.fonts.bold,
     fontSize: t.fontSize(15),
   },
-  lista: { padding: 16, paddingBottom: 32 },
+  lista: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
+    padding: 16,
+    paddingBottom: 32,
+  },
   resumen: {
     borderRadius: t.shape.radiusLg,
     padding: 16,
@@ -283,7 +289,7 @@ const useStyles = makeThemedStyles((t) => ({
     justifyContent: 'center',
   },
   filaEmoji: { fontSize: t.fontSize(20) },
-  filaTextos: { flex: 1 },
+  filaTextos: { flex: 1, minWidth: 0 },
   filaLabel: {
     ...t.typography.type.body,
     ...t.typography.fonts.semibold,

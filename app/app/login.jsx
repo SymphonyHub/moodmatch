@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform,
-  ActivityIndicator, ScrollView,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
@@ -133,12 +134,13 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <SafeAreaView style={styles.flex} edges={['top', 'bottom']}>
       <StatusBar style={theme.statusBar.onBackground} />
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        bottomOffset={24}
+      >
         <View style={styles.orbe} />
         <View style={styles.shell}>
           <View style={styles.brand}>
@@ -257,8 +259,8 @@ export default function LoginScreen() {
             </Tappable>
           </View>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -332,9 +334,10 @@ const useStyles = makeThemedStyles((t) => ({
   },
   toggleBtn: {
     flex: 1,
-    paddingVertical: 10,
+    minHeight: 44,
     borderRadius: t.shape.radiusSm,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   toggleActive: {
     backgroundColor: t.colors.surface,

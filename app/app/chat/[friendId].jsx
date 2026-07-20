@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import {
   View, Text, FlatList, ScrollView, ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -16,6 +17,7 @@ import {
   crearOptimista, confirmar, marcarFallido, prepararReintento, reconciliar,
 } from '../../friends/mensajesChat';
 import { clasificar, crearRespuesta, estaRespondida } from '../../friends/invitacionSalida';
+import { chatBubbleMaxWidth } from '../../utils/responsive';
 
 const POLL_MS = 8000;
 const MAX_LENGTH = 500;
@@ -30,6 +32,8 @@ const formatHora = (iso) => {
 function Burbuja({ mensaje, texto, esInvitacion, mostrarBotones, onReintentar, onResponder }) {
   const { theme } = useTheme();
   const styles = useStyles();
+  const { width } = useWindowDimensions();
+  const bubbleMaxWidth = chatBubbleMaxWidth(width, 0.78);
   // Un mensaje fallido pierde el fondo primario: pasa a superficie con borde
   // de peligro, y toda la burbuja es tocable para reintentar (el texto solo
   // vive acá — ChatInputBar ya limpió su input al enviar).
@@ -39,6 +43,7 @@ function Burbuja({ mensaje, texto, esInvitacion, mostrarBotones, onReintentar, o
         styles.burbuja,
         mensaje.mine ? styles.burbujaMia : styles.burbujaAjena,
         mensaje.failed && styles.burbujaFallida,
+        { maxWidth: bubbleMaxWidth },
       ]}
     >
       {esInvitacion && (
@@ -58,10 +63,19 @@ function Burbuja({ mensaje, texto, esInvitacion, mostrarBotones, onReintentar, o
       </Text>
       {mostrarBotones && (
         <View style={styles.invBotones}>
-          <Tappable style={[styles.invBtn, styles.invBtnAceptar]} onPress={() => onResponder(true)}>
+          <Tappable
+            wrapperStyle={styles.invBtnWrapper}
+            style={[styles.invBtn, styles.invBtnAceptar]}
+            onPress={() => onResponder(true)}
+          >
             <Text style={styles.invBtnAceptarTxt}>Aceptar</Text>
           </Tappable>
-          <Tappable style={[styles.invBtn, styles.invBtnRechazar]} onPress={() => onResponder(false)} haptic={false}>
+          <Tappable
+            wrapperStyle={styles.invBtnWrapper}
+            style={[styles.invBtn, styles.invBtnRechazar]}
+            onPress={() => onResponder(false)}
+            haptic={false}
+          >
             <Text style={styles.invBtnRechazarTxt}>Rechazar</Text>
           </Tappable>
         </View>
@@ -79,7 +93,7 @@ function Burbuja({ mensaje, texto, esInvitacion, mostrarBotones, onReintentar, o
     <View style={[styles.burbujaFila, mensaje.mine ? styles.filaMia : styles.filaAjena]}>
       {mensaje.failed ? (
         <Tappable
-          style={styles.burbujaMax}
+          style={[styles.burbujaMax, { maxWidth: bubbleMaxWidth }]}
           onPress={() => onReintentar(mensaje)}
           accessibilityLabel="Reintentar envío del mensaje"
         >
@@ -248,7 +262,7 @@ const useStyles = makeThemedStyles((t) => ({
     paddingVertical: 12,
     paddingHorizontal: 8,
   },
-  btnVolver: { padding: 6 },
+  btnVolver: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerInfo: { flex: 1, marginLeft: 4 },
   headerNombre: {
     ...t.typography.type.section,
@@ -260,13 +274,19 @@ const useStyles = makeThemedStyles((t) => ({
     opacity: 0.8,
     marginTop: 2,
   },
-  lista: { padding: 16, paddingBottom: 8, flexGrow: 1 },
+  lista: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
+    padding: 16,
+    paddingBottom: 8,
+    flexGrow: 1,
+  },
   burbujaFila: { flexDirection: 'row', marginBottom: 8 },
   filaMia: { justifyContent: 'flex-end' },
   filaAjena: { justifyContent: 'flex-start' },
-  burbujaMax: { maxWidth: '78%' },
+  burbujaMax: {},
   burbuja: {
-    maxWidth: '78%',
     borderRadius: t.shape.radiusLg,
     paddingVertical: 10,
     paddingHorizontal: 14,
@@ -324,11 +344,12 @@ const useStyles = makeThemedStyles((t) => ({
     gap: 8,
     marginTop: 10,
   },
+  invBtnWrapper: { flex: 1 },
   invBtn: {
-    flex: 1,
-    paddingVertical: 9,
+    minHeight: 44,
     borderRadius: t.shape.radiusMd,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   invBtnAceptar: { backgroundColor: t.colors.primary },
   invBtnAceptarTxt: {
@@ -356,9 +377,10 @@ const useStyles = makeThemedStyles((t) => ({
   },
   chips: { paddingBottom: 10, gap: 8 },
   chip: {
+    minHeight: 44,
+    justifyContent: 'center',
     backgroundColor: t.colors.primarySoft,
     borderRadius: t.shape.radiusMd,
-    paddingVertical: 8,
     paddingHorizontal: 12,
     borderWidth: t.shape.borderThin,
     borderColor: t.colors.primarySoftBorder,

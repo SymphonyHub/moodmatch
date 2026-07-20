@@ -102,6 +102,7 @@ const useStyles = makeThemedStyles((t) => ({
     ...t.shadows.card,
   },
   principal: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
@@ -126,12 +127,12 @@ const useStyles = makeThemedStyles((t) => ({
     lineHeight: Math.round(t.fontSize(13) * 1.5),
   },
   btnHice: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     borderRadius: t.shape.radiusMd,
-    paddingVertical: 12,
     marginTop: 16,
   },
   btnHecha: { backgroundColor: t.colors.primarySoft },

@@ -13,6 +13,9 @@ import LockedState from '../../wellness/LockedState';
 const useStyles = makeThemedStyles((t) => ({
   container: {
     flex: 1,
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
     padding: 16,
     gap: 16,
   },

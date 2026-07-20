@@ -1,7 +1,8 @@
-import { Text, View } from 'react-native';
+import { Text, useWindowDimensions, View } from 'react-native';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Entrance from '../Entrance';
 import MarkdownText from './MarkdownText';
+import { chatBubbleMaxWidth } from '../../utils/responsive';
 
 // Resalta en negrita los teléfonos de ayuda dentro del mensaje de crisis.
 function TextoCrisis({ texto, styles }) {
@@ -24,11 +25,13 @@ function TextoCrisis({ texto, styles }) {
 export default function ChatBubble({ autor, tipo = 'texto', texto, mood }) {
   const { theme } = useTheme();
   const styles = useStyles();
+  const { width } = useWindowDimensions();
+  const bubbleMaxWidth = chatBubbleMaxWidth(width, 0.84);
 
   if (tipo === 'crisis') {
     return (
       <Entrance style={styles.filaBot} distance={12}>
-        <View style={[styles.burbuja, styles.burbujaCrisis]}>
+        <View style={[styles.burbuja, styles.burbujaCrisis, { maxWidth: bubbleMaxWidth }]}>
           <TextoCrisis texto={texto} styles={styles} />
         </View>
       </Entrance>
@@ -44,6 +47,7 @@ export default function ChatBubble({ autor, tipo = 'texto', texto, mood }) {
             styles.burbuja,
             styles.burbujaUsuario,
             tinte && { backgroundColor: tinte.soft },
+            { maxWidth: bubbleMaxWidth },
           ]}
         >
           <Text style={[styles.textoUsuario, tinte && { color: tinte.color }]}>{texto}</Text>
@@ -56,7 +60,7 @@ export default function ChatBubble({ autor, tipo = 'texto', texto, mood }) {
   // los guiones se renderiza idéntico que antes.
   return (
     <Entrance style={styles.filaBot} distance={12}>
-      <View style={[styles.burbuja, styles.burbujaBot]}>
+      <View style={[styles.burbuja, styles.burbujaBot, { maxWidth: bubbleMaxWidth }]}>
         <MarkdownText texto={texto} style={styles.textoBot} />
       </View>
     </Entrance>
@@ -67,7 +71,6 @@ const useStyles = makeThemedStyles((t) => ({
   filaBot: { alignItems: 'flex-start', marginBottom: 10 },
   filaUsuario: { alignItems: 'flex-end', marginBottom: 10 },
   burbuja: {
-    maxWidth: '84%',
     paddingVertical: 11,
     paddingHorizontal: 15,
     borderRadius: t.shape.radiusLg,

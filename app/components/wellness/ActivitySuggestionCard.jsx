@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Text, useWindowDimensions, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import {
@@ -9,6 +9,7 @@ import {
 import Tappable from '../Tappable';
 import Entrance from '../Entrance';
 import RecompensaCompletada from './RecompensaCompletada';
+import { isCompactWidth } from '../../utils/responsive';
 
 // Etiqueta local: wellness no depende de los guiones del chat.
 const ETIQUETA_OTRA_IDEA = 'Quiero otra idea';
@@ -28,6 +29,8 @@ export default function ActivitySuggestionCard({
 }) {
   const { theme } = useTheme();
   const styles = useStyles();
+  const { width } = useWindowDimensions();
+  const compact = isCompactWidth(width);
   const [celebrando, setCelebrando] = useState(false);
 
   const color = theme.colors.categories[actividad.categoria] ?? theme.colors.textMuted;
@@ -51,8 +54,9 @@ export default function ActivitySuggestionCard({
         <Text style={styles.nombre}>{actividad.nombre}</Text>
         <Text style={styles.desc}>{actividad.descripcion}</Text>
 
-        <View style={styles.acciones}>
+        <View style={[styles.acciones, compact && styles.accionesCompactas]}>
           <Tappable
+            wrapperStyle={compact ? styles.accionCompacta : styles.accion}
             style={[styles.btnHice, completada ? styles.btnHecha : { backgroundColor: color }]}
             onPress={handleHice}
             disabled={completada}
@@ -68,6 +72,7 @@ export default function ActivitySuggestionCard({
           </Tappable>
 
           <Tappable
+            wrapperStyle={compact ? styles.accionCompacta : styles.accion}
             style={[styles.btnOtra, { borderColor: color }, loadingOtra && styles.btnDeshabilitado]}
             onPress={onOtraIdea}
             disabled={loadingOtra}
@@ -123,14 +128,16 @@ const useStyles = makeThemedStyles((t) => ({
     flexDirection: 'row',
     gap: 10,
   },
+  accionesCompactas: { flexDirection: 'column' },
+  accion: { flex: 1 },
+  accionCompacta: { width: '100%' },
   btnHice: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     borderRadius: t.shape.radiusMd,
-    paddingVertical: 12,
+    minHeight: 44,
   },
   btnHecha: { backgroundColor: t.colors.primarySoft },
   btnHiceText: {
@@ -138,10 +145,9 @@ const useStyles = makeThemedStyles((t) => ({
     fontSize: t.fontSize(15),
   },
   btnOtra: {
-    flex: 1,
     borderWidth: t.shape.borderMedium,
     borderRadius: t.shape.radiusMd,
-    paddingVertical: 12,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },

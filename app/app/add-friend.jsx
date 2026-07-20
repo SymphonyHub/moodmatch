@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import {
+  View, Text, ActivityIndicator, ScrollView,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiAddFriend } from '../services/api';
@@ -62,11 +65,15 @@ export default function AddFriendScreen() {
   const irAAmigos = () => router.replace('/(tabs)/amigos');
 
   return (
-    <View style={styles.pantalla}>
-      {fase === 'checking' || fase === 'adding' ? (
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      ) : (
-        <Entrance style={styles.card}>
+    <SafeAreaView style={styles.pantalla}>
+      <ScrollView
+        contentContainerStyle={styles.contenido}
+        showsVerticalScrollIndicator={false}
+      >
+        {fase === 'checking' || fase === 'adding' ? (
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        ) : (
+          <Entrance style={styles.card}>
           <Text style={styles.emoji}>
             {fase === 'done' ? '🎉' : fase === 'error' ? '😕' : '🤝'}
           </Text>
@@ -106,9 +113,10 @@ export default function AddFriendScreen() {
               </Tappable>
             </>
           )}
-        </Entrance>
-      )}
-    </View>
+          </Entrance>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -116,12 +124,16 @@ const useStyles = makeThemedStyles((t) => ({
   pantalla: {
     flex: 1,
     backgroundColor: t.colors.background,
+  },
+  contenido: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
   card: {
     width: '100%',
+    maxWidth: 520,
     backgroundColor: t.colors.surface,
     borderRadius: t.shape.radiusXl,
     padding: 28,
@@ -155,6 +167,6 @@ const useStyles = makeThemedStyles((t) => ({
     fontSize: t.fontSize(15),
     ...t.typography.fonts.bold,
   },
-  btnSec: { marginTop: 12, paddingVertical: 10 },
+  btnSec: { marginTop: 12, minHeight: 44, justifyContent: 'center' },
   btnSecTxt: { color: t.colors.textFaint, fontSize: t.fontSize(14) },
 }));

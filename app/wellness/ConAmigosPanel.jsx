@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, ScrollView, Text } from 'react-native';
-import { apiGetSocialActivities } from '../services/api';
+import { apiGetSocialActivities, apiSuggestSocialActivity } from '../services/api';
 import { makeThemedStyles, useTheme } from '../theme/ThemeContext';
 import { springs, durations, easings } from '../theme/motion';
 import AccionConAmigos from './AccionConAmigos';
@@ -22,7 +22,8 @@ const useStyles = makeThemedStyles((t) => ({
   },
 }));
 
-// Pestaña "Con amigos" del Wellness Hub — dominio del Agente C (Amigos/QR).
+// Pestaña "Con amigos" del Wellness Hub: combina una sugerencia asistida por IA
+// (con fallback del backend) con las tres acciones sociales existentes.
 // SOLO el contenido desbloqueado: la regla de bloqueo (lockStateFor) y el
 // LockedState viven en la pantalla contenedora (actividades.jsx). Como este
 // panel se monta recién al desbloquear, su entrada con springs.unlock es la
@@ -49,9 +50,18 @@ export default function ConAmigosPanel() {
 
   useEffect(() => {
     let activo = true;
-    apiGetSocialActivities()
-      .then((data) => {
-        if (activo) setActividades(data.activities ? data.activities.slice(0, MAX_ACTIVIDADES) : []);
+    Promise.allSettled([apiSuggestSocialActivity(), apiGetSocialActivities()])
+      .then(([social, fijas]) => {
+        if (!activo) return;
+        const sugerida =
+          social.status === 'fulfilled'
+            ? [{ ...social.value.activity, sugeridaDinamica: true }]
+            : [];
+        const base =
+          fijas.status === 'fulfilled' && Array.isArray(fijas.value.activities)
+            ? fijas.value.activities.slice(0, MAX_ACTIVIDADES)
+            : [];
+        setActividades([...sugerida, ...base]);
       })
       .catch(() => {
         if (activo) setActividades([]);

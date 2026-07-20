@@ -13,6 +13,11 @@ export const TIPO_POR_NOMBRE = {
 
 export const tipoDeAccion = (nombre) => TIPO_POR_NOMBRE[nombre] ?? null;
 
+// Una sugerencia dinámica nunca hereda por coincidencia de título la acción
+// especial de una tarjeta fija.
+export const tipoDeActividadSocial = (actividad) =>
+  actividad?.sugeridaDinamica ? null : tipoDeAccion(actividad?.nombre);
+
 // Ánimos "difíciles": alguien que podría estar pasándola mal. Mismo criterio de
 // tono que el chat de emociones (validar, no forzar positividad).
 export const ANIMOS_DIFICILES = ['TRISTE', 'ANSIOSO', 'ENOJADO'];

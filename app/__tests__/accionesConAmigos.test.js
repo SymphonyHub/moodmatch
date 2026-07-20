@@ -1,5 +1,6 @@
 import {
   tipoDeAccion,
+  tipoDeActividadSocial,
   elegirSugerencia,
   MENSAJES_PRECARGA,
   ANIMOS_DIFICILES,
@@ -15,6 +16,19 @@ describe('tipoDeAccion (mapeo nombre → tipo)', () => {
   test('un nombre desconocido → null (cae en tarjeta informativa)', () => {
     expect(tipoDeAccion('Cocina para alguien')).toBeNull();
     expect(tipoDeAccion(undefined)).toBeNull();
+  });
+});
+
+describe('tipoDeActividadSocial', () => {
+  test('una sugerencia dinámica no activa un flujo fijo aunque repita el título', () => {
+    expect(tipoDeActividadSocial({
+      nombre: 'Salida con amigos',
+      sugeridaDinamica: true,
+    })).toBeNull();
+  });
+
+  test('las actividades fijas conservan su flujo', () => {
+    expect(tipoDeActividadSocial({ nombre: 'Salida con amigos' })).toBe('salida');
   });
 });
 

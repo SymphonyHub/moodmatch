@@ -5,6 +5,13 @@ import { API_URL } from '../config';
 // por sesión sin duplicar la clave de AsyncStorage.
 export const getToken = () => AsyncStorage.getItem('token');
 
+const SOCIAL_SUGGESTION_TTL_MS = 5 * 60 * 1000;
+let socialSuggestionCache = null;
+
+export const resetSocialSuggestionCache = () => {
+  socialSuggestionCache = null;
+};
+
 const authHeaders = async () => {
   const token = await getToken();
   return {
@@ -151,6 +158,46 @@ export const apiGetUnreadCount = async () => {
 export const apiGetSocialActivities = async () => {
   const headers = await authHeaders();
   return fetch(`${API_URL}/api/activities?categoria=social`, { headers }).then((r) => r.json());
+};
+
+// Sugerencia social asistida por IA. No envía body: el backend arma el
+// contexto exclusivamente con el perfil propio y moods ya visibles.
+export const apiSuggestSocialActivity = async () => {
+  const token = await getToken();
+  const ahora = Date.now();
+  if (
+    socialSuggestionCache?.token === token &&
+    socialSuggestionCache.expiresAt > ahora
+  ) {
+    return socialSuggestionCache.request;
+  }
+
+  const request = fetch(`${API_URL}/api/activities/suggest-social`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  }).then(async (res) => {
+    const data = await res.json();
+    if (!res.ok || !data?.activity) {
+      throw new Error(data?.error ?? 'Sugerencia social inválida');
+    }
+    return data;
+  });
+
+  socialSuggestionCache = {
+    token,
+    request,
+    expiresAt: ahora + SOCIAL_SUGGESTION_TTL_MS,
+  };
+
+  try {
+    return await request;
+  } catch (error) {
+    if (socialSuggestionCache?.request === request) resetSocialSuggestionCache();
+    throw error;
+  }
 };
 
 export const apiGetFriendsCount = async () => {

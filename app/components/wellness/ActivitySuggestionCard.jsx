@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
-import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../../constants/categories';
+import {
+  CATEGORY_IONICONS,
+  DEFAULT_CATEGORY_IONICON,
+} from '../../constants/categories';
 import Tappable from '../Tappable';
 import Entrance from '../Entrance';
 import RecompensaCompletada from './RecompensaCompletada';
@@ -28,7 +31,7 @@ export default function ActivitySuggestionCard({
   const [celebrando, setCelebrando] = useState(false);
 
   const color = theme.colors.categories[actividad.categoria] ?? theme.colors.textMuted;
-  const icon = CATEGORY_ICONS[actividad.categoria] ?? DEFAULT_CATEGORY_ICON;
+  const icon = CATEGORY_IONICONS[actividad.categoria] ?? DEFAULT_CATEGORY_IONICON;
 
   // Solo anima cuando se marca en vivo; si ya venía completada de antes, se
   // muestra el estado final sin celebración.
@@ -41,9 +44,10 @@ export default function ActivitySuggestionCard({
   return (
     <Entrance key={actividad.id} style={styles.fila}>
       <View style={[styles.card, { borderLeftColor: color }]}>
-        <Text style={[styles.tag, { color }]}>
-          {completada ? '✓' : icon}{'  '}{actividad.categoria.toUpperCase()}
-        </Text>
+        <View style={styles.tag}>
+          <Ionicons name={completada ? 'checkmark' : icon} size={18} color={color} />
+          <Text style={[styles.tagText, { color }]}>{actividad.categoria.toUpperCase()}</Text>
+        </View>
         <Text style={styles.nombre}>{actividad.nombre}</Text>
         <Text style={styles.desc}>{actividad.descripcion}</Text>
 
@@ -92,13 +96,18 @@ const useStyles = makeThemedStyles((t) => ({
     borderRadius: t.shape.radiusLg,
     padding: 24,
     borderLeftWidth: 5,
-    ...t.shadows.cardStrong,
+    ...t.shadows.card,
   },
   tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  tagText: {
     fontSize: t.fontSize(11),
     ...t.typography.fonts.bold,
     letterSpacing: 1.2,
-    marginBottom: 8,
   },
   nombre: {
     ...t.typography.type.title,

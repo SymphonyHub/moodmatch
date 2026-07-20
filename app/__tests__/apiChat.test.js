@@ -7,7 +7,11 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 );
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { apiChatRespond } from '../services/api';
+import {
+  apiChatRespond,
+  apiSuggestSocialActivity,
+  resetSocialSuggestionCache,
+} from '../services/api';
 import { API_URL } from '../config';
 import {
   respuestaGemini,
@@ -21,6 +25,7 @@ const respuestaHttp = (body, ok = true) => ({ ok, json: async () => body });
 
 beforeEach(async () => {
   await AsyncStorage.setItem('token', 'token-de-test');
+  resetSocialSuggestionCache();
   global.fetch = jest.fn();
 });
 
@@ -104,5 +109,58 @@ describe('apiChatRespond', () => {
     await expect(apiChatRespond('ANSIOSO', 'no me carga nada')).rejects.toThrow(
       'Network request failed',
     );
+  });
+});
+
+describe('apiSuggestSocialActivity', () => {
+  const sugerencia = {
+    activity: {
+      id: 'social-abc',
+      nombre: 'Playlist compartida',
+      descripcion: 'Elijan canciones juntos.',
+      categoria: 'social',
+    },
+    fuente: 'gemini',
+  };
+
+  test('hace POST autenticado sin enviar datos privados en un body', async () => {
+    global.fetch.mockResolvedValue(respuestaHttp(sugerencia));
+
+    await expect(apiSuggestSocialActivity()).resolves.toEqual(sugerencia);
+
+    const [url, opciones] = global.fetch.mock.calls[0];
+    expect(url).toBe(`${API_URL}/api/activities/suggest-social`);
+    expect(opciones.method).toBe('POST');
+    expect(opciones.headers.Authorization).toBe('Bearer token-de-test');
+    expect(opciones.body).toBeUndefined();
+  });
+
+  test('rechaza respuestas sin actividad para que la UI conserve las fijas', async () => {
+    global.fetch.mockResolvedValue(respuestaHttp({ fuente: 'plantilla' }));
+    await expect(apiSuggestSocialActivity()).rejects.toThrow('Sugerencia social inválida');
+  });
+
+  test('deduplica llamadas de la misma sesión para no gastar cuota al cambiar de tab', async () => {
+    global.fetch.mockResolvedValue(respuestaHttp(sugerencia));
+
+    const [primera, segunda] = await Promise.all([
+      apiSuggestSocialActivity(),
+      apiSuggestSocialActivity(),
+    ]);
+
+    expect(primera).toEqual(sugerencia);
+    expect(segunda).toEqual(sugerencia);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('un token distinto no reutiliza la sugerencia de otra cuenta', async () => {
+    global.fetch.mockResolvedValue(respuestaHttp(sugerencia));
+    await apiSuggestSocialActivity();
+
+    await AsyncStorage.setItem('token', 'otro-token');
+    await apiSuggestSocialActivity();
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch.mock.calls[1][1].headers.Authorization).toBe('Bearer otro-token');
   });
 });

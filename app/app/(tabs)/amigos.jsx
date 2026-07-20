@@ -19,7 +19,11 @@ function FriendCard({ amigo, index }) {
     : null;
 
   const abrirChat = () => {
-    const params = { friendId: String(amigo.id), nombre: amigo.nombre };
+    const params = {
+      friendId: String(amigo.id),
+      amistadId: String(amigo.amistadId),
+      nombre: amigo.nombre,
+    };
     if (amigo.moodReciente) params.mood = amigo.moodReciente;
     router.push({ pathname: '/chat/[friendId]', params });
   };

@@ -91,6 +91,14 @@ describe('POST /api/friendships — par duplicado', () => {
         ],
       },
     });
+    expect(prisma.friendship.create).toHaveBeenCalledWith({
+      data: {
+        userId: MY_USER_ID,
+        friendId: 2,
+        mascota: { create: { nombre: 'Lumi' } },
+      },
+      include: { mascota: true },
+    });
   });
 });
 
@@ -101,6 +109,7 @@ describe('GET /api/friendships — vínculo simétrico', () => {
     prisma.friendship.findMany.mockResolvedValue([
       // Yo agregué a 2
       {
+        id: 10,
         userId: MY_USER_ID,
         friendId: 2,
         user: { id: MY_USER_ID, nombre: 'Yo', moodEntries: [] },
@@ -108,6 +117,7 @@ describe('GET /api/friendships — vínculo simétrico', () => {
       },
       // 3 me agregó a mí
       {
+        id: 11,
         userId: 3,
         friendId: MY_USER_ID,
         user: { id: 3, nombre: 'Beto', moodEntries: [] },
@@ -115,6 +125,7 @@ describe('GET /api/friendships — vínculo simétrico', () => {
       },
       // Fila espejo duplicada con 2 (2 también me agregó)
       {
+        id: 12,
         userId: 2,
         friendId: MY_USER_ID,
         user: { id: 2, nombre: 'Ana', moodEntries: entradaMood('FELIZ') },
@@ -133,6 +144,7 @@ describe('GET /api/friendships — vínculo simétrico', () => {
     const ana = res.body.amigos.find((a) => a.id === 2);
     expect(ana.nombre).toBe('Ana');
     expect(ana.moodReciente).toBe('FELIZ');
+    expect(ana.amistadId).toBeDefined();
   });
 
   test('incluye unread por amigo desde cheers no vistos', async () => {

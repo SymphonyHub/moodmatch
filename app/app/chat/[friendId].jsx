@@ -11,6 +11,7 @@ import { MOOD_INFO } from '../../constants/moods';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../../components/Tappable';
 import ChatInputBar from '../../components/chat/ChatInputBar';
+import MascotaWidget from '../../mascota/MascotaWidget';
 import {
   crearOptimista, confirmar, marcarFallido, prepararReintento, reconciliar,
 } from '../../friends/mensajesChat';
@@ -90,13 +91,16 @@ function Burbuja({ mensaje, texto, esInvitacion, mostrarBotones, onReintentar, o
 }
 
 export default function ChatScreen() {
-  const { friendId, nombre, mood, draft } = useLocalSearchParams();
+  const {
+    friendId, amistadId, nombre, mood, draft,
+  } = useLocalSearchParams();
   const { theme } = useTheme();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
 
   const [mensajes, setMensajes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [mascotaRefresh, setMascotaRefresh] = useState(0);
   const listRef = useRef(null);
 
   const moodInfo = mood ? MOOD_INFO[mood] : null;
@@ -130,6 +134,7 @@ export default function ChatScreen() {
       const data = await apiSendMessage(friendId, temp.message);
       if (!data.mensaje) throw new Error(data.error || 'No se pudo enviar');
       setMensajes((prev) => confirmar(prev, temp.id, data.mensaje));
+      setMascotaRefresh((valor) => valor + 1);
     } catch {
       setMensajes((prev) => marcarFallido(prev, temp.id));
     }
@@ -182,6 +187,8 @@ export default function ChatScreen() {
           )}
         </View>
       </View>
+
+      <MascotaWidget amistadId={amistadId} refreshKey={mascotaRefresh} />
 
       {loading ? (
         <View style={styles.centro}>

@@ -126,6 +126,23 @@ export const apiSendMessage = async (friendId, message) => {
   }).then((r) => r.json());
 };
 
+export const apiGetMascota = async (amistadId) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/mascota/${amistadId}`, { headers }).then((r) => r.json());
+};
+
+// Contrato para el botón "La hice" de Con amigos. completionId debe ser
+// estable para la misma actividad compartida, de modo que ambos usuarios no
+// sumen dos veces si la marcan desde sus dispositivos.
+export const apiRegistrarActividadMascota = async (amistadId, completionId) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/mascota/${amistadId}/actividad`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ completionId }),
+  }).then((r) => r.json());
+};
+
 export const apiGetUnreadCount = async () => {
   const headers = await authHeaders();
   return fetch(`${API_URL}/api/messages/unread-count`, { headers }).then((r) => r.json());

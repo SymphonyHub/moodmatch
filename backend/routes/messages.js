@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
+const { filtroMensajesVisibles, registrarMensajeReciproco } = require('../lib/mascota');
 
 const MAX_LENGTH = 500;
 
@@ -44,6 +45,7 @@ router.get('/:friendId', requireAuth, async (req, res) => {
         { fromUserId: me, toUserId: friendId },
         { fromUserId: friendId, toUserId: me },
       ],
+      ...filtroMensajesVisibles,
     },
     orderBy: { createdAt: 'asc' },
   });
@@ -84,8 +86,12 @@ router.post('/:friendId', requireAuth, async (req, res) => {
     return res.status(403).json({ error: 'No son amigos' });
   }
 
-  const mensaje = await prisma.cheer.create({
-    data: { fromUserId: me, toUserId: friendId, message },
+  const { mensaje, mascota } = await prisma.$transaction(async (tx) => {
+    const creado = await tx.cheer.create({
+      data: { fromUserId: me, toUserId: friendId, message },
+    });
+    const mascotaActual = await registrarMensajeReciproco(tx, friendship, me);
+    return { mensaje: creado, mascota: mascotaActual };
   });
 
   res.status(201).json({
@@ -95,6 +101,7 @@ router.post('/:friendId', requireAuth, async (req, res) => {
       mine: true,
       createdAt: mensaje.createdAt,
     },
+    mascota,
   });
 });
 

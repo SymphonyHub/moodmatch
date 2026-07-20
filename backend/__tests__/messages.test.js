@@ -14,12 +14,17 @@ jest.mock('../lib/prisma', () => {
   db.$transaction = jest.fn((callback) => callback(db));
   return db;
 });
+jest.mock('../lib/notificationEvents', () => ({
+  dispatchNotification: jest.fn(),
+  notifyNewMessage: jest.fn(),
+}));
 
 const request = require('supertest');
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const messagesRouter = require('../routes/messages');
 const prisma = require('../lib/prisma');
+const { notifyNewMessage } = require('../lib/notificationEvents');
 
 const MY_USER_ID = 1;
 const FRIEND_ID = 2;
@@ -139,6 +144,10 @@ describe('POST /api/messages/:friendId', () => {
     // el texto se guarda con trim
     expect(prisma.cheer.create).toHaveBeenCalledWith({
       data: { fromUserId: MY_USER_ID, toUserId: FRIEND_ID, message: 'te va a ir genial mañana' },
+    });
+    expect(notifyNewMessage).toHaveBeenCalledWith({
+      fromUserId: MY_USER_ID,
+      toUserId: FRIEND_ID,
     });
   });
 

@@ -18,6 +18,10 @@ const {
   retoExpirado,
   sumarCarino,
 } = require('../lib/mascota');
+const {
+  dispatchNotification,
+  notifySharedActivity,
+} = require('../lib/notificationEvents');
 
 const buscarAmistadPropia = (amistadId, userId, db = prisma) =>
   db.friendship.findFirst({
@@ -220,6 +224,13 @@ router.post('/:amistadId/actividad', requireAuth, async (req, res) => {
       registrada: true,
     };
   }, { isolationLevel: 'Serializable' });
+
+  if (resultado.registrada) {
+    dispatchNotification(notifySharedActivity({
+      fromUserId: req.user.userId,
+      toUserId: otroId,
+    }));
+  }
 
   return res.status(resultado.registrada ? 201 : 200).json(resultado);
 });

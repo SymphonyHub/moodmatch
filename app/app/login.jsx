@@ -15,6 +15,7 @@ import { useTheme, makeThemedStyles } from '../theme/ThemeContext';
 import { VALID_THEME_CHOICES } from '../theme/themes';
 import { normalizeCustomTheme } from '../theme/customTheme';
 import Tappable from '../components/Tappable';
+import { syncPushToken } from '../notifications/pushRegistration';
 
 const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
@@ -85,6 +86,7 @@ export default function LoginScreen() {
       }
 
       await AsyncStorage.setItem('token', data.token);
+      syncPushToken({ requestPermission: true });
 
       // Reconciliar tema con el perfil: si el servidor tiene una preferencia
       // guardada (otro dispositivo o reinstalación), se adopta; si no, se sube

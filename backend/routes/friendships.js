@@ -2,6 +2,11 @@ const router = require('express').Router();
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { NOMBRE_MASCOTA } = require('../lib/mascota');
+const {
+  dispatchNotification,
+  notifyFriendAccepted,
+  notifyNewMessage,
+} = require('../lib/notificationEvents');
 
 const VALID_CHEERS = [
   '💚 Pensando en ti',
@@ -59,6 +64,11 @@ router.post('/', requireAuth, async (req, res) => {
     },
     include: { mascota: true },
   });
+
+  dispatchNotification(notifyFriendAccepted({
+    acceptedByUserId: req.user.userId,
+    invitationOwnerId: friend.id,
+  }));
 
   res.status(201).json({ friendship, friend });
 });
@@ -151,6 +161,11 @@ router.post('/:friendId/cheer', requireAuth, async (req, res) => {
   const cheer = await prisma.cheer.create({
     data: { fromUserId: req.user.userId, toUserId: friendId, message },
   });
+
+  dispatchNotification(notifyNewMessage({
+    fromUserId: req.user.userId,
+    toUserId: friendId,
+  }));
 
   res.status(201).json({ cheer });
 });

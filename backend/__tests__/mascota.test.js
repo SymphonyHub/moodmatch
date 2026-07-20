@@ -8,12 +8,17 @@ jest.mock('../lib/prisma', () => {
   db.$transaction = jest.fn((callback) => callback(db));
   return db;
 });
+jest.mock('../lib/notificationEvents', () => ({
+  dispatchNotification: jest.fn(),
+  notifySharedActivity: jest.fn(),
+}));
 
 const request = require('supertest');
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const mascotaRouter = require('../routes/mascota');
 const prisma = require('../lib/prisma');
+const { notifySharedActivity } = require('../lib/notificationEvents');
 
 const MY_USER_ID = 1;
 const FRIEND_ID = 2;
@@ -235,6 +240,10 @@ describe('POST /api/mascota/:amistadId/actividad', () => {
     expect(prisma.mascotaAmistad.upsert).toHaveBeenCalledWith(expect.objectContaining({
       update: { nivelCarino: { increment: 3 } },
     }));
+    expect(notifySharedActivity).toHaveBeenCalledWith({
+      fromUserId: MY_USER_ID,
+      toUserId: FRIEND_ID,
+    });
   });
 
   test('la misma completionId es idempotente incluso si la marcó el otro usuario', async () => {
@@ -252,6 +261,7 @@ describe('POST /api/mascota/:amistadId/actividad', () => {
     expect(prisma.mascotaAmistad.upsert).toHaveBeenCalledWith(expect.objectContaining({
       update: { nivelCarino: { increment: 0 } },
     }));
+    expect(notifySharedActivity).not.toHaveBeenCalled();
   });
 
   test('valida completionId', async () => {

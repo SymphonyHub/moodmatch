@@ -2,6 +2,10 @@ const router = require('express').Router();
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { filtroMensajesVisibles, registrarMensajeReciproco } = require('../lib/mascota');
+const {
+  dispatchNotification,
+  notifyNewMessage,
+} = require('../lib/notificationEvents');
 
 const MAX_LENGTH = 500;
 const REACCIONES_PERMITIDAS = ['❤️', '👍', '😂', '😮', '😢'];
@@ -179,6 +183,8 @@ router.post('/:friendId', requireAuth, async (req, res) => {
     const mascotaActual = await registrarMensajeReciproco(tx, friendship, me);
     return { mensaje: creado, mascota: mascotaActual };
   });
+
+  dispatchNotification(notifyNewMessage({ fromUserId: me, toUserId: friendId }));
 
   res.status(201).json({
     mensaje: {

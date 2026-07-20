@@ -150,6 +150,27 @@ export const apiRegistrarActividadMascota = async (amistadId, completionId) => {
   }).then((r) => r.json());
 };
 
+export const apiCuidarMascota = async (amistadId) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/mascota/${amistadId}/cuidado`, {
+    method: 'POST', headers,
+  }).then((r) => r.json());
+};
+
+export const apiIniciarRetoMascota = async (amistadId) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/mascota/${amistadId}/reto`, {
+    method: 'POST', headers,
+  }).then((r) => r.json());
+};
+
+export const apiProponerNombreMascota = async (amistadId, nombre) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/mascota/${amistadId}/nombre`, {
+    method: 'PATCH', headers, body: JSON.stringify({ nombre }),
+  }).then((r) => r.json());
+};
+
 export const apiGetUnreadCount = async () => {
   const headers = await authHeaders();
   return fetch(`${API_URL}/api/messages/unread-count`, { headers }).then((r) => r.json());

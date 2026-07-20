@@ -1,8 +1,9 @@
 jest.mock('../lib/prisma', () => {
   const db = {
     friendship: { findFirst: jest.fn() },
-    mascotaAmistad: { upsert: jest.fn() },
+    mascotaAmistad: { upsert: jest.fn(), update: jest.fn() },
     cheer: { findFirst: jest.fn(), create: jest.fn() },
+    moodEntry: { findMany: jest.fn() },
   };
   db.$transaction = jest.fn((callback) => callback(db));
   return db;
@@ -18,6 +19,7 @@ const MY_USER_ID = 1;
 const FRIEND_ID = 2;
 const AMISTAD_ID = 7;
 const token = jwt.sign({ userId: MY_USER_ID }, 'moodmatch-dev-secret');
+const friendToken = jwt.sign({ userId: FRIEND_ID }, 'moodmatch-dev-secret');
 const amistad = { id: AMISTAD_ID, userId: FRIEND_ID, friendId: MY_USER_ID };
 const mascota = {
   id: 'pet-1', amistadId: AMISTAD_ID, nombre: 'Lumi', nivelCarino: 0,
@@ -30,6 +32,7 @@ app.use('/api/mascota', mascotaRouter);
 beforeEach(() => {
   jest.clearAllMocks();
   prisma.mascotaAmistad.upsert.mockResolvedValue(mascota);
+  prisma.moodEntry.findMany.mockResolvedValue([]);
 });
 
 describe('GET /api/mascota/:amistadId', () => {
@@ -62,12 +65,148 @@ describe('GET /api/mascota/:amistadId', () => {
       .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.mascota).toEqual(expect.objectContaining({ nombre: 'Lumi', nivelCarino: 0 }));
+    expect(res.body.mascota).toEqual(expect.objectContaining({ nombre: 'Lumi', nivelCarino: 0, personalidad: 'curiosa' }));
     expect(prisma.mascotaAmistad.upsert).toHaveBeenCalledWith({
       where: { amistadId: AMISTAD_ID },
       create: { amistadId: AMISTAD_ID, nombre: 'Lumi', nivelCarino: 0 },
       update: { nivelCarino: { increment: 0 } },
     });
+  });
+});
+
+describe('mecánicas avanzadas de mascota', () => {
+  test('el cuidado suma más cariño que un par de mensajes y respeta 24 horas por usuario', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.upsert.mockResolvedValue({ ...mascota, retoCooperativo: null });
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, nivelCarino: 6 });
+
+    const res = await request(app)
+      .post(`/api/mascota/${AMISTAD_ID}/cuidado`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(201);
+    expect(prisma.mascotaAmistad.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        ultimoCuidadoUsuario2: expect.any(Date),
+        nivelCarino: { increment: 6 },
+      }),
+    }));
+
+    prisma.mascotaAmistad.upsert.mockResolvedValue({
+      ...mascota, ultimoCuidadoUsuario2: new Date(), retoCooperativo: null,
+    });
+    const bloqueado = await request(app)
+      .post(`/api/mascota/${AMISTAD_ID}/cuidado`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(bloqueado.status).toBe(429);
+    expect(prisma.mascotaAmistad.update).toHaveBeenCalledTimes(1);
+  });
+
+  test('el reto expira y no entrega su premio fuera de la ventana', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.upsert.mockResolvedValue({
+      ...mascota,
+      retoCooperativo: {
+        tipo: 'CUIDADO_COMPARTIDO', expiraEn: '2000-01-01T00:00:00.000Z',
+        progresoUsuario1: true, progresoUsuario2: true, completado: false,
+      },
+    });
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, nivelCarino: 6 });
+
+    const res = await request(app)
+      .post(`/api/mascota/${AMISTAD_ID}/cuidado`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(201);
+    expect(prisma.mascotaAmistad.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ nivelCarino: { increment: 6 } }),
+    }));
+  });
+
+  test('no reemplaza un reto todavía vigente', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.upsert.mockResolvedValue({
+      ...mascota,
+      retoCooperativo: {
+        tipo: 'CUIDADO_COMPARTIDO', expiraEn: '2099-01-01T00:00:00.000Z',
+        progresoUsuario1: false, progresoUsuario2: false, completado: false,
+      },
+    });
+
+    const res = await request(app)
+      .post(`/api/mascota/${AMISTAD_ID}/reto`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(409);
+    expect(prisma.mascotaAmistad.update).not.toHaveBeenCalled();
+  });
+
+  test('al completar ambos cuidados antes de vencer avanza a la siguiente etapa y guarda un hito', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.upsert.mockResolvedValue({
+      ...mascota,
+      nivelCarino: 3,
+      retoCooperativo: {
+        tipo: 'CUIDADO_COMPARTIDO', expiraEn: '2099-01-01T00:00:00.000Z',
+        progresoUsuario1: true, progresoUsuario2: false, completado: false,
+      },
+    });
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, nivelCarino: 10 });
+
+    const res = await request(app)
+      .post(`/api/mascota/${AMISTAD_ID}/cuidado`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(201);
+    const data = prisma.mascotaAmistad.update.mock.calls[0][0].data;
+    expect(data.nivelCarino).toEqual({ increment: 7 });
+    expect(data.retoCooperativo.completado).toBe(true);
+    expect(data.historialHitos).toEqual([expect.objectContaining({ hito: expect.stringMatching(/Completaron/) })]);
+  });
+
+  test('negocia el nombre: una persona propone y la otra confirma el mismo nombre', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.upsert.mockResolvedValue(mascota);
+    prisma.mascotaAmistad.update.mockResolvedValue({
+      ...mascota,
+      nombrePropuesto: JSON.stringify({ nombre: 'Nube', propuestoPor: MY_USER_ID }),
+    });
+
+    const propuesta = await request(app)
+      .patch(`/api/mascota/${AMISTAD_ID}/nombre`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nombre: 'Nube' });
+    expect(propuesta.status).toBe(200);
+    expect(propuesta.body.confirmado).toBe(false);
+
+    prisma.mascotaAmistad.upsert.mockResolvedValue({
+      ...mascota,
+      nombrePropuesto: JSON.stringify({ nombre: 'Nube', propuestoPor: MY_USER_ID }),
+    });
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, nombre: 'Nube', nombrePropuesto: null });
+    const confirmacion = await request(app)
+      .patch(`/api/mascota/${AMISTAD_ID}/nombre`)
+      .set('Authorization', `Bearer ${friendToken}`)
+      .send({ nombre: 'Nube' });
+    expect(confirmacion.status).toBe(200);
+    expect(confirmacion.body.confirmado).toBe(true);
+    expect(prisma.mascotaAmistad.update).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ nombre: 'Nube', nombrePropuesto: null }),
+    }));
+  });
+
+  test('solo devuelve una personalidad agregada, nunca los ánimos de cada persona', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.moodEntry.findMany.mockResolvedValue([{ moodType: 'FELIZ' }, { moodType: 'FELIZ' }]);
+
+    const res = await request(app)
+      .get(`/api/mascota/${AMISTAD_ID}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.body.mascota.personalidad).toBe('más animada');
+    expect(JSON.stringify(res.body.mascota)).not.toContain('FELIZ');
+    expect(res.body.mascota).not.toHaveProperty('moodEntries');
   });
 });
 

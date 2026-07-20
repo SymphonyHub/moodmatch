@@ -17,5 +17,6 @@ export function estadoMascota(nivelCarino) {
     etiqueta: etapa.etiqueta,
     progreso,
     siguienteNivel: etapa.hasta,
+    sprite: nivel < 4 ? 0 : nivel < 10 ? 1 : nivel < 20 ? 2 : 3,
   };
 }

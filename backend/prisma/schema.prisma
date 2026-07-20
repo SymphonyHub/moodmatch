@@ -26,6 +26,8 @@ model User {
   customTheme     Json?
   avatarUrl       String?
   perfilPersonalidad Json?
+  expoPushToken          String?
+  notificationPreferences Json?
   createdAt       DateTime     @default(now())
 
   moodEntries    MoodEntry[]
@@ -95,6 +97,7 @@ model Cheer {
   toUserId   Int
   message    String
   seen       Boolean  @default(false)
+  reacciones Json?
   createdAt  DateTime @default(now())
 
   fromUser User @relation("CheerFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
@@ -107,6 +110,11 @@ model MascotaAmistad {
   amistad     Friendship @relation(fields: [amistadId], references: [id], onDelete: Cascade)
   nombre      String
   nivelCarino Int        @default(0)
+  ultimoCuidadoUsuario1 DateTime?
+  ultimoCuidadoUsuario2 DateTime?
+  retoCooperativo       Json?
+  nombrePropuesto       String?
+  historialHitos        Json?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 }

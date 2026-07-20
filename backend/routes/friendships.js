@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
+const { NOMBRE_MASCOTA } = require('../lib/mascota');
 
 const VALID_CHEERS = [
   '💚 Pensando en ti',
@@ -51,7 +52,12 @@ router.post('/', requireAuth, async (req, res) => {
   }
 
   const friendship = await prisma.friendship.create({
-    data: { userId: req.user.userId, friendId: friend.id },
+    data: {
+      userId: req.user.userId,
+      friendId: friend.id,
+      mascota: { create: { nombre: NOMBRE_MASCOTA } },
+    },
+    include: { mascota: true },
   });
 
   res.status(201).json({ friendship, friend });
@@ -98,6 +104,7 @@ router.get('/', requireAuth, async (req, res) => {
     vistos.add(other.id);
     amigos.push({
       id: other.id,
+      amistadId: f.id,
       nombre: other.nombre,
       moodReciente: other.moodEntries[0]?.moodType ?? null,
       fechaReciente: other.moodEntries[0]?.createdAt ?? null,

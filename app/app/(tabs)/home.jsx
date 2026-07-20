@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useReducer, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { AppState, ScrollView, Text, View } from 'react-native';
+import * as Network from 'expo-network';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { router, useFocusEffect } from 'expo-router';
-import { apiCreateMoodEntry, apiChatRespond, apiGetMe, apiGetMoodHistory } from '../../services/api';
+import { apiChatRespond, apiGetMe, apiGetMoodHistory } from '../../services/api';
 import { MOODS } from '../../constants/moods';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import {
@@ -14,6 +15,7 @@ import { ETIQUETAS } from '../../features/emociones/guiones';
 import { useCrisisShield } from '../../features/emociones/useCrisisShield';
 import { useRetry } from '../../features/emociones/useRetry';
 import { RUTA_WELLNESS } from '../../features/wellness/paraMi';
+import { capturarMoodEntry, sincronizarMoodEntries } from '../../features/wellness/moodQueue';
 import ChatBubble from '../../components/chat/ChatBubble';
 import QuickReplies from '../../components/chat/QuickReplies';
 import TypingIndicator from '../../components/chat/TypingIndicator';
@@ -60,6 +62,35 @@ export default function HomeScreen() {
       };
     }, []),
   );
+
+  useEffect(() => {
+    let activo = true;
+    const sincronizar = () => sincronizarMoodEntries()
+      .then(({ sincronizadas }) => {
+        if (!activo) return;
+        for (const item of sincronizadas) {
+          dispatch({
+            tipo: 'ENTRADA_SINCRONIZADA',
+            clientId: item.clientId,
+            moodEntryId: item.data.moodEntry.id,
+          });
+        }
+      })
+      .catch(() => {});
+
+    sincronizar();
+    const networkSubscription = Network.addNetworkStateListener((state) => {
+      if (state.isConnected && state.isInternetReachable !== false) sincronizar();
+    });
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') sincronizar();
+    });
+    return () => {
+      activo = false;
+      networkSubscription.remove();
+      appStateSubscription.remove();
+    };
+  }, []);
 
   // Revela los mensajes de a uno: los del usuario al instante, los del bot
   // tras una pausa breve de "escribiendo".
@@ -117,17 +148,16 @@ export default function HomeScreen() {
   useEffect(() => {
     if (conv.fase !== 'creandoEntrada') return undefined;
     let cancelado = false;
-    apiCreateMoodEntry(conv.mood, conv.notas.join('\n') || null)
-      .then((data) => {
+    capturarMoodEntry(conv.mood, conv.notas.join('\n') || null)
+      .then((resultado) => {
         if (cancelado) return;
-        if (data.moodEntry && data.actividadSugerida) {
+        if (resultado.estado === 'sincronizada') {
           dispatch({
             tipo: 'ENTRADA_CREADA',
-            moodEntryId: data.moodEntry.id,
-            actividad: data.actividadSugerida,
+            moodEntryId: resultado.data.moodEntry.id,
           });
         } else {
-          dispatch({ tipo: 'ENTRADA_FALLO' });
+          dispatch({ tipo: 'ENTRADA_ENCOLADA', clientId: resultado.clientId });
         }
       })
       .catch(() => {
@@ -162,6 +192,8 @@ export default function HomeScreen() {
         { id: 'verSugerencia', label: ETIQUETAS.verSugerencia },
         { id: 'reiniciar', label: ETIQUETAS.reiniciar },
       ];
+    } else if (qr.tipo === 'encolada') {
+      chips = [{ id: 'reiniciar', label: ETIQUETAS.reiniciar }];
     }
   }
 

@@ -5,6 +5,7 @@ import {
   prepararReintento,
   reconciliar,
   esLocal,
+  actualizarReacciones,
 } from '../friends/mensajesChat';
 
 const AHORA = new Date('2026-07-17T15:30:00.000Z');
@@ -87,5 +88,27 @@ describe('reconciliar (poll del servidor)', () => {
     const confirmado = { id: 42, message: 'hola', mine: true, createdAt: AHORA.toISOString() };
     const lista = reconciliar([servidor(1, 'a'), confirmado], [confirmado]);
     expect(lista).toEqual([servidor(1, 'a'), confirmado]);
+  });
+
+  test('un poll iniciado antes no revierte una reacción recién confirmada', () => {
+    const anterior = {
+      ...servidor(1, 'hola'), reacciones: [{ emoji: '❤️', count: 1, mine: true }],
+    };
+    const stale = { ...servidor(1, 'hola'), reacciones: [] };
+    const mutaciones = new Map([[1, 2000]]);
+
+    expect(reconciliar([stale], [anterior], mutaciones, 1500)).toEqual([anterior]);
+    expect(reconciliar([stale], [anterior], mutaciones, 2500)).toEqual([stale]);
+  });
+});
+
+describe('actualizarReacciones', () => {
+  test('actualiza solo el mensaje confirmado indicado', () => {
+    const original = [servidor(1, 'uno'), servidor(2, 'dos')];
+    const reacciones = [{ emoji: '❤️', count: 2, mine: true }];
+    const resultado = actualizarReacciones(original, 2, reacciones);
+
+    expect(resultado[0]).toBe(original[0]);
+    expect(resultado[1]).toEqual({ ...original[1], reacciones });
   });
 });

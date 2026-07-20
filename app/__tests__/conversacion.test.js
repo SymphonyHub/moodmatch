@@ -139,6 +139,28 @@ describe('registro creado → charla extendida (Fase 9)', () => {
     expect(reducer(fallo, { tipo: 'REINTENTAR_ENTRADA' }).fase).toBe('creandoEntrada');
   });
 
+  test('un registro offline queda pendiente y se abre al sincronizar el mismo clientId', () => {
+    let conv = elegir(crearConversacion(0), 'NEUTRO');
+    conv = reducer(conv, { tipo: 'QUICK_REPLY', replyId: 'reserva' });
+    conv = reducer(conv, { tipo: 'ENTRADA_ENCOLADA', clientId: 'offline-1' });
+
+    expect(conv.fase).toBe('encolada');
+    expect(conv.registrada).toBe(false);
+    expect(quickRepliesDe(conv)).toEqual({ tipo: 'encolada' });
+    expect(ultimoMensaje(conv).texto).toMatch(/sincronizará automáticamente/i);
+    expect(reducer(conv, {
+      tipo: 'ENTRADA_SINCRONIZADA', clientId: 'otro', moodEntryId: 8,
+    })).toBe(conv);
+
+    conv = reducer(conv, {
+      tipo: 'ENTRADA_SINCRONIZADA', clientId: 'offline-1', moodEntryId: 8,
+    });
+    expect(conv.fase).toBe('charla');
+    expect(conv.registrada).toBe(true);
+    expect(conv.moodEntryId).toBe(8);
+    expect(ultimoMensaje(conv).texto).toMatch(/ya se sincronizó/i);
+  });
+
   test('REINICIAR desde la charla vuelve al estado inicial limpio', () => {
     const conv = reducer(llegarACharla(), { tipo: 'REINICIAR' });
     expect(conv.fase).toBe('saludo');

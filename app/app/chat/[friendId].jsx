@@ -1,12 +1,11 @@
 import { useCallback, useRef, useState } from 'react';
 import {
-  View, Text, FlatList, ScrollView, ActivityIndicator,
-  useWindowDimensions,
+  View, Text, FlatList, ScrollView, ActivityIndicator, TextInput, useWindowDimensions,
 } from 'react-native';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { apiGetMessages, apiSendMessage } from '../../services/api';
+import { apiGetMessages, apiSendMessage, apiSetMessageReaction } from '../../services/api';
 import { CHEERS } from '../../constants/cheers';
 import { MOOD_INFO } from '../../constants/moods';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
@@ -14,13 +13,15 @@ import Tappable from '../../components/Tappable';
 import ChatInputBar from '../../components/chat/ChatInputBar';
 import MascotaWidget from '../../mascota/MascotaWidget';
 import {
-  crearOptimista, confirmar, marcarFallido, prepararReintento, reconciliar,
+  actualizarReacciones, crearOptimista, confirmar, marcarFallido, prepararReintento, reconciliar,
 } from '../../friends/mensajesChat';
 import { clasificar, crearRespuesta, estaRespondida } from '../../friends/invitacionSalida';
 import { chatBubbleMaxWidth } from '../../utils/responsive';
+import { buscarEnMensajes, moverResultado } from '../../friends/busquedaChat';
 
 const POLL_MS = 8000;
 const MAX_LENGTH = 500;
+const EMOJIS_REACCION = ['❤️', '👍', '😂', '😮', '😢'];
 
 const formatHora = (iso) => {
   const d = new Date(iso);
@@ -29,7 +30,19 @@ const formatHora = (iso) => {
   return `${hh}:${mm}`;
 };
 
-function Burbuja({ mensaje, texto, esInvitacion, mostrarBotones, onReintentar, onResponder }) {
+function Burbuja({
+  mensaje,
+  texto,
+  esInvitacion,
+  mostrarBotones,
+  onReintentar,
+  onResponder,
+  onAbrirReacciones,
+  onReaccion,
+  seleccionando,
+  reaccionando,
+  destacada,
+}) {
   const { theme } = useTheme();
   const styles = useStyles();
   const { width } = useWindowDimensions();
@@ -43,7 +56,7 @@ function Burbuja({ mensaje, texto, esInvitacion, mostrarBotones, onReintentar, o
         styles.burbuja,
         mensaje.mine ? styles.burbujaMia : styles.burbujaAjena,
         mensaje.failed && styles.burbujaFallida,
-        { maxWidth: bubbleMaxWidth },
+        destacada && styles.burbujaDestacada,
       ]}
     >
       {esInvitacion && (
@@ -91,15 +104,64 @@ function Burbuja({ mensaje, texto, esInvitacion, mostrarBotones, onReintentar, o
   );
   return (
     <View style={[styles.burbujaFila, mensaje.mine ? styles.filaMia : styles.filaAjena]}>
-      {mensaje.failed ? (
-        <Tappable
-          style={[styles.burbujaMax, { maxWidth: bubbleMaxWidth }]}
-          onPress={() => onReintentar(mensaje)}
-          accessibilityLabel="Reintentar envío del mensaje"
-        >
-          {cuerpo}
-        </Tappable>
-      ) : cuerpo}
+      <View
+        style={[
+          styles.burbujaGrupo,
+          mensaje.mine ? styles.grupoMio : styles.grupoAjeno,
+          { maxWidth: bubbleMaxWidth },
+        ]}
+      >
+        {mensaje.failed ? (
+          <Tappable
+            style={styles.burbujaMax}
+            onPress={() => onReintentar(mensaje)}
+            accessibilityLabel="Reintentar envío del mensaje"
+          >
+            {cuerpo}
+          </Tappable>
+        ) : cuerpo}
+        {!mensaje.pending && !mensaje.failed && (
+          <View style={[styles.reacciones, mensaje.mine ? styles.reaccionesMias : styles.reaccionesAjenas]}>
+            {(mensaje.reacciones ?? []).map((reaccion) => (
+              <Tappable
+                key={reaccion.emoji}
+                style={[styles.reaccionChip, reaccion.mine && styles.reaccionChipMia]}
+                onPress={() => onReaccion(mensaje, reaccion.mine ? null : reaccion.emoji)}
+                disabled={reaccionando}
+                haptic={false}
+                accessibilityLabel={`${reaccion.emoji}, ${reaccion.count} reacciones`}
+              >
+                <Text style={styles.reaccionTexto}>{reaccion.emoji} {reaccion.count}</Text>
+              </Tappable>
+            ))}
+            <Tappable
+              style={styles.reaccionAgregar}
+              onPress={() => onAbrirReacciones(mensaje.id)}
+              disabled={reaccionando}
+              haptic={false}
+              accessibilityLabel="Agregar reacción"
+            >
+              <Ionicons name="happy-outline" size={16} color={theme.colors.textMuted} />
+              <Ionicons name="add" size={10} color={theme.colors.textMuted} />
+            </Tappable>
+          </View>
+        )}
+        {seleccionando && (
+          <View style={styles.selectorReacciones}>
+            {EMOJIS_REACCION.map((emoji) => (
+              <Tappable
+                key={emoji}
+                style={styles.selectorEmoji}
+                onPress={() => onReaccion(mensaje, emoji)}
+                disabled={reaccionando}
+                accessibilityLabel={`Reaccionar con ${emoji}`}
+              >
+                <Text style={styles.selectorEmojiTexto}>{emoji}</Text>
+              </Tappable>
+            ))}
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -115,16 +177,52 @@ export default function ChatScreen() {
   const [mensajes, setMensajes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mascotaRefresh, setMascotaRefresh] = useState(0);
+  const [buscando, setBuscando] = useState(false);
+  const [consulta, setConsulta] = useState('');
+  const [resultadoActivo, setResultadoActivo] = useState(0);
+  const [selectorReaccion, setSelectorReaccion] = useState(null);
+  const [reaccionando, setReaccionando] = useState(null);
   const listRef = useRef(null);
+  const mutacionesReaccionRef = useRef(new Map());
 
   const moodInfo = mood ? MOOD_INFO[mood] : null;
+  const coincidencias = buscarEnMensajes(mensajes, consulta);
+  const posicionActiva = coincidencias.length > 0
+    ? Math.min(resultadoActivo, coincidencias.length - 1)
+    : 0;
+  const indiceDestacado = coincidencias[posicionActiva];
+
+  const desplazarA = (index) => {
+    if (index === undefined) return;
+    listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+  };
+
+  const cambiarConsulta = (texto) => {
+    setConsulta(texto);
+    setResultadoActivo(0);
+    const resultados = buscarEnMensajes(mensajes, texto);
+    if (resultados.length > 0) setTimeout(() => desplazarA(resultados[0]), 0);
+  };
+
+  const moverEntreResultados = (delta) => {
+    if (coincidencias.length === 0) return;
+    const siguiente = moverResultado(coincidencias.length, posicionActiva, delta);
+    setResultadoActivo(siguiente);
+    desplazarA(coincidencias[siguiente]);
+  };
 
   const cargar = useCallback(async () => {
+    const inicioCarga = Date.now();
     try {
       const data = await apiGetMessages(friendId);
       if (data.mensajes) {
         // La verdad del servidor sin pisar los locales en vuelo o fallidos
-        setMensajes((prev) => reconciliar(data.mensajes, prev));
+        setMensajes((prev) => reconciliar(
+          data.mensajes,
+          prev,
+          mutacionesReaccionRef.current,
+          inicioCarga,
+        ));
       }
     } catch {
       // el próximo poll reintenta
@@ -168,12 +266,27 @@ export default function ChatScreen() {
     transmitir(mensaje);
   };
 
+  const reaccionar = async (mensaje, emoji) => {
+    if (mensaje.pending || mensaje.failed || reaccionando !== null) return;
+    setReaccionando(mensaje.id);
+    try {
+      const data = await apiSetMessageReaction(friendId, mensaje.id, emoji);
+      mutacionesReaccionRef.current.set(mensaje.id, Date.now());
+      setMensajes((prev) => actualizarReacciones(prev, mensaje.id, data.mensaje.reacciones));
+      setSelectorReaccion(null);
+    } catch {
+      // Se conserva la reacción anterior; el usuario puede reintentar.
+    } finally {
+      setReaccionando(null);
+    }
+  };
+
   // Responder una invitación de salida = enviar un mensaje marcado (aceptar/
   // rechazar) por el flujo optimista normal. Al aparecer, estaRespondida pasa a
   // true y los botones desaparecen.
   const responder = (acepta) => enviar(crearRespuesta(acepta));
 
-  const renderItem = ({ item }) => {
+  const renderItem = ({ item, index }) => {
     const { tipo, texto } = clasificar(item.message);
     const esInvitacion = tipo === 'invitacion';
     return (
@@ -184,6 +297,11 @@ export default function ChatScreen() {
         mostrarBotones={esInvitacion && !item.mine && !item.pending && !estaRespondida(mensajes, item)}
         onReintentar={reintentar}
         onResponder={responder}
+        onAbrirReacciones={(id) => setSelectorReaccion((actual) => (actual === id ? null : id))}
+        onReaccion={reaccionar}
+        seleccionando={selectorReaccion === item.id}
+        reaccionando={reaccionando === item.id}
+        destacada={indiceDestacado === index}
       />
     );
   };
@@ -200,7 +318,56 @@ export default function ChatScreen() {
             <Text style={styles.headerMood}>{moodInfo.emoji}  {moodInfo.label}</Text>
           )}
         </View>
+        <Tappable
+          style={styles.btnBuscar}
+          onPress={() => {
+            setBuscando((valor) => !valor);
+            setConsulta('');
+            setResultadoActivo(0);
+          }}
+          haptic={false}
+          accessibilityLabel={buscando ? 'Cerrar búsqueda' : 'Buscar en la conversación'}
+        >
+          <Ionicons name={buscando ? 'close' : 'search'} size={22} color={theme.colors.onHeader} />
+        </Tappable>
       </View>
+
+      {buscando && (
+        <View style={styles.busquedaBarra}>
+          <Ionicons name="search" size={18} color={theme.colors.textMuted} />
+          <TextInput
+            style={styles.busquedaInput}
+            value={consulta}
+            onChangeText={cambiarConsulta}
+            placeholder="Buscar mensajes"
+            placeholderTextColor={theme.colors.textFaint}
+            autoFocus
+            returnKeyType="search"
+            accessibilityLabel="Buscar mensajes"
+          />
+          <Text style={styles.busquedaConteo}>
+            {consulta.trim() ? `${coincidencias.length ? posicionActiva + 1 : 0}/${coincidencias.length}` : ''}
+          </Text>
+          <Tappable
+            style={styles.busquedaNavegar}
+            onPress={() => moverEntreResultados(-1)}
+            disabled={coincidencias.length === 0}
+            haptic={false}
+            accessibilityLabel="Coincidencia anterior"
+          >
+            <Ionicons name="chevron-up" size={19} color={theme.colors.textMuted} />
+          </Tappable>
+          <Tappable
+            style={styles.busquedaNavegar}
+            onPress={() => moverEntreResultados(1)}
+            disabled={coincidencias.length === 0}
+            haptic={false}
+            accessibilityLabel="Coincidencia siguiente"
+          >
+            <Ionicons name="chevron-down" size={19} color={theme.colors.textMuted} />
+          </Tappable>
+        </View>
+      )}
 
       <MascotaWidget amistadId={amistadId} refreshKey={mascotaRefresh} />
 
@@ -215,7 +382,13 @@ export default function ChatScreen() {
           keyExtractor={(m) => String(m.id)}
           renderItem={renderItem}
           contentContainerStyle={styles.lista}
-          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+          onContentSizeChange={() => {
+            if (!buscando) listRef.current?.scrollToEnd({ animated: true });
+          }}
+          onScrollToIndexFailed={({ index, averageItemLength }) => {
+            listRef.current?.scrollToOffset({ offset: averageItemLength * index, animated: true });
+            setTimeout(() => desplazarA(index), 100);
+          }}
           ListEmptyComponent={(
             <View style={styles.vacio}>
               <Text style={styles.vacioEmoji}>💬</Text>
@@ -263,6 +436,7 @@ const useStyles = makeThemedStyles((t) => ({
     paddingHorizontal: 8,
   },
   btnVolver: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  btnBuscar: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerInfo: { flex: 1, marginLeft: 4 },
   headerNombre: {
     ...t.typography.type.section,
@@ -274,6 +448,28 @@ const useStyles = makeThemedStyles((t) => ({
     opacity: 0.8,
     marginTop: 2,
   },
+  busquedaBarra: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: t.colors.surface,
+    borderBottomWidth: t.shape.borderThin,
+    borderBottomColor: t.colors.border,
+  },
+  busquedaInput: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 7,
+    fontSize: t.fontSize(14),
+    color: t.colors.text,
+  },
+  busquedaConteo: { minWidth: 36, fontSize: t.fontSize(11), color: t.colors.textMuted },
+  busquedaNavegar: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   lista: {
     width: '100%',
     maxWidth: 680,
@@ -285,8 +481,12 @@ const useStyles = makeThemedStyles((t) => ({
   burbujaFila: { flexDirection: 'row', marginBottom: 8 },
   filaMia: { justifyContent: 'flex-end' },
   filaAjena: { justifyContent: 'flex-start' },
-  burbujaMax: {},
+  burbujaGrupo: {},
+  grupoMio: { alignItems: 'flex-end' },
+  grupoAjeno: { alignItems: 'flex-start' },
+  burbujaMax: { maxWidth: '100%' },
   burbuja: {
+    maxWidth: '100%',
     borderRadius: t.shape.radiusLg,
     paddingVertical: 10,
     paddingHorizontal: 14,
@@ -305,6 +505,10 @@ const useStyles = makeThemedStyles((t) => ({
     borderWidth: t.shape.borderThin,
     borderColor: t.colors.danger,
     maxWidth: '100%',
+  },
+  burbujaDestacada: {
+    borderWidth: 2,
+    borderColor: t.colors.accent,
   },
   textoMio: {
     fontSize: t.fontSize(15),
@@ -325,6 +529,39 @@ const useStyles = makeThemedStyles((t) => ({
     marginTop: 4,
     alignSelf: 'flex-end',
   },
+  reacciones: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4, alignItems: 'center' },
+  reaccionesMias: { justifyContent: 'flex-end' },
+  reaccionesAjenas: { justifyContent: 'flex-start' },
+  reaccionChip: {
+    borderRadius: t.shape.radiusMd,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    backgroundColor: t.colors.surface,
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.border,
+  },
+  reaccionChipMia: { borderColor: t.colors.primary, backgroundColor: t.colors.primarySoft },
+  reaccionTexto: { fontSize: t.fontSize(12), color: t.colors.text },
+  reaccionAgregar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: t.shape.radiusMd,
+  },
+  selectorReacciones: {
+    flexDirection: 'row',
+    marginTop: 5,
+    padding: 4,
+    gap: 2,
+    borderRadius: t.shape.radiusLg,
+    backgroundColor: t.colors.surface,
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.border,
+    ...t.shadows.card,
+  },
+  selectorEmoji: { paddingHorizontal: 6, paddingVertical: 4 },
+  selectorEmojiTexto: { fontSize: t.fontSize(19) },
   invEtiqueta: {
     flexDirection: 'row',
     alignItems: 'center',

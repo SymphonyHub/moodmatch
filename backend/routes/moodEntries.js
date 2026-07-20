@@ -3,9 +3,10 @@ const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
 
 const VALID_MOODS = ['FELIZ', 'TRISTE', 'ANSIOSO', 'CALMADO', 'ENOJADO', 'NEUTRO'];
+const CLIENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-async function nextSuggestion(userId, moodType, moodEntryId) {
-  const moodActivities = await prisma.moodActivity.findMany({
+async function nextSuggestion(db, moodType, moodEntryId) {
+  const moodActivities = await db.moodActivity.findMany({
     where: { moodType },
     include: { activity: true },
     orderBy: { activityId: 'asc' },
@@ -16,12 +17,28 @@ async function nextSuggestion(userId, moodType, moodEntryId) {
   const idx = Math.floor(Math.random() * moodActivities.length);
   const chosen = moodActivities[idx].activity;
 
-  await prisma.suggestion.create({
+  await db.suggestion.create({
     data: { moodEntryId, activityId: chosen.id },
   });
 
   return chosen;
 }
+
+const respuestaDesdeEntry = (entry, creada) => {
+  const { suggestions = [], ...moodEntry } = entry;
+  return {
+    moodEntry,
+    actividadSugerida: suggestions[0]?.activity ?? null,
+    creada,
+  };
+};
+
+const mismoRegistro = (entry, userId, moodType, nota, capturedAt) => (
+  entry.userId === userId
+  && entry.moodType === moodType
+  && (entry.nota ?? null) === nota
+  && (!capturedAt || new Date(entry.createdAt).toISOString() === capturedAt.toISOString())
+);
 
 // GET /api/mood-entries?days=30 — registros del usuario dentro de la ventana
 // de días pedida (para la vista de historial). Sin suggestions: aquí solo
@@ -67,20 +84,70 @@ router.get('/latest', requireAuth, async (req, res) => {
 
 // POST /api/mood-entries
 router.post('/', requireAuth, async (req, res) => {
-  const { moodType, nota } = req.body;
+  const {
+    moodType, nota, clientId: clientIdRaw, capturedAt: capturedAtRaw,
+  } = req.body;
 
   if (!moodType) return res.status(400).json({ error: 'moodType es requerido' });
   if (!VALID_MOODS.includes(moodType)) {
     return res.status(400).json({ error: `moodType debe ser uno de: ${VALID_MOODS.join(', ')}` });
   }
+  if (nota !== undefined && nota !== null && typeof nota !== 'string') {
+    return res.status(400).json({ error: 'nota debe ser texto' });
+  }
+  if (clientIdRaw !== undefined && clientIdRaw !== null && !CLIENT_ID_RE.test(clientIdRaw)) {
+    return res.status(400).json({ error: 'clientId inválido' });
+  }
+  const capturedAt = capturedAtRaw ? new Date(capturedAtRaw) : null;
+  if (capturedAtRaw && Number.isNaN(capturedAt.getTime())) {
+    return res.status(400).json({ error: 'capturedAt inválido' });
+  }
 
-  const moodEntry = await prisma.moodEntry.create({
-    data: { userId: req.user.userId, moodType, nota: nota || null },
-  });
+  const userId = req.user.userId;
+  const clientId = clientIdRaw ?? null;
+  const notaNormalizada = nota || null;
+  let resultado;
 
-  const actividadSugerida = await nextSuggestion(req.user.userId, moodType, moodEntry.id);
+  try {
+    resultado = await prisma.$transaction(async (tx) => {
+      if (clientId) {
+        const existente = await tx.moodEntry.findUnique({
+          where: { clientId },
+          include: { suggestions: { take: 1, include: { activity: true } } },
+        });
+        if (existente) return respuestaDesdeEntry(existente, false);
+      }
 
-  res.status(201).json({ moodEntry, actividadSugerida });
+      const moodEntry = await tx.moodEntry.create({
+        data: {
+          userId,
+          clientId,
+          moodType,
+          nota: notaNormalizada,
+          ...(capturedAt && { createdAt: capturedAt }),
+        },
+      });
+      const actividadSugerida = await nextSuggestion(tx, moodType, moodEntry.id);
+      return { moodEntry, actividadSugerida, creada: true };
+    });
+  } catch (error) {
+    // Dos sincronizaciones concurrentes pueden intentar insertar el mismo UUID.
+    // La restricción única decide; el perdedor devuelve el registro ya creado.
+    if (error?.code !== 'P2002' || !clientId) throw error;
+    const existente = await prisma.moodEntry.findUnique({
+      where: { clientId },
+      include: { suggestions: { take: 1, include: { activity: true } } },
+    });
+    if (!existente) throw error;
+    resultado = respuestaDesdeEntry(existente, false);
+  }
+
+  if (!mismoRegistro(resultado.moodEntry, userId, moodType, notaNormalizada, capturedAt)) {
+    return res.status(409).json({ error: 'clientId ya fue usado para otro registro' });
+  }
+
+  const { creada, ...body } = resultado;
+  res.status(creada ? 201 : 200).json(body);
 });
 
 // POST /api/mood-entries/:id/suggestion — "Quiero otra idea"
@@ -92,7 +159,7 @@ router.post('/:id/suggestion', requireAuth, async (req, res) => {
     return res.status(404).json({ error: 'Registro no encontrado' });
   }
 
-  const activity = await nextSuggestion(req.user.userId, moodEntry.moodType, moodEntryId);
+  const activity = await nextSuggestion(prisma, moodEntry.moodType, moodEntryId);
   res.json({ activity });
 });
 

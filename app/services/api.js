@@ -12,8 +12,8 @@ export const resetSocialSuggestionCache = () => {
   socialSuggestionCache = null;
 };
 
-const authHeaders = async () => {
-  const token = await getToken();
+const authHeaders = async (tokenExplicito = null) => {
+  const token = tokenExplicito ?? await getToken();
   return {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
@@ -58,13 +58,31 @@ export const apiUpdateMe = async (fields) => {
   }).then((r) => r.json());
 };
 
-export const apiCreateMoodEntry = async (moodType, nota = null) => {
-  const headers = await authHeaders();
-  return fetch(`${API_URL}/api/mood-entries`, {
+export const apiCreateMoodEntry = async (
+  moodType,
+  nota = null,
+  clientId = null,
+  capturedAt = null,
+  tokenExplicito = null,
+) => {
+  const headers = await authHeaders(tokenExplicito);
+  const res = await fetch(`${API_URL}/api/mood-entries`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ moodType, nota }),
-  }).then((r) => r.json());
+    body: JSON.stringify({
+      moodType,
+      nota,
+      ...(clientId && { clientId }),
+      ...(capturedAt && { capturedAt }),
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data?.moodEntry) {
+    const error = new Error(data?.error ?? 'No se pudo guardar el registro');
+    error.status = res.status;
+    throw error;
+  }
+  return data;
 };
 
 // Registros de ánimo de los últimos `days` días ({ entries }), para /historial.
@@ -131,6 +149,20 @@ export const apiSendMessage = async (friendId, message) => {
     headers,
     body: JSON.stringify({ message }),
   }).then((r) => r.json());
+};
+
+export const apiSetMessageReaction = async (friendId, messageId, emoji) => {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_URL}/api/messages/${friendId}/${messageId}/reaction`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ emoji }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data?.mensaje) {
+    throw new Error(data?.error ?? 'No se pudo guardar la reacción');
+  }
+  return data;
 };
 
 export const apiGetMascota = async (amistadId) => {

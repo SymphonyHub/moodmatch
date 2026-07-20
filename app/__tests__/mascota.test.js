@@ -21,6 +21,13 @@ describe('estadoMascota', () => {
       etiqueta: 'Tomando confianza',
       progreso: 0.5,
       siguienteNivel: 10,
+      sprite: 1,
     });
+  });
+
+  test.each([
+    [0, 0], [4, 1], [10, 2], [20, 3], [100, 3],
+  ])('elige uno de los cuatro sprites según el nivel %i', (nivel, sprite) => {
+    expect(estadoMascota(nivel).sprite).toBe(sprite);
   });
 });

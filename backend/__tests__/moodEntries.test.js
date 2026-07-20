@@ -1,8 +1,14 @@
-jest.mock('../lib/prisma', () => ({
-  moodEntry: { create: jest.fn(), findFirst: jest.fn(), findMany: jest.fn() },
-  moodActivity: { findMany: jest.fn() },
-  suggestion: { create: jest.fn() },
-}));
+jest.mock('../lib/prisma', () => {
+  const db = {
+    moodEntry: {
+      create: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(),
+    },
+    moodActivity: { findMany: jest.fn() },
+    suggestion: { create: jest.fn() },
+  };
+  db.$transaction = jest.fn((callback) => callback(db));
+  return db;
+});
 
 const request = require('supertest');
 const express = require('express');
@@ -16,7 +22,10 @@ const app = express();
 app.use(express.json());
 app.use('/api/mood-entries', moodEntriesRouter);
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  prisma.moodEntry.findUnique.mockResolvedValue(null);
+});
 
 const VALID_MOODS = ['FELIZ', 'TRISTE', 'ANSIOSO', 'CALMADO', 'ENOJADO', 'NEUTRO'];
 
@@ -51,7 +60,7 @@ describe('POST /api/mood-entries — validación de moodType', () => {
 
   test.each(VALID_MOODS)('acepta moodType válido: %s', async (mood) => {
     prisma.moodEntry.create.mockResolvedValue({
-      id: 1, userId: 1, moodType: mood, nota: null, createdAt: new Date(),
+      id: 1, userId: 1, clientId: null, moodType: mood, nota: null, createdAt: new Date(),
     });
     prisma.moodActivity.findMany.mockResolvedValue([]);
 
@@ -62,6 +71,111 @@ describe('POST /api/mood-entries — validación de moodType', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.moodEntry.moodType).toBe(mood);
+  });
+});
+
+describe('POST /api/mood-entries — idempotencia offline', () => {
+  const clientId = '5d2f6a10-e73c-4fe2-8f40-923d59f9b561';
+  const actividad = { id: 7, nombre: 'Caminar', descripcion: 'Una vuelta', categoria: 'físico' };
+  const entry = {
+    id: 20,
+    userId: 1,
+    clientId,
+    moodType: 'CALMADO',
+    nota: 'respiré un rato',
+    createdAt: new Date('2026-07-20T12:00:00Z'),
+  };
+
+  test('crea el registro y su sugerencia dentro de una sola transacción', async () => {
+    prisma.moodEntry.create.mockResolvedValue(entry);
+    prisma.moodActivity.findMany.mockResolvedValue([{ activityId: 7, activity: actividad }]);
+    prisma.suggestion.create.mockResolvedValue({ id: 30, moodEntryId: 20, activityId: 7 });
+
+    const res = await request(app)
+      .post('/api/mood-entries')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        moodType: 'CALMADO',
+        nota: 'respiré un rato',
+        clientId,
+        capturedAt: '2026-07-20T12:00:00.000Z',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ moodEntry: expect.objectContaining({ id: 20, clientId }), actividadSugerida: actividad });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.moodEntry.create).toHaveBeenCalledWith({
+      data: {
+        userId: 1,
+        clientId,
+        moodType: 'CALMADO',
+        nota: 'respiré un rato',
+        createdAt: new Date('2026-07-20T12:00:00.000Z'),
+      },
+    });
+    expect(prisma.suggestion.create).toHaveBeenCalledWith({
+      data: { moodEntryId: 20, activityId: 7 },
+    });
+  });
+
+  test('un reintento con el mismo clientId devuelve la creación original', async () => {
+    prisma.moodEntry.findUnique.mockResolvedValue({
+      ...entry,
+      suggestions: [{ activity: actividad }],
+    });
+
+    const res = await request(app)
+      .post('/api/mood-entries')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ moodType: 'CALMADO', nota: 'respiré un rato', clientId });
+
+    expect(res.status).toBe(200);
+    expect(res.body.moodEntry.id).toBe(entry.id);
+    expect(res.body.actividadSugerida).toEqual(actividad);
+    expect(prisma.moodEntry.create).not.toHaveBeenCalled();
+    expect(prisma.suggestion.create).not.toHaveBeenCalled();
+  });
+
+  test('rechaza reutilizar un clientId con otro contenido o usuario', async () => {
+    prisma.moodEntry.findUnique.mockResolvedValue({
+      ...entry,
+      moodType: 'FELIZ',
+      suggestions: [{ activity: actividad }],
+    });
+
+    const res = await request(app)
+      .post('/api/mood-entries')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ moodType: 'CALMADO', nota: 'respiré un rato', clientId });
+
+    expect(res.status).toBe(409);
+  });
+
+  test('rechaza clientId malformado', async () => {
+    const res = await request(app)
+      .post('/api/mood-entries')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ moodType: 'FELIZ', clientId: 'no-es-uuid' });
+
+    expect(res.status).toBe(400);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  test('una carrera del índice único recupera y devuelve el registro ganador', async () => {
+    prisma.$transaction.mockRejectedValueOnce(Object.assign(new Error('unique'), { code: 'P2002' }));
+    prisma.moodEntry.findUnique.mockResolvedValue({
+      ...entry,
+      suggestions: [{ activity: actividad }],
+    });
+
+    const res = await request(app)
+      .post('/api/mood-entries')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ moodType: 'CALMADO', nota: 'respiré un rato', clientId });
+
+    expect(res.status).toBe(200);
+    expect(res.body.moodEntry.id).toBe(entry.id);
+    expect(res.body.actividadSugerida).toEqual(actividad);
   });
 });
 

@@ -30,6 +30,14 @@ export const ERROR_ENTRADA = [
   'Algo falló al guardar. Revisa tu conexión y volvemos a intentarlo.',
 ];
 
+export const ENTRADA_ENCOLADA = [
+  'Guardé tu registro en este dispositivo. Se sincronizará automáticamente cuando vuelva la conexión.',
+];
+
+export const ENTRADA_SINCRONIZADA = [
+  'Tu registro ya se sincronizó. La sugerencia está lista en tu espacio Para mí.',
+];
+
 export const ETIQUETAS = {
   reintentar: 'Intentar de nuevo',
   reiniciar: 'Registrar otra emoción',

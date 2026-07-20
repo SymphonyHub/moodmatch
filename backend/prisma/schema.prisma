@@ -40,6 +40,7 @@ model User {
 model MoodEntry {
   id        Int        @id @default(autoincrement())
   userId    Int
+  clientId  String?    @unique
   moodType  MoodType
   nota      String?
   createdAt DateTime   @default(now())

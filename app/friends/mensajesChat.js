@@ -43,6 +43,20 @@ export function prepararReintento(mensajes, tempId) {
 
 // Resultado del poll: la verdad del servidor + los locales aún sin confirmar
 // (pendientes en vuelo y fallidos esperando reintento) al final de la lista.
-export function reconciliar(mensajesServidor, prev) {
-  return [...mensajesServidor, ...prev.filter(esLocal)];
+export function reconciliar(mensajesServidor, prev, mutacionesReaccion = new Map(), inicioCarga = Infinity) {
+  const anteriores = new Map(prev.map((mensaje) => [mensaje.id, mensaje]));
+  const servidorProtegido = mensajesServidor.map((mensaje) => {
+    const mutadaEn = mutacionesReaccion.get(mensaje.id);
+    const anterior = anteriores.get(mensaje.id);
+    return mutadaEn >= inicioCarga && anterior
+      ? { ...mensaje, reacciones: anterior.reacciones }
+      : mensaje;
+  });
+  return [...servidorProtegido, ...prev.filter(esLocal)];
+}
+
+export function actualizarReacciones(mensajes, messageId, reacciones) {
+  return mensajes.map((mensaje) => (
+    mensaje.id === messageId ? { ...mensaje, reacciones } : mensaje
+  ));
 }

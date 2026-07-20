@@ -1,7 +1,14 @@
 // Máquina de estados de la conversación de emociones. Pura y sin efectos:
 // la UI (home.jsx) despacha acciones y ejecuta los llamados a la API cuando
 // la fase lo indica (fase 'creandoEntrada' → POST /api/mood-entries).
-import { GUIONES, SALUDO, ERROR_ENTRADA, SUGERENCIA } from './guiones';
+import {
+  ENTRADA_ENCOLADA,
+  ENTRADA_SINCRONIZADA,
+  ERROR_ENTRADA,
+  GUIONES,
+  SALUDO,
+  SUGERENCIA,
+} from './guiones';
 import { detectarCrisis, MENSAJE_CRISIS } from './crisis';
 import { respuestaPlantilla } from './plantillas';
 import { MOOD_INFO } from '../../constants/moods';
@@ -25,6 +32,7 @@ export function crearConversacion(seed = Math.floor(Math.random() * 997)) {
     notas: [], // texto libre acumulado → `nota` del MoodEntry
     crisisMostrada: false,
     moodEntryId: null,
+    clientIdPendiente: null,
     registrada: false, // true desde ENTRADA_CREADA: la charla sigue sin cierre
     pendienteIA: null, // { texto, historial } del turno en vuelo / a reintentar
     seed,
@@ -193,6 +201,24 @@ export function reducer(estado, accion) {
       return { ...estado, moodEntryId: accion.moodEntryId, registrada: true, fase: 'charla' };
     }
 
+    case 'ENTRADA_ENCOLADA': {
+      if (estado.fase !== 'creandoEntrada') return estado;
+      const s = agregarBot(estado, 'entradaEncolada', ENTRADA_ENCOLADA);
+      return { ...s, clientIdPendiente: accion.clientId, fase: 'encolada' };
+    }
+
+    case 'ENTRADA_SINCRONIZADA': {
+      if (estado.fase !== 'encolada' || estado.clientIdPendiente !== accion.clientId) return estado;
+      const s = agregarBot(estado, 'entradaSincronizada', ENTRADA_SINCRONIZADA);
+      return {
+        ...s,
+        clientIdPendiente: null,
+        moodEntryId: accion.moodEntryId,
+        registrada: true,
+        fase: 'charla',
+      };
+    }
+
     case 'ENTRADA_FALLO': {
       if (estado.fase !== 'creandoEntrada') return estado;
       const s = agregarBot(estado, 'errorEntrada', ERROR_ENTRADA);
@@ -228,6 +254,7 @@ export function quickRepliesDe(estado) {
   }
   if (estado.fase === 'iaFallo') return { tipo: 'iaFallo' };
   if (estado.fase === 'errorEntrada') return { tipo: 'reintentar' };
+  if (estado.fase === 'encolada') return { tipo: 'encolada' };
   // Charla extendida: chips disponibles pero no obligatorios — el usuario
   // también puede simplemente seguir escribiendo.
   if (estado.fase === 'charla') return { tipo: 'charla' };

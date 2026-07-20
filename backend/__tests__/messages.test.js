@@ -5,7 +5,9 @@ jest.mock('../lib/prisma', () => {
     cheer: {
       count: jest.fn(),
       findMany: jest.fn(),
+      findFirst: jest.fn(),
       updateMany: jest.fn(),
+      update: jest.fn(),
       create: jest.fn(),
     },
   };
@@ -43,6 +45,7 @@ describe('auth', () => {
       request(app).get('/api/messages/unread-count'),
       request(app).get(`/api/messages/${FRIEND_ID}`),
       request(app).post(`/api/messages/${FRIEND_ID}`).send({ message: 'hola' }),
+      request(app).put(`/api/messages/${FRIEND_ID}/8/reaction`).send({ emoji: '❤️' }),
     ]) {
       const res = await req;
       expect(res.status).toBe(401);
@@ -80,8 +83,8 @@ describe('GET /api/messages/:friendId', () => {
   test('devuelve la conversación en ambas direcciones y marca vistos los entrantes', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
     prisma.cheer.findMany.mockResolvedValue([
-      { id: 1, fromUserId: FRIEND_ID, toUserId: MY_USER_ID, message: 'hola', seen: false, createdAt: new Date('2026-07-14T10:00:00Z') },
-      { id: 2, fromUserId: MY_USER_ID, toUserId: FRIEND_ID, message: 'buenas!', seen: true, createdAt: new Date('2026-07-14T10:01:00Z') },
+      { id: 1, fromUserId: FRIEND_ID, toUserId: MY_USER_ID, message: 'hola', seen: false, reacciones: { '❤️': [1, 2] }, createdAt: new Date('2026-07-14T10:00:00Z') },
+      { id: 2, fromUserId: MY_USER_ID, toUserId: FRIEND_ID, message: 'buenas!', seen: true, reacciones: null, createdAt: new Date('2026-07-14T10:01:00Z') },
     ]);
     prisma.cheer.updateMany.mockResolvedValue({ count: 1 });
 
@@ -91,8 +94,13 @@ describe('GET /api/messages/:friendId', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.mensajes).toEqual([
-      expect.objectContaining({ id: 1, message: 'hola', mine: false }),
-      expect.objectContaining({ id: 2, message: 'buenas!', mine: true }),
+      expect.objectContaining({
+        id: 1,
+        message: 'hola',
+        mine: false,
+        reacciones: [{ emoji: '❤️', count: 2, mine: true }],
+      }),
+      expect.objectContaining({ id: 2, message: 'buenas!', mine: true, reacciones: [] }),
     ]);
     expect(prisma.cheer.updateMany).toHaveBeenCalledWith({
       where: { fromUserId: FRIEND_ID, toUserId: MY_USER_ID, seen: false },
@@ -202,5 +210,129 @@ describe('POST /api/messages/:friendId', () => {
     expect(prisma.mascotaAmistad.upsert).toHaveBeenCalledWith(expect.objectContaining({
       update: { nivelCarino: { increment: 2 } },
     }));
+  });
+});
+
+describe('PUT /api/messages/:friendId/:messageId/reaction', () => {
+  const mensaje = {
+    id: 8,
+    fromUserId: FRIEND_ID,
+    toUserId: MY_USER_ID,
+    message: 'hola',
+    reacciones: { '👍': [FRIEND_ID] },
+  };
+
+  beforeEach(() => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.cheer.findFirst.mockResolvedValue(mensaje);
+    prisma.cheer.update.mockImplementation(({ data }) => Promise.resolve({ ...mensaje, ...data }));
+  });
+
+  test('agrega una reacción sin pisar la del otro usuario', async () => {
+    const res = await request(app)
+      .put(`/api/messages/${FRIEND_ID}/8/reaction`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ emoji: '❤️' });
+
+    expect(res.status).toBe(200);
+    expect(prisma.cheer.update).toHaveBeenCalledWith({
+      where: { id: 8 },
+      data: { reacciones: { '❤️': [MY_USER_ID], '👍': [FRIEND_ID] } },
+    });
+    expect(res.body.mensaje.reacciones).toEqual([
+      { emoji: '❤️', count: 1, mine: true },
+      { emoji: '👍', count: 1, mine: false },
+    ]);
+  });
+
+  test('cambia su reacción anterior y el reintento es idempotente', async () => {
+    prisma.cheer.findFirst.mockResolvedValue({
+      ...mensaje,
+      reacciones: { '❤️': [MY_USER_ID], '👍': [FRIEND_ID] },
+    });
+
+    await request(app)
+      .put(`/api/messages/${FRIEND_ID}/8/reaction`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ emoji: '😂' });
+
+    expect(prisma.cheer.update).toHaveBeenCalledWith({
+      where: { id: 8 },
+      data: { reacciones: { '👍': [FRIEND_ID], '😂': [MY_USER_ID] } },
+    });
+  });
+
+  test('emoji null quita solamente la reacción propia', async () => {
+    prisma.cheer.findFirst.mockResolvedValue({
+      ...mensaje,
+      reacciones: { '❤️': [MY_USER_ID], '👍': [FRIEND_ID] },
+    });
+
+    const res = await request(app)
+      .put(`/api/messages/${FRIEND_ID}/8/reaction`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ emoji: null });
+
+    expect(res.status).toBe(200);
+    expect(prisma.cheer.update).toHaveBeenCalledWith({
+      where: { id: 8 },
+      data: { reacciones: { '👍': [FRIEND_ID] } },
+    });
+  });
+
+  test('rechaza emojis no permitidos antes de consultar la base', async () => {
+    const res = await request(app)
+      .put(`/api/messages/${FRIEND_ID}/8/reaction`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ emoji: '🔥' });
+
+    expect(res.status).toBe(400);
+    expect(prisma.cheer.findFirst).not.toHaveBeenCalled();
+  });
+
+  test('no permite reaccionar a mensajes ajenos o marcadores internos', async () => {
+    prisma.cheer.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .put(`/api/messages/${FRIEND_ID}/99/reaction`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ emoji: '👍' });
+
+    expect(res.status).toBe(404);
+    expect(prisma.cheer.findFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: 99,
+        NOT: { message: { startsWith: '__MASCOTA_ACTIVIDAD__:' } },
+      }),
+    });
+    expect(prisma.cheer.update).not.toHaveBeenCalled();
+  });
+
+  test('rechaza la reacción cuando ya no existe amistad', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .put(`/api/messages/${FRIEND_ID}/8/reaction`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ emoji: '👍' });
+
+    expect(res.status).toBe(403);
+    expect(prisma.cheer.findFirst).not.toHaveBeenCalled();
+  });
+
+  test('reintenta una transacción serializable ante conflicto concurrente', async () => {
+    prisma.$transaction.mockRejectedValueOnce(Object.assign(new Error('conflicto'), { code: 'P2034' }));
+
+    const res = await request(app)
+      .put(`/api/messages/${FRIEND_ID}/8/reaction`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ emoji: '❤️' });
+
+    expect(res.status).toBe(200);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(prisma.$transaction).toHaveBeenLastCalledWith(
+      expect.any(Function),
+      { isolationLevel: 'Serializable' },
+    );
   });
 });

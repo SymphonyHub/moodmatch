@@ -34,6 +34,11 @@ import { Fraunces_400Regular } from '@expo-google-fonts/fraunces/400Regular';
 import { Fraunces_500Medium } from '@expo-google-fonts/fraunces/500Medium';
 import { Fraunces_600SemiBold } from '@expo-google-fonts/fraunces/600SemiBold';
 import { Fraunces_700Bold } from '@expo-google-fonts/fraunces/700Bold';
+import { GrenzeGotisch_400Regular } from '@expo-google-fonts/grenze-gotisch/400Regular';
+import { GrenzeGotisch_500Medium } from '@expo-google-fonts/grenze-gotisch/500Medium';
+import { GrenzeGotisch_600SemiBold } from '@expo-google-fonts/grenze-gotisch/600SemiBold';
+import { GrenzeGotisch_700Bold } from '@expo-google-fonts/grenze-gotisch/700Bold';
+import { Macondo_400Regular } from '@expo-google-fonts/macondo/400Regular';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { ThemeProvider, ThemeVeil, useTheme } from '../theme/ThemeContext';
 import { FriendsCountProvider } from '../friends/FriendsCountContext';
@@ -77,6 +82,11 @@ function ThemedStack() {
     Fraunces_500Medium,
     Fraunces_600SemiBold,
     Fraunces_700Bold,
+    GrenzeGotisch_400Regular,
+    GrenzeGotisch_500Medium,
+    GrenzeGotisch_600SemiBold,
+    GrenzeGotisch_700Bold,
+    Macondo_400Regular,
   });
 
   // Si una fuente fallara (no debería: son assets locales), seguimos con la del sistema.

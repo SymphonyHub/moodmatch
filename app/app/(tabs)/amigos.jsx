@@ -9,6 +9,7 @@ import { MOOD_INFO } from '../../constants/moods';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../../components/Tappable';
 import Entrance from '../../components/Entrance';
+import Avatar from '../../components/profile/Avatar';
 
 function FriendCard({ amigo, index }) {
   const { theme } = useTheme();
@@ -27,9 +28,12 @@ function FriendCard({ amigo, index }) {
   return (
     <Entrance index={index}>
       <Tappable style={styles.card} onPress={abrirChat} haptic={false}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarTxt}>{amigo.nombre.charAt(0).toUpperCase()}</Text>
-        </View>
+        <Avatar
+          avatarUrl={amigo.avatarUrl}
+          nombre={amigo.nombre}
+          size={46}
+          style={styles.avatar}
+        />
         <View style={styles.info}>
           <Text style={styles.nombre}>{amigo.nombre}</Text>
           {mood ? (
@@ -149,18 +153,7 @@ const useStyles = makeThemedStyles((t) => ({
     ...t.shadows.card,
   },
   avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: t.colors.primarySoft,
-    justifyContent: 'center',
-    alignItems: 'center',
     marginRight: 14,
-  },
-  avatarTxt: {
-    fontSize: t.fontSize(20),
-    ...t.typography.fonts.bold,
-    color: t.colors.primary,
   },
   info: { flex: 1 },
   nombre: {

@@ -19,12 +19,38 @@ const VALID_THEME_PREFERENCES = [
 // persistido es el contenedor { activeId, palettes[] }; también se acepta el
 // objeto legacy de 4 claves para la transición (clientes viejos).
 const HEX_RE = /^#[0-9a-f]{6}$/i;
-const VALID_BODY_FONTS = ['manrope', 'nunito', 'baloo2', 'rubik', 'lora', 'bitter', 'fraunces'];
+const VALID_BODY_FONTS = [
+  'manrope',
+  'nunito',
+  'baloo2',
+  'rubik',
+  'lora',
+  'bitter',
+  'fraunces',
+  'grenzeGotisch',
+  'macondo',
+];
 const CONFIG_KEYS = ['primary', 'accent', 'background', 'bodyFont'];
 const PALETTE_KEYS = ['id', 'name', ...CONFIG_KEYS];
 const CONTAINER_KEYS = ['activeId', 'palettes'];
 const MAX_PALETAS = 5;
 const NAME_MAX = 24;
+const AVATAR_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || 'g0vemv0z';
+
+function isValidAvatarUrl(value) {
+  if (value === null) return true;
+  if (typeof value !== 'string' || value.length > 2048) return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === 'https:' &&
+      url.hostname === 'res.cloudinary.com' &&
+      url.pathname.startsWith(`/${AVATAR_CLOUD_NAME}/image/upload/`)
+    );
+  } catch {
+    return false;
+  }
+}
 
 function esObjeto(v) {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -84,6 +110,7 @@ const USER_SELECT = {
   qrCode: true,
   themePreference: true,
   customTheme: true,
+  avatarUrl: true,
   createdAt: true,
 };
 
@@ -101,12 +128,11 @@ router.get('/me', requireAuth, async (req, res) => {
   res.json({ user });
 });
 
-// PATCH /api/users/me — permite actualizar themePreference y/o customTheme.
-// null es válido en ambos: vuelve al tema por defecto / borra la paleta.
+// PATCH /api/users/me — actualización parcial del perfil autenticado.
 router.patch('/me', requireAuth, async (req, res) => {
   const body = req.body ?? {};
 
-  if (!('themePreference' in body) && !('customTheme' in body)) {
+  if (!('themePreference' in body) && !('customTheme' in body) && !('avatarUrl' in body)) {
     return res.status(400).json({ error: 'Nada que actualizar' });
   }
 
@@ -127,6 +153,13 @@ router.patch('/me', requireAuth, async (req, res) => {
     }
     // Prisma exige DbNull explícito para limpiar una columna Json.
     data.customTheme = customTheme === null ? Prisma.DbNull : customTheme;
+  }
+
+  if ('avatarUrl' in body) {
+    if (!isValidAvatarUrl(body.avatarUrl)) {
+      return res.status(400).json({ error: 'URL de avatar inválida' });
+    }
+    data.avatarUrl = body.avatarUrl;
   }
 
   const user = await prisma.user.update({

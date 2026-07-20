@@ -38,6 +38,14 @@
           "cameraPermission": "MoodMatch usa la cámara para escanear el código QR de tus amigos."
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "MoodMatch accede a tus fotos para que elijas una imagen de perfil.",
+          "cameraPermission": "MoodMatch usa la cámara para que tomes una imagen de perfil.",
+          "microphonePermission": false
+        }
+      ],
       "expo-font"
     ],
     "experiments": {

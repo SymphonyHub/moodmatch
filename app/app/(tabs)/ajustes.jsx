@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { View, Text, TextInput, ScrollView, useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { THEMES, AUTO_THEME_ID, CUSTOM_THEME_ID, resolveThemeId } from '../../theme/themes';
 import { useTheme, makeThemedStyles, ThemeScope } from '../../theme/ThemeContext';
 import {
@@ -13,6 +13,7 @@ import {
   NAME_MAX,
   makeCustomTheme,
   evaluateCustomTheme,
+  customThemePassesAA,
   configDe,
   nuevaPaletaId,
   upsertPalette,
@@ -21,6 +22,8 @@ import {
 import { MOODS } from '../../constants/moods';
 import Tappable from '../../components/Tappable';
 import { HueBar, LumBar } from '../../components/color/HueBar';
+import AvatarPicker from '../../components/profile/AvatarPicker';
+import { apiGetMe } from '../../services/api';
 
 const THEME_OPTIONS = [
   { id: AUTO_THEME_ID, name: 'Automático', tagline: 'Sigue el modo del sistema' },
@@ -188,8 +191,7 @@ function FontPicker({ selected, onSelect }) {
   );
 }
 
-// Aviso WCAG AA: informa qué pares no alcanzan 4.5:1 pero NUNCA bloquea
-// el botón de aplicar (requisito de la fase).
+// Aviso WCAG AA: una combinación que no alcance 4.5:1 no se puede aplicar.
 function ContrastNotice({ issues }) {
   const styles = useStyles();
 
@@ -213,7 +215,7 @@ function ContrastNotice({ issues }) {
         </Text>
       ))}
       <Text style={styles.contrastWarnHint}>
-        Puedes aplicarla igualmente, pero algunos textos podrían leerse peor.
+        Ajusta los colores indicados para poder guardar o aplicar esta paleta.
       </Text>
     </View>
   );
@@ -376,10 +378,26 @@ export default function AjustesScreen() {
   const [candidate, setCandidate] = useState(themeChoice);
   // draft = paleta en edición (copia local con id/name/config). Arranca en la activa.
   const [draft, setDraft] = useState(() => ({ ...paletaActiva(customConfig) }));
+  const [profile, setProfile] = useState(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      apiGetMe()
+        .then((data) => {
+          if (active && data.user) setProfile(data.user);
+        })
+        .catch(() => {});
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
 
   const isCustomCandidate = candidate === CUSTOM_THEME_ID;
   const draftTheme = useMemo(() => makeCustomTheme(configDe(draft)), [draft]);
   const contrastIssues = useMemo(() => evaluateCustomTheme(draftTheme), [draftTheme]);
+  const customPassesAA = useMemo(() => customThemePassesAA(draftTheme), [draftTheme]);
 
   const previewTheme = isCustomCandidate
     ? draftTheme
@@ -406,7 +424,9 @@ export default function AjustesScreen() {
   };
   // Guardar exige un nombre no vacío; el resto siempre es válido (hex derivado).
   const nameOk = draft.name.trim().length > 0;
-  const canSave = draftDiverge && nameOk;
+  // Guardar una paleta activa actualiza el tema en runtime, así que también
+  // debe respetar AA para no eludir el bloqueo del botón Aplicar.
+  const canSave = draftDiverge && nameOk && customPassesAA;
   const savePaletteDraft = () => savePalette({ ...draft, name: draft.name.trim() });
 
   // isDirty del botón Aplicar: cambió el tema elegido, o (en custom) hay una
@@ -471,17 +491,36 @@ export default function AjustesScreen() {
         )}
 
         <Tappable
-          style={[styles.btnAplicar, (!isDirty || isApplying) && styles.btnAplicarDisabled]}
+          style={[
+            styles.btnAplicar,
+            (!isDirty || isApplying || (isCustomCandidate && !customPassesAA)) &&
+              styles.btnAplicarDisabled,
+          ]}
           onPress={handleAplicar}
-          disabled={!isDirty || isApplying}
+          disabled={!isDirty || isApplying || (isCustomCandidate && !customPassesAA)}
+          accessibilityHint={
+            isCustomCandidate && !customPassesAA
+              ? 'Corrige el contraste de la paleta antes de aplicarla'
+              : undefined
+          }
         >
           <Text style={styles.btnAplicarTxt}>
-            {isDirty ? `Aplicar tema ${candidateName}` : 'Este es tu tema actual'}
+            {isCustomCandidate && !customPassesAA
+              ? 'Corrige el contraste para aplicar'
+              : isDirty
+                ? `Aplicar tema ${candidateName}`
+                : 'Este es tu tema actual'}
           </Text>
         </Tappable>
       </SectionCard>
 
       <SectionCard title="Cuenta">
+        <AvatarPicker
+          avatarUrl={profile?.avatarUrl}
+          nombre={profile?.nombre}
+          onChange={(avatarUrl) => setProfile((current) => ({ ...current, avatarUrl }))}
+        />
+        <View style={styles.accountDivider} />
         <Tappable style={styles.btnSalir} onPress={handleCerrarSesion} haptic={false}>
           <Text style={styles.btnSalirTxt}>Cerrar sesión</Text>
         </Tappable>
@@ -696,6 +735,7 @@ const useStyles = makeThemedStyles((t) => ({
     paddingVertical: 13,
     alignItems: 'center',
   },
+  accountDivider: { height: t.shape.borderThin, backgroundColor: t.colors.border, marginVertical: 16 },
   btnSalirTxt: { color: t.colors.textMuted, fontSize: t.fontSize(15) },
 }));
 

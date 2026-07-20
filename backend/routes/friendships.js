@@ -33,7 +33,7 @@ router.post('/', requireAuth, async (req, res) => {
 
   const friend = await prisma.user.findUnique({
     where: { qrCode: qrCode.trim() },
-    select: { id: true, nombre: true, email: true, qrCode: true },
+    select: { id: true, nombre: true, email: true, qrCode: true, avatarUrl: true },
   });
 
   if (!friend) {
@@ -64,6 +64,7 @@ router.get('/', requireAuth, async (req, res) => {
   const userSelect = {
     id: true,
     nombre: true,
+    avatarUrl: true,
     moodEntries: {
       orderBy: { createdAt: 'desc' },
       take: 1,
@@ -99,6 +100,7 @@ router.get('/', requireAuth, async (req, res) => {
     amigos.push({
       id: other.id,
       nombre: other.nombre,
+      avatarUrl: other.avatarUrl,
       moodReciente: other.moodEntries[0]?.moodType ?? null,
       fechaReciente: other.moodEntries[0]?.createdAt ?? null,
       unread: unreadByFriend[other.id] ?? 0,

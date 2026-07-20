@@ -15,16 +15,32 @@ export const AA_MIN = 4.5;
 const HEX_RE = /^#[0-9a-f]{6}$/i;
 const CONFIG_KEYS = ['primary', 'accent', 'background', 'bodyFont'];
 
-// 7 fuentes de cuerpo con personalidades distintas (Fase 10 P2). Cada una trae
-// los 4 pesos que exige el contrato de tokens; Sora sigue fija en títulos. Las
-// serif usan su peso regular en captionFamily para legibilidad a tamaño chico.
-export const BODY_FONT_IDS = ['manrope', 'nunito', 'baloo2', 'rubik', 'lora', 'bitter', 'fraunces'];
+// Fuentes de cuerpo con personalidades distintas. Sora sigue fija en títulos.
+// Macondo solo publica peso regular, por eso comparte el mismo asset entre roles.
+export const BODY_FONT_IDS = [
+  'manrope',
+  'nunito',
+  'baloo2',
+  'rubik',
+  'lora',
+  'bitter',
+  'fraunces',
+  'grenzeGotisch',
+  'macondo',
+];
 
 const familiaDe = (prefijo) => ({
   regular: { fontFamily: `${prefijo}_400Regular` },
   medium: { fontFamily: `${prefijo}_500Medium` },
   semibold: { fontFamily: `${prefijo}_600SemiBold` },
   bold: { fontFamily: `${prefijo}_700Bold` },
+});
+
+const familiaUnPeso = (fontFamily) => ({
+  regular: { fontFamily },
+  medium: { fontFamily },
+  semibold: { fontFamily },
+  bold: { fontFamily },
 });
 
 export const BODY_FONTS = {
@@ -77,13 +93,27 @@ export const BODY_FONTS = {
     bodyFamily: 'Fraunces_500Medium',
     captionFamily: 'Fraunces_400Regular',
   },
+  grenzeGotisch: {
+    label: 'Grenze Gotisch',
+    tagline: 'Gótica y teatral',
+    fonts: familiaDe('GrenzeGotisch'),
+    bodyFamily: 'GrenzeGotisch_500Medium',
+    captionFamily: 'GrenzeGotisch_400Regular',
+  },
+  macondo: {
+    label: 'Macondo',
+    tagline: 'Exótica y artesanal',
+    fonts: familiaUnPeso('Macondo_400Regular'),
+    bodyFamily: 'Macondo_400Regular',
+    captionFamily: 'Macondo_400Regular',
+  },
 };
 
 // Swatches curados por rol. Los fondos oscuros tienen luminancia <= nocturno
 // para que los moods/categories heredados conserven AA sobre las superficies
 // derivadas. Los primarios/acentos vienen en dos mitades: tonos profundos que
 // funcionan sobre fondos claros y tonos claros que funcionan sobre oscuros
-// (la mezcla cruzada la señala el aviso de contraste, sin bloquear).
+// (la mezcla cruzada la señala el guardrail antes de guardar o aplicar).
 export const SWATCHES = {
   background: [
     '#f5f6fa', '#faf7f2', '#f3f7f4', '#f7f3f8', '#fdf6ee', '#ffffff',
@@ -247,7 +277,7 @@ const lighten = (hex, amount) => mix(hex, '#ffffff', amount);
 // Tinta mezclada con el fondo, empezando en startWeight (peso del fondo) y
 // acercándose a la tinta pura en pasos de 0.05 hasta cumplir AA contra todas
 // las superficies. Si ni la tinta pura cumple, la devuelve (el aviso de
-// contraste lo reporta; nunca bloqueamos).
+// contraste lo reporta y el editor impide guardar/aplicar esa combinación).
 function deriveReadable(ink, background, surfaces, startWeight) {
   let weight = startWeight;
   while (weight > 0) {
@@ -421,3 +451,5 @@ export function evaluateCustomTheme(theme) {
     .filter(({ ratio }) => ratio < AA_MIN)
     .map(({ pair, ratio }) => ({ pair, ratio: Math.round(ratio * 100) / 100 }));
 }
+
+export const customThemePassesAA = (theme) => evaluateCustomTheme(theme).length === 0;

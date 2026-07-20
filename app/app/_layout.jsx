@@ -123,7 +123,7 @@ function ThemedStack() {
 
 export default function RootLayout() {
   return (
-    // KeyboardProvider alimenta useKeyboardOffset con WindowInsets nativos
+    // KeyboardProvider alimenta KeyboardStickyView con WindowInsets nativos
     // (edge-to-edge no redimensiona la ventana y los eventos Keyboard de RN
     // fallan en MIUI) — lo más alto posible, como recomienda la librería.
     <KeyboardProvider>

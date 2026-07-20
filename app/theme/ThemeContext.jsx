@@ -6,6 +6,10 @@ import {
   saveThemeChoice,
   loadCustomThemeConfig,
   saveCustomThemeConfig,
+  DEFAULT_TEXT_SCALE,
+  LARGE_TEXT_SCALE,
+  loadTextScale,
+  saveTextScale,
 } from './persistence';
 import {
   makeCustomTheme,
@@ -20,21 +24,50 @@ import { apiUpdateThemePreference, apiUpdateMe } from '../services/api';
 
 const ThemeContext = createContext(null);
 
+// Los temas existentes declaran tanto presets tipográficos como tamaños
+// puntuales vía fontSize(). Escalamos ambos para que el modo accesible sea
+// coherente en toda la app, incluidos los ThemeScope de previsualización.
+export function scaleThemeText(theme, scale = DEFAULT_TEXT_SCALE) {
+  if (scale === DEFAULT_TEXT_SCALE) return theme;
+  const type = Object.fromEntries(
+    Object.entries(theme.typography.type).map(([name, style]) => [
+      name,
+      {
+        ...style,
+        fontSize: Math.round(style.fontSize * scale),
+        lineHeight: Math.round(style.lineHeight * scale),
+      },
+    ]),
+  );
+  const baseScale = theme.typography.scale;
+  return {
+    ...theme,
+    typography: { ...theme.typography, scale: baseScale * scale, type },
+    fontSize: (size) => Math.round(size * baseScale * scale),
+  };
+}
+
 export function ThemeProvider({ children }) {
   // null = aún no se hidrató la elección guardada; el root layout no renderiza hasta entonces.
   const [choice, setChoice] = useState(null);
   // Contenedor de paletas personalizadas { activeId, palettes } (null = nunca
   // configurado → DEFAULT_CUSTOM_THEME).
   const [customConfig, setCustomConfigState] = useState(null);
+  const [textScale, setTextScaleState] = useState(DEFAULT_TEXT_SCALE);
   // Velo de transición al aplicar un tema: { color, opacity } mientras anima.
   const [veil, setVeil] = useState(null);
   const systemScheme = useColorScheme();
 
   useEffect(() => {
     let alive = true;
-    Promise.all([loadThemeChoice(), loadCustomThemeConfig()]).then(([stored, storedCustom]) => {
+    Promise.all([loadThemeChoice(), loadCustomThemeConfig(), loadTextScale()]).then(([
+      stored,
+      storedCustom,
+      storedTextScale,
+    ]) => {
       if (!alive) return;
       setCustomConfigState(storedCustom);
+      setTextScaleState(storedTextScale);
       setChoice(stored);
     });
     return () => {
@@ -57,6 +90,12 @@ export function ThemeProvider({ children }) {
     setCustomConfigState(next);
     saveCustomThemeConfig(next);
     if (sync) apiUpdateMe({ customTheme: next }).catch(() => {});
+  }, []);
+
+  const setTextScale = useCallback((next) => {
+    const scale = next === LARGE_TEXT_SCALE ? LARGE_TEXT_SCALE : DEFAULT_TEXT_SCALE;
+    setTextScaleState(scale);
+    saveTextScale(scale);
   }, []);
 
   // Gestión de paletas: parten del contenedor actual (o el default) y aplican
@@ -111,10 +150,11 @@ export function ThemeProvider({ children }) {
 
   const hydrated = choice !== null;
   const effectiveChoice = hydrated ? choice : DEFAULT_THEME_ID;
-  const theme =
+  const baseTheme =
     effectiveChoice === CUSTOM_THEME_ID
       ? customTheme
       : THEMES[resolveThemeId(effectiveChoice, systemScheme)];
+  const theme = useMemo(() => scaleThemeText(baseTheme, textScale), [baseTheme, textScale]);
 
   const value = useMemo(
     () => ({
@@ -129,6 +169,8 @@ export function ThemeProvider({ children }) {
       savePalette,
       deletePalette,
       setActivePalette,
+      textScale,
+      setTextScale,
       isApplying: veil !== null,
       veil,
     }),
@@ -144,6 +186,8 @@ export function ThemeProvider({ children }) {
       savePalette,
       deletePalette,
       setActivePalette,
+      textScale,
+      setTextScale,
       veil,
     ],
   );
@@ -169,7 +213,14 @@ export function ThemeVeil() {
 // Fija un tema en un subárbol sin aplicarlo globalmente (preview de Ajustes).
 export function ThemeScope({ theme, children }) {
   const parent = useContext(ThemeContext);
-  const value = useMemo(() => ({ ...(parent ?? {}), theme, isPreview: true }), [parent, theme]);
+  const scaledTheme = useMemo(
+    () => scaleThemeText(theme, parent?.textScale ?? DEFAULT_TEXT_SCALE),
+    [theme, parent?.textScale],
+  );
+  const value = useMemo(
+    () => ({ ...(parent ?? {}), theme: scaledTheme, isPreview: true }),
+    [parent, scaledTheme],
+  );
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 

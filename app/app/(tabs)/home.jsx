@@ -2,7 +2,7 @@ import { useCallback, useEffect, useReducer, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { router, useFocusEffect } from 'expo-router';
-import { apiCreateMoodEntry, apiChatRespond, apiGetMe } from '../../services/api';
+import { apiCreateMoodEntry, apiChatRespond, apiGetMe, apiGetMoodHistory } from '../../services/api';
 import { MOODS } from '../../constants/moods';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import {
@@ -21,6 +21,7 @@ import ChatInputBar from '../../components/chat/ChatInputBar';
 import FallbackMessage from '../../components/chat/FallbackMessage';
 import useAutoScroll from '../../components/chat/useAutoScroll';
 import Avatar from '../../components/profile/Avatar';
+import { rachaDeDias } from '../../features/wellness/racha';
 
 // Pausa de "escribiendo" antes de cada burbuja del bot: apenas por encima de
 // durations.gentle (380 ms) — presencia sin latencia fingida.
@@ -39,6 +40,7 @@ export default function HomeScreen() {
   const { ejecutar, reset: resetRetry } = useRetry();
   const tabBarHeight = useBottomTabBarHeight();
   const [profile, setProfile] = useState(null);
+  const [racha, setRacha] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -46,6 +48,11 @@ export default function HomeScreen() {
       apiGetMe()
         .then((data) => {
           if (active && data.user) setProfile(data.user);
+        })
+        .catch(() => {});
+      apiGetMoodHistory()
+        .then((data) => {
+          if (active) setRacha(rachaDeDias(data.entries));
         })
         .catch(() => {});
       return () => {
@@ -192,7 +199,7 @@ export default function HomeScreen() {
   return (
     <View style={{ flex: 1 }}>
       <View style={styles.profileHeader}>
-        <Avatar avatarUrl={profile?.avatarUrl} nombre={profile?.nombre} size={44} />
+        <Avatar avatarUrl={profile?.avatarUrl} nombre={profile?.nombre} size={44} racha={racha} />
         <View style={styles.profileCopy}>
           <Text style={styles.greeting}>{profile?.nombre ? `Hola, ${profile.nombre}` : 'Tu espacio de hoy'}</Text>
           <Text style={styles.greetingHint}>¿Cómo estás hoy?</Text>

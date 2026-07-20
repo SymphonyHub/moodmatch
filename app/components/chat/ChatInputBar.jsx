@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Animated, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { KeyboardStickyView } from 'react-native-keyboard-controller';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../Tappable';
-import useKeyboardOffset from './useKeyboardOffset';
 
 /**
  * ChatInputBar — barra de envío compartida de los chats (Fase 9, Prioridad 1).
@@ -12,7 +13,7 @@ import useKeyboardOffset from './useKeyboardOffset';
  * integran en sus pantallas. Unifica la barra de escritura con manejo correcto
  * de teclado: el campo crece solo con mensajes largos (hasta maxHeight) y el
  * botón de enviar queda siempre visible sobre el teclado, vía
- * [useKeyboardOffset] (ver ahí la causa raíz del bug edge-to-edge).
+ * KeyboardStickyView (animado por insets nativos, sin relayout en JS).
  *
  * Contrato de integración:
  *
@@ -32,7 +33,7 @@ import useKeyboardOffset from './useKeyboardOffset';
  *
  * - La pantalla debe QUITAR su KeyboardAvoidingView al integrarla: la barra se
  *   compensa sola en ambas plataformas y un KAV activo duplicaría el empuje.
- * - La barra ya incluye el inset inferior de safe-area en reposo; la pantalla
+ * - La barra ya queda anclada al teclado por el componente nativo; la pantalla
  *   no debe sumar su propio paddingBottom debajo de ella.
  * - El texto es estado interno: se limpia al enviar; enviar vacío no dispara.
  *   `initialText` solo lo siembra una vez al montar (el usuario puede editarlo
@@ -51,10 +52,10 @@ export default function ChatInputBar({
 }) {
   const { theme } = useTheme();
   const styles = useStyles();
+  const insets = useSafeAreaInsets();
   const [texto, setTexto] = useState(initialText);
-  const paddingInferior = useKeyboardOffset({ bottomOffset });
-
   const puedeEnviar = texto.trim().length > 0 && !disabled;
+  const paddingInferior = bottomOffset > 0 ? 10 : Math.max(insets.bottom, 10);
 
   const enviar = () => {
     if (!puedeEnviar) return;
@@ -63,30 +64,37 @@ export default function ChatInputBar({
   };
 
   return (
-    <Animated.View style={[styles.superficie, { paddingBottom: paddingInferior }]}>
-      {accessory}
-      <View style={styles.fila}>
-        <TextInput
-          style={styles.input}
-          value={texto}
-          onChangeText={setTexto}
-          placeholder={placeholder}
-          placeholderTextColor={theme.colors.textFaint}
-          multiline
-          maxLength={maxLength}
-          editable={!disabled}
-          onSubmitEditing={enviar}
-        />
-        <Tappable
-          style={[styles.botonEnviar, !puedeEnviar && styles.botonEnviarDisabled]}
-          onPress={enviar}
-          disabled={!puedeEnviar}
-          accessibilityLabel="Enviar mensaje"
-        >
-          <Ionicons name="arrow-up" size={22} color={theme.colors.onPrimary} />
-        </Tappable>
+    <KeyboardStickyView
+      // La escena de tabs ya termina sobre su barra: al abrir, se repone esa
+      // altura para que la entrada quede exactamente sobre el teclado.
+      offset={{ closed: 0, opened: bottomOffset }}
+      style={styles.sticky}
+    >
+      <View style={[styles.superficie, { paddingBottom: paddingInferior }]}>
+        {accessory}
+        <View style={styles.fila}>
+          <TextInput
+            style={styles.input}
+            value={texto}
+            onChangeText={setTexto}
+            placeholder={placeholder}
+            placeholderTextColor={theme.colors.textFaint}
+            multiline
+            maxLength={maxLength}
+            editable={!disabled}
+            onSubmitEditing={enviar}
+          />
+          <Tappable
+            style={[styles.botonEnviar, !puedeEnviar && styles.botonEnviarDisabled]}
+            onPress={enviar}
+            disabled={!puedeEnviar}
+            accessibilityLabel="Enviar mensaje"
+          >
+            <Ionicons name="arrow-up" size={22} color={theme.colors.onPrimary} />
+          </Tappable>
+        </View>
       </View>
-    </Animated.View>
+    </KeyboardStickyView>
   );
 }
 
@@ -98,6 +106,7 @@ const useStyles = makeThemedStyles((t) => ({
     paddingHorizontal: 16,
     paddingTop: 10,
   },
+  sticky: { zIndex: 2, elevation: 2 },
   fila: {
     flexDirection: 'row',
     alignItems: 'flex-end',

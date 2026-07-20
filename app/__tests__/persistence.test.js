@@ -8,12 +8,17 @@ import {
   saveThemeChoice,
   loadCustomThemeConfig,
   saveCustomThemeConfig,
+  DEFAULT_TEXT_SCALE,
+  LARGE_TEXT_SCALE,
+  loadTextScale,
+  saveTextScale,
 } from '../theme/persistence';
 import { DEFAULT_THEME_ID } from '../theme/themes';
 import { DEFAULT_CUSTOM_CONFIG, DEFAULT_CUSTOM_THEME } from '../theme/customTheme';
 
 const STORAGE_KEY = 'moodmatch.themeChoice';
 const CUSTOM_KEY = 'moodmatch.customTheme';
+const TEXT_SCALE_KEY = 'moodmatch.textScale';
 
 beforeEach(async () => {
   jest.clearAllMocks();
@@ -95,5 +100,24 @@ describe('load/saveCustomThemeConfig', () => {
   test('save no lanza si el almacenamiento falla', async () => {
     AsyncStorage.setItem.mockRejectedValueOnce(new Error('storage roto'));
     await expect(saveCustomThemeConfig(DEFAULT_CUSTOM_THEME)).resolves.toBeUndefined();
+  });
+});
+
+describe('load/saveTextScale', () => {
+  test('usa el tamaño normal si no hay preferencia o el valor es inválido', async () => {
+    expect(await loadTextScale()).toBe(DEFAULT_TEXT_SCALE);
+    await AsyncStorage.setItem(TEXT_SCALE_KEY, '1.4');
+    expect(await loadTextScale()).toBe(DEFAULT_TEXT_SCALE);
+  });
+
+  test('persiste y recupera el modo de texto grande', async () => {
+    await saveTextScale(LARGE_TEXT_SCALE);
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(TEXT_SCALE_KEY, String(LARGE_TEXT_SCALE));
+    expect(await loadTextScale()).toBe(LARGE_TEXT_SCALE);
+  });
+
+  test('no lanza si no se puede guardar', async () => {
+    AsyncStorage.setItem.mockRejectedValueOnce(new Error('storage roto'));
+    await expect(saveTextScale(LARGE_TEXT_SCALE)).resolves.toBeUndefined();
   });
 });

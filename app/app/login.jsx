@@ -86,7 +86,18 @@ export default function LoginScreen() {
       }
 
       await AsyncStorage.setItem('token', data.token);
-      syncPushToken({ requestPermission: true });
+      const pushResult = await syncPushToken({ requestPermission: true }).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`[Push][login] fallo inesperado: ${message}`);
+        return { status: 'error', stage: 'login', error: message };
+      });
+      if (pushResult.status === 'error' || pushResult.status === 'configuration-error') {
+        console.error(
+          `[Push][login] el login continúa sin token (${pushResult.stage}): ${pushResult.error}`,
+        );
+      } else if (pushResult.status === 'permission-denied') {
+        console.info('[Push][login] permiso de notificaciones no concedido; el login continúa.');
+      }
 
       // Reconciliar tema con el perfil: si el servidor tiene una preferencia
       // guardada (otro dispositivo o reinstalación), se adopta; si no, se sube

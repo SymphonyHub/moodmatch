@@ -146,6 +146,7 @@ const USER_SELECT = {
   customTheme: true,
   perfilPersonalidad: true,
   avatarUrl: true,
+  racha: true,
   createdAt: true,
 };
 
@@ -172,7 +173,8 @@ router.patch('/me', requireAuth, async (req, res) => {
     !('themePreference' in body) &&
     !('customTheme' in body) &&
     !('perfilPersonalidad' in body) &&
-    !('avatarUrl' in body)
+    !('avatarUrl' in body) &&
+    !('racha' in body)
   ) {
     return res.status(400).json({ error: 'Nada que actualizar' });
   }
@@ -211,6 +213,17 @@ router.patch('/me', requireAuth, async (req, res) => {
     data.avatarUrl = body.avatarUrl;
   }
 
+  // La racha (días consecutivos registrando ánimo) se calcula en el cliente con
+  // la zona horaria del dispositivo (features/wellness/racha.js) y se persiste
+  // acá como caché para el perfil, para no recalcularla en cada lectura.
+  if ('racha' in body) {
+    const { racha } = body;
+    if (!Number.isInteger(racha) || racha < 0 || racha > 100000) {
+      return res.status(400).json({ error: 'racha inválida' });
+    }
+    data.racha = racha;
+  }
+
   const user = await prisma.user.update({
     where: { id: req.user.userId },
     data,
@@ -218,6 +231,46 @@ router.patch('/me', requireAuth, async (req, res) => {
   });
 
   res.json({ user });
+});
+
+// GET /api/users/me/mascotas — mascotas del usuario en formato compacto para la
+// sección "Mascotas destacadas" del perfil. Solo se listan las activas y ya
+// aceptadas: una invitación recién enviada (activa por default de schema, pero
+// invitacionEstado !== 'aceptada') no debe aparecer como mascota destacada.
+// La etapa/sprite se deriva en el cliente desde nivelCarino (estadoMascota.js).
+router.get('/me/mascotas', requireAuth, async (req, res) => {
+  const me = req.user.userId;
+
+  const friendships = await prisma.friendship.findMany({
+    where: { OR: [{ userId: me }, { friendId: me }] },
+    include: {
+      user: { select: { id: true, nombre: true, avatarUrl: true } },
+      friend: { select: { id: true, nombre: true, avatarUrl: true } },
+      mascota: true,
+    },
+  });
+
+  // Mismo criterio de vínculo simétrico que GET /api/friendships: puede haber
+  // filas espejo A→B y B→A, así que se deduplica por el otro usuario.
+  const vistos = new Set();
+  const mascotas = [];
+  for (const f of friendships) {
+    const mascota = f.mascota;
+    if (!mascota || !mascota.activa || mascota.invitacionEstado !== 'aceptada') continue;
+    const amigo = f.userId === me ? f.friend : f.user;
+    if (vistos.has(amigo.id)) continue;
+    vistos.add(amigo.id);
+    mascotas.push({
+      amistadId: f.id,
+      amigoId: amigo.id,
+      amigoNombre: amigo.nombre,
+      amigoAvatarUrl: amigo.avatarUrl,
+      nombre: mascota.nombre,
+      nivelCarino: mascota.nivelCarino,
+    });
+  }
+
+  res.json({ mascotas });
 });
 
 module.exports = router;

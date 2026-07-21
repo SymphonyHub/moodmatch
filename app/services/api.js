@@ -170,6 +170,13 @@ export const apiGetMascota = async (amistadId) => {
   return fetch(`${API_URL}/api/mascota/${amistadId}`, { headers }).then((r) => r.json());
 };
 
+// Mascotas activas y aceptadas del usuario ({ mascotas }), para la sección
+// "Mascotas destacadas" del perfil. La etapa/sprite se deriva en el cliente.
+export const apiGetMyMascotas = async () => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/users/me/mascotas`, { headers }).then((r) => r.json());
+};
+
 // Contrato para el botón "La hice" de Con amigos. completionId debe ser
 // estable para la misma actividad compartida, de modo que ambos usuarios no
 // sumen dos veces si la marcan desde sus dispositivos.

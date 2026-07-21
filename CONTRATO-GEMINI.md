@@ -6,7 +6,7 @@ Escrito por el Agente D (Guardrails); A, B y C construyen contra esto.
 
 > **Nota de nombre:** este contrato fija `POST /api/chat/respond` y reemplaza
 > al nombre provisional `/api/chat/emocional` que aparecía en
-> FASE6-wellness-hub.md (Parte D). Implementar `/respond`.
+> docs/fases/FASE6-wellness-hub.md (Parte D). Implementar `/respond`.
 
 ---
 

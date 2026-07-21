@@ -97,13 +97,12 @@ describe('POST /api/friendships — par duplicado', () => {
         ],
       },
     });
+    // Fase 14: agregar un amigo ya no crea la mascota (es opt-in por invitación).
     expect(prisma.friendship.create).toHaveBeenCalledWith({
       data: {
         userId: MY_USER_ID,
         friendId: 2,
-        mascota: { create: { nombre: 'Lumi' } },
       },
-      include: { mascota: true },
     });
     expect(notifyFriendAccepted).toHaveBeenCalledWith({
       acceptedByUserId: MY_USER_ID,

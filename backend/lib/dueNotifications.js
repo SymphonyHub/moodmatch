@@ -116,6 +116,9 @@ async function sendMoodReminders(db, now) {
 
 async function sendPetAttentionReminders(db, now) {
   const pets = await db.mascotaAmistad.findMany({
+    // Solo mascotas activas: las invitaciones pendientes o rechazadas no
+    // generan recordatorios de cuidado (Fase 14, mascota opt-in).
+    where: { invitacionEstado: 'aceptada', activa: true },
     select: {
       amistadId: true,
       createdAt: true,

@@ -4,8 +4,22 @@ const CARINO_POR_ACTIVIDAD = 3;
 const CARINO_POR_CUIDADO = 6;
 const COOLDOWN_CUIDADO_MS = 24 * 60 * 60 * 1000;
 const DURACION_RETO_MS = 48 * 60 * 60 * 1000;
+const PET_ATTENTION_AFTER_MS = 48 * 60 * 60 * 1000;
 const PREFIJO_ACTIVIDAD = '__MASCOTA_ACTIVIDAD__:';
 const UMBRALES_ETAPA = [4, 10, 20, 40];
+
+// Estados del ciclo de vida de la invitación (Fase 14): la mascota ya no se
+// crea al agregar un amigo, solo cuando alguien invita explícitamente.
+const ESTADOS_INVITACION = ['pendiente', 'aceptada', 'rechazada'];
+
+// Etapas de evolución estilo Pokémon (Parte B). Aquí solo se deriva el nombre
+// visible desde el nivel de cariño; el sprite y la animación de transición son
+// del Agente C. Umbrales 16/36 según FASE14 sección 4.
+const UMBRALES_EVOLUCION = [
+  { etapa: 1, desde: 0, nombre: 'Cachorro' },
+  { etapa: 2, desde: 16, nombre: 'Joven' },
+  { etapa: 3, desde: 36, nombre: 'Adulta' },
+];
 
 const filtroMensajesVisibles = {
   NOT: { message: { startsWith: PREFIJO_ACTIVIDAD } },
@@ -80,6 +94,32 @@ const bonusReto = (nivelCarino) => Math.max(0, siguienteUmbral(nivelCarino) - ni
 const claveUsuarioReto = (amistad, userId) =>
   amistad.userId === userId ? 'progresoUsuario1' : 'progresoUsuario2';
 
+function etapaVisual(nivelCarino = 0) {
+  const nivel = Math.max(0, Number.isFinite(nivelCarino) ? nivelCarino : 0);
+  const actual = [...UMBRALES_EVOLUCION].reverse().find(({ desde }) => nivel >= desde)
+    ?? UMBRALES_EVOLUCION[0];
+  return { numero: actual.etapa, nombre: actual.nombre };
+}
+
+// Última señal de cuidado: el momento más reciente entre la creación de la
+// mascota y ambos cuidados. Espeja latestPetCare de dueNotifications para que
+// el badge de "necesita atención" coincida con cuándo se dispara la push.
+function ultimoCuidadoMs(mascota) {
+  const marcas = [mascota.createdAt, mascota.ultimoCuidadoUsuario1, mascota.ultimoCuidadoUsuario2]
+    .map((valor) => (valor ? new Date(valor).getTime() : null))
+    .filter((ms) => ms !== null && Number.isFinite(ms));
+  return marcas.length ? Math.max(...marcas) : null;
+}
+
+function necesitaAtencion(mascota, ahora = new Date()) {
+  const ultimo = ultimoCuidadoMs(mascota);
+  if (ultimo === null) return true;
+  return ahora.getTime() - ultimo >= PET_ATTENTION_AFTER_MS;
+}
+
+const mascotaAceptada = (mascota) =>
+  Boolean(mascota) && mascota.invitacionEstado === 'aceptada' && mascota.activa !== false;
+
 function calcularPersonalidad(entries) {
   const moods = Array.isArray(entries) ? entries.map((entry) => entry.moodType) : [];
   if (moods.length === 0) return 'curiosa';
@@ -127,6 +167,11 @@ function presentarMascota(mascota, amistad, userId, personalidad) {
     nombre: mascota.nombre,
     nivelCarino: mascota.nivelCarino,
     personalidad,
+    etapa: etapaVisual(mascota.nivelCarino),
+    invitacionEstado: mascota.invitacionEstado ?? 'aceptada',
+    invitacionMia: mascota.invitadaPor != null && mascota.invitadaPor === userId,
+    activa: mascota.activa !== false,
+    necesitaAtencion: necesitaAtencion(mascota),
     puedeCuidar: !ultimoCuidado || new Date(proximoCuidadoEn).getTime() <= Date.now(),
     proximoCuidadoEn,
     reto: reto ? {
@@ -150,18 +195,23 @@ module.exports = {
   CARINO_POR_CUIDADO,
   COOLDOWN_CUIDADO_MS,
   DURACION_RETO_MS,
+  ESTADOS_INVITACION,
   NOMBRE_MASCOTA,
+  PET_ATTENTION_AFTER_MS,
   agregarHito,
   asegurarMascota,
   bonusReto,
   calcularPersonalidad,
   claveUsuarioReto,
   crearReto,
+  etapaVisual,
   filtroMensajesVisibles,
   guardarPropuesta,
   historialSeguro,
   leerPropuesta,
+  mascotaAceptada,
   mensajeActividad,
+  necesitaAtencion,
   presentarMascota,
   registrarMensajeReciproco,
   retoExpirado,

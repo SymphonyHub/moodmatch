@@ -1,7 +1,6 @@
 const router = require('express').Router();
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
-const { NOMBRE_MASCOTA } = require('../lib/mascota');
 const {
   dispatchNotification,
   notifyFriendAccepted,
@@ -56,13 +55,13 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(409).json({ error: 'Ya son amigos' });
   }
 
+  // La mascota ya no nace con la amistad (Fase 14): es opt-in y se crea solo
+  // cuando alguien envía una invitación explícita desde la sección Mascota.
   const friendship = await prisma.friendship.create({
     data: {
       userId: req.user.userId,
       friendId: friend.id,
-      mascota: { create: { nombre: NOMBRE_MASCOTA } },
     },
-    include: { mascota: true },
   });
 
   dispatchNotification(notifyFriendAccepted({

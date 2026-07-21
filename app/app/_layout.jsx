@@ -116,6 +116,7 @@ function ThemedStack() {
         <Stack.Screen name="onboarding/cuestionario" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="chat/[friendId]" animation="slide_from_right" />
+        <Stack.Screen name="mascota/[amistadId]" animation="slide_from_right" />
         <Stack.Screen name="add-friend" />
       </Stack>
       <ThemeVeil />

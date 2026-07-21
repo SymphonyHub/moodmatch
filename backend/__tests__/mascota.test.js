@@ -1,7 +1,7 @@
 jest.mock('../lib/prisma', () => {
   const db = {
     friendship: { findFirst: jest.fn() },
-    mascotaAmistad: { upsert: jest.fn(), update: jest.fn() },
+    mascotaAmistad: { upsert: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
     cheer: { findFirst: jest.fn(), create: jest.fn() },
     moodEntry: { findMany: jest.fn() },
   };
@@ -10,6 +10,7 @@ jest.mock('../lib/prisma', () => {
 });
 jest.mock('../lib/notificationEvents', () => ({
   dispatchNotification: jest.fn(),
+  notifyPetInvitation: jest.fn(),
   notifySharedActivity: jest.fn(),
 }));
 
@@ -28,6 +29,7 @@ const friendToken = jwt.sign({ userId: FRIEND_ID }, 'moodmatch-dev-secret');
 const amistad = { id: AMISTAD_ID, userId: FRIEND_ID, friendId: MY_USER_ID };
 const mascota = {
   id: 'pet-1', amistadId: AMISTAD_ID, nombre: 'Lumi', nivelCarino: 0,
+  invitacionEstado: 'aceptada', activa: true, invitadaPor: FRIEND_ID,
 };
 
 const app = express();
@@ -37,6 +39,7 @@ app.use('/api/mascota', mascotaRouter);
 beforeEach(() => {
   jest.clearAllMocks();
   prisma.mascotaAmistad.upsert.mockResolvedValue(mascota);
+  prisma.mascotaAmistad.findUnique.mockResolvedValue(mascota);
   prisma.moodEntry.findMany.mockResolvedValue([]);
 });
 
@@ -60,10 +63,10 @@ describe('GET /api/mascota/:amistadId', () => {
       .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(404);
-    expect(prisma.mascotaAmistad.upsert).not.toHaveBeenCalled();
+    expect(prisma.mascotaAmistad.findUnique).not.toHaveBeenCalled();
   });
 
-  test('crea de forma diferida la mascota si todavía no existe', async () => {
+  test('devuelve la mascota cuando la invitación está aceptada, sin crearla de nuevo', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
     const res = await request(app)
       .get(`/api/mascota/${AMISTAD_ID}`)
@@ -71,11 +74,27 @@ describe('GET /api/mascota/:amistadId', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.mascota).toEqual(expect.objectContaining({ nombre: 'Lumi', nivelCarino: 0, personalidad: 'curiosa' }));
-    expect(prisma.mascotaAmistad.upsert).toHaveBeenCalledWith({
-      where: { amistadId: AMISTAD_ID },
-      create: { amistadId: AMISTAD_ID, nombre: 'Lumi', nivelCarino: 0 },
-      update: { nivelCarino: { increment: 0 } },
-    });
+    expect(prisma.mascotaAmistad.upsert).not.toHaveBeenCalled();
+  });
+
+  test('responde 404 si la mascota todavía no fue aceptada (opt-in)', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({ ...mascota, invitacionEstado: 'pendiente' });
+    const res = await request(app)
+      .get(`/api/mascota/${AMISTAD_ID}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(404);
+  });
+
+  test('responde 404 si no existe mascota para la amistad', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.findUnique.mockResolvedValue(null);
+    const res = await request(app)
+      .get(`/api/mascota/${AMISTAD_ID}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(404);
   });
 });
 
@@ -258,9 +277,26 @@ describe('POST /api/mascota/:amistadId/actividad', () => {
     expect(res.status).toBe(200);
     expect(res.body.registrada).toBe(false);
     expect(prisma.cheer.create).not.toHaveBeenCalled();
-    expect(prisma.mascotaAmistad.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      update: { nivelCarino: { increment: 0 } },
-    }));
+    expect(prisma.mascotaAmistad.upsert).not.toHaveBeenCalled();
+    expect(notifySharedActivity).not.toHaveBeenCalled();
+  });
+
+  test('registra la actividad pero no suma cariño si la mascota no está activa', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.findUnique.mockResolvedValue(null);
+    prisma.cheer.findFirst.mockResolvedValue(null);
+    prisma.cheer.create.mockResolvedValue({ id: 21 });
+
+    const res = await request(app)
+      .post(`/api/mascota/${AMISTAD_ID}/actividad`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ completionId: 'salida:2026-07-21' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.registrada).toBe(true);
+    expect(res.body.mascota).toBeNull();
+    expect(prisma.cheer.create).toHaveBeenCalled();
+    expect(prisma.mascotaAmistad.upsert).not.toHaveBeenCalled();
     expect(notifySharedActivity).not.toHaveBeenCalled();
   });
 

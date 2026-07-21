@@ -61,6 +61,14 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
+          name="mascota"
+          options={{
+            title: 'Mascota',
+            tabBarLabel: 'Mascota',
+            tabBarIconSet: { outline: 'paw-outline', filled: 'paw' },
+          }}
+        />
+        <Tabs.Screen
           name="amigos"
           options={{
             title: 'Amigos',

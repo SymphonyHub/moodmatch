@@ -4,6 +4,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES = Object.freeze({
   actividades: true,
   recordatorio: true,
   amistad: true,
+  invitacion_mascota: true,
   noMolestar: null,
 });
 
@@ -13,6 +14,7 @@ export const NOTIFICATION_OPTIONS = [
   { key: 'actividades', label: 'Actividades compartidas', hint: 'Cuando completan una actividad contigo.' },
   { key: 'recordatorio', label: 'Registro de ánimo', hint: 'Un recordatorio suave después de varios días.' },
   { key: 'amistad', label: 'Invitaciones', hint: 'Cuando una amistad acepta tu invitación.' },
+  { key: 'invitacion_mascota', label: 'Invitación de mascota', hint: 'Cuando te invitan a cuidar una mascota juntos.' },
 ];
 
 const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;

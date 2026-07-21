@@ -165,6 +165,34 @@ export const apiSetMessageReaction = async (friendId, messageId, emoji) => {
   return data;
 };
 
+// Índice de la sección Mascota: mascotas activas, invitaciones (recibidas y
+// enviadas) y amigos elegibles para invitar.
+export const apiGetSeccionMascota = async () => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/mascota`, { headers }).then((r) => r.json());
+};
+
+export const apiInvitarMascota = async (amistadId) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/mascota/invitacion`, {
+    method: 'POST', headers, body: JSON.stringify({ amistadId }),
+  }).then((r) => r.json());
+};
+
+export const apiAceptarInvitacionMascota = async (amistadId) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/mascota/${amistadId}/invitacion/aceptar`, {
+    method: 'POST', headers,
+  }).then((r) => r.json());
+};
+
+export const apiRechazarInvitacionMascota = async (amistadId) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/mascota/${amistadId}/invitacion/rechazar`, {
+    method: 'POST', headers,
+  }).then((r) => r.json());
+};
+
 export const apiGetMascota = async (amistadId) => {
   const headers = await authHeaders();
   return fetch(`${API_URL}/api/mascota/${amistadId}`, { headers }).then((r) => r.json());

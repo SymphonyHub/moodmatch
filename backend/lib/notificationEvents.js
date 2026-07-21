@@ -29,6 +29,11 @@ const CONTENT = {
     body: 'Una amistad aceptó tu invitación.',
     data: { url: '/(tabs)/amigos', type: 'amistad' },
   }),
+  invitacion_mascota: () => ({
+    title: 'Te invitaron a cuidar una mascota',
+    body: 'Una amistad quiere cuidar una mascota contigo. Puedes aceptar cuando quieras.',
+    data: { url: '/(tabs)/mascota', type: 'invitacion_mascota' },
+  }),
 };
 
 async function sendUserNotification(userId, type, content, options = {}) {
@@ -97,6 +102,12 @@ const notifyPetNeedsAttention = (userId, friendshipId, options = {}) =>
     collapseId: `mascota-${friendshipId}`,
   });
 
+const notifyPetInvitation = ({ toUserId, friendshipId }, options = {}) =>
+  sendUserNotification(toUserId, 'invitacion_mascota', CONTENT.invitacion_mascota(), {
+    ...options,
+    collapseId: `invitacion-mascota-${friendshipId}`,
+  });
+
 const notifyMoodReminder = (userId, options = {}) =>
   sendUserNotification(userId, 'recordatorio', CONTENT.recordatorio(), {
     ...options,
@@ -114,6 +125,7 @@ module.exports = {
   notifyFriendAccepted,
   notifyMoodReminder,
   notifyNewMessage,
+  notifyPetInvitation,
   notifyPetNeedsAttention,
   notifySharedActivity,
   sendUserNotification,

@@ -375,6 +375,7 @@ function SectionCard({ title, hint, children }) {
 
 export default function AjustesScreen() {
   const {
+    theme,
     themeChoice,
     applyThemeChoice,
     isApplying,

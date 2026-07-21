@@ -19,14 +19,16 @@ jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 jest.mock('../services/api', () => ({
   apiRegisterPushToken: jest.fn(),
   apiUnregisterPushToken: jest.fn(),
+  getToken: jest.fn(),
 }));
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import { apiRegisterPushToken, apiUnregisterPushToken } from '../services/api';
+import { apiRegisterPushToken, apiUnregisterPushToken, getToken } from '../services/api';
 import {
   getPushPermissionStatus,
   retryPendingPushUnregister,
+  syncPushForActiveSession,
   syncPushToken,
   unregisterPushTokenForLogout,
 } from '../notifications/pushRegistration';
@@ -37,6 +39,7 @@ beforeEach(async () => {
   Notifications.getExpoPushTokenAsync.mockResolvedValue({ data: 'ExponentPushToken[test]' });
   apiRegisterPushToken.mockResolvedValue({ registered: true });
   apiUnregisterPushToken.mockResolvedValue(undefined);
+  getToken.mockResolvedValue(null);
 });
 
 describe('registro push', () => {
@@ -56,7 +59,9 @@ describe('registro push', () => {
   });
 
   test('solicita permiso una sola vez si todavía no había decisión', async () => {
-    Notifications.getPermissionsAsync.mockResolvedValue({ status: 'undetermined', granted: false });
+    Notifications.getPermissionsAsync
+      .mockResolvedValueOnce({ status: 'undetermined', granted: false })
+      .mockResolvedValueOnce({ status: 'denied', granted: false });
     Notifications.requestPermissionsAsync.mockResolvedValue({ status: 'denied', granted: false });
 
     await expect(syncPushToken({ requestPermission: true })).resolves.toEqual({
@@ -67,6 +72,63 @@ describe('registro push', () => {
     });
     expect(Notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1);
     expect(apiRegisterPushToken).not.toHaveBeenCalled();
+  });
+
+  test('una sesión existente también dispara el prompt si el estado sigue indeterminado', async () => {
+    getToken.mockResolvedValue('sesion-activa');
+    Notifications.getPermissionsAsync.mockResolvedValue({ status: 'undetermined', granted: false });
+    Notifications.requestPermissionsAsync.mockResolvedValue({ status: 'granted', granted: true });
+
+    await expect(syncPushForActiveSession()).resolves.toEqual({
+      status: 'registered',
+      expoPushToken: 'ExponentPushToken[test]',
+    });
+    expect(Notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+    expect(apiRegisterPushToken).toHaveBeenCalledTimes(1);
+  });
+
+  test('la misma sesión no insiste si el prompt queda sin decisión', async () => {
+    getToken.mockResolvedValue('sesion-activa');
+    Notifications.getPermissionsAsync.mockResolvedValue({ status: 'undetermined', granted: false });
+    Notifications.requestPermissionsAsync.mockResolvedValue({ status: 'undetermined', granted: false });
+
+    await syncPushToken({ requestPermission: true });
+    await syncPushToken({ requestPermission: true });
+
+    expect(Notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+  });
+
+  test('una sesión nueva vuelve a ofrecer el prompt si aún no hubo decisión', async () => {
+    await AsyncStorage.setItem('horaAzul:notificationsPermissionSession', 'sesion-anterior');
+    getToken.mockResolvedValue('sesion-nueva');
+    Notifications.getPermissionsAsync.mockResolvedValue({ status: 'undetermined', granted: false });
+    Notifications.requestPermissionsAsync.mockResolvedValue({ status: 'denied', granted: false });
+
+    await syncPushToken({ requestPermission: true });
+
+    expect(Notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+  });
+
+  test('sin sesión no solicita permiso', async () => {
+    await expect(syncPushForActiveSession()).resolves.toEqual({ status: 'no-session' });
+    expect(Notifications.getPermissionsAsync).not.toHaveBeenCalled();
+    expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+  });
+
+  test('expone y registra el error real de getExpoPushTokenAsync', async () => {
+    const error = new Error('Default FirebaseApp is not initialized');
+    const log = jest.spyOn(console, 'error').mockImplementation(() => {});
+    Notifications.getPermissionsAsync.mockResolvedValue({ status: 'granted', granted: true });
+    Notifications.getExpoPushTokenAsync.mockRejectedValueOnce(error);
+
+    await expect(syncPushToken()).resolves.toEqual({
+      status: 'error',
+      stage: 'obtener ExpoPushToken con getExpoPushTokenAsync',
+      error: error.message,
+    });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining(error.message));
+    expect(apiRegisterPushToken).not.toHaveBeenCalled();
+    log.mockRestore();
   });
 
   test('un permiso denegado no lanza ni intenta obtener token', async () => {

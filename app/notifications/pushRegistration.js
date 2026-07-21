@@ -7,9 +7,10 @@ import { router } from 'expo-router';
 import {
   apiRegisterPushToken,
   apiUnregisterPushToken,
+  getToken,
 } from '../services/api';
 
-const PERMISSION_ASKED_KEY = 'horaAzul:notificationsPermissionAsked';
+const PERMISSION_SESSION_KEY = 'horaAzul:notificationsPermissionSession';
 const PUSH_REGISTRATION_KEY = 'horaAzul:pushRegistration';
 const PENDING_UNREGISTER_KEY = 'horaAzul:pendingPushUnregister';
 const ALLOWED_URLS = new Set([
@@ -31,6 +32,16 @@ const hasPermission = (permissions) => (
   permissions?.granted ||
   permissions?.ios?.status === Notifications.IosAuthorizationStatus?.PROVISIONAL
 );
+
+const errorMessage = (error) => (
+  error instanceof Error ? error.message : String(error)
+);
+
+function pushError(stage, error) {
+  const message = errorMessage(error);
+  console.error(`[Push] ${stage}: ${message}`);
+  return { status: 'error', stage, error: message };
+}
 
 async function ensureAndroidChannel() {
   if (Platform.OS !== 'android') return;
@@ -57,32 +68,42 @@ export async function getPushPermissionStatus() {
 export async function syncPushToken({ requestPermission = false } = {}) {
   if (Platform.OS === 'web') return { status: 'unsupported' };
 
+  let stage = 'configurar canal Android';
   try {
     await ensureAndroidChannel();
+    stage = 'consultar permiso de notificaciones';
     let permissions = await Notifications.getPermissionsAsync();
 
-    if (!hasPermission(permissions) && requestPermission) {
-      const alreadyAsked = await AsyncStorage.getItem(PERMISSION_ASKED_KEY);
-      if (!alreadyAsked && permissions.status !== 'denied') {
+    if (!hasPermission(permissions) && requestPermission && permissions.status !== 'denied') {
+      const sessionToken = await getToken();
+      const attemptedSession = await AsyncStorage.getItem(PERMISSION_SESSION_KEY);
+      if (!sessionToken || attemptedSession !== sessionToken) {
+        stage = 'solicitar permiso de notificaciones';
         permissions = await Notifications.requestPermissionsAsync();
-        await AsyncStorage.setItem(PERMISSION_ASKED_KEY, '1');
+        if (sessionToken) await AsyncStorage.setItem(PERMISSION_SESSION_KEY, sessionToken);
       }
     }
     if (!hasPermission(permissions)) return { status: 'permission-denied' };
 
     const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-    if (!projectId) return { status: 'configuration-error' };
+    if (!projectId) {
+      const error = 'No se encontró extra.eas.projectId en la configuración de Expo';
+      console.error(`[Push] configuración: ${error}`);
+      return { status: 'configuration-error', stage: 'configuración', error };
+    }
 
+    stage = 'obtener ExpoPushToken con getExpoPushTokenAsync';
     const expoPushToken = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    stage = 'guardar ExpoPushToken en el backend';
     const registration = await apiRegisterPushToken(expoPushToken, timeZone);
     if (registration.unregister) {
       await AsyncStorage.setItem(PUSH_REGISTRATION_KEY, JSON.stringify(registration.unregister));
     }
     return { status: 'registered', expoPushToken };
-  } catch {
-    // Permisos, red y Expo son best-effort: nunca bloquean login o navegación.
-    return { status: 'error' };
+  } catch (error) {
+    // Best-effort: informa la etapa y causa real sin bloquear autenticación.
+    return pushError(stage, error);
   }
 }
 
@@ -124,6 +145,18 @@ export async function retryPendingPushUnregister() {
   }
 }
 
+export async function syncPushForActiveSession() {
+  await retryPendingPushUnregister();
+  let sessionToken;
+  try {
+    sessionToken = await getToken();
+  } catch (error) {
+    return pushError('leer sesión para registrar notificaciones', error);
+  }
+  if (!sessionToken) return { status: 'no-session' };
+  return syncPushToken({ requestPermission: true });
+}
+
 function openNotification(notification) {
   const url = notification?.request?.content?.data?.url;
   if (ALLOWED_URLS.has(url)) router.push(url);
@@ -132,7 +165,7 @@ function openNotification(notification) {
 export function PushObserver() {
   useEffect(() => {
     if (Platform.OS === 'web') return undefined;
-    retryPendingPushUnregister().then(() => syncPushToken());
+    syncPushForActiveSession();
     const lastResponse = Notifications.getLastNotificationResponse();
     if (lastResponse?.notification) openNotification(lastResponse.notification);
 
@@ -140,7 +173,7 @@ export function PushObserver() {
       openNotification(response.notification);
     });
     const appStateSubscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') retryPendingPushUnregister().then(() => syncPushToken());
+      if (state === 'active') syncPushForActiveSession();
     });
 
     return () => {

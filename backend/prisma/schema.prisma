@@ -28,6 +28,7 @@ model User {
   perfilPersonalidad Json?
   expoPushToken          String?
   notificationPreferences Json?
+  racha           Int          @default(0)
   createdAt       DateTime     @default(now())
 
   moodEntries    MoodEntry[]
@@ -116,6 +117,13 @@ model MascotaAmistad {
   retoCooperativo       Json?
   nombrePropuesto       String?
   historialHitos        Json?
+  etapa                   Int      @default(1)
+  accesorioCabeza         String?
+  accesorioColor          String?
+  accesoriosDesbloqueados Json?
+  activa                  Boolean  @default(true)
+  invitacionEstado        String   @default("pendiente")
+  invitadaPor             Int?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 }

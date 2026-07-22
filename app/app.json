@@ -53,7 +53,8 @@
           "color": "#4A5FC1",
           "defaultChannel": "hora-azul"
         }
-      ]
+      ],
+      "@sentry/react-native"
     ],
     "experiments": {
       "typedRoutes": true

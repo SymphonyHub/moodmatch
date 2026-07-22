@@ -1,6 +1,10 @@
-require('dotenv').config();
+// Primero de todo: inicializa Sentry (y carga .env) antes de que se cargue
+// express. Ver el comentario en instrument.js.
+require('./instrument');
+
 const express = require('express');
 const cors = require('cors');
+const { montarManejadorDeErrores } = require('./lib/sentry');
 
 const app = express();
 app.use(cors());
@@ -19,6 +23,10 @@ app.use('/api/chat',         require('./routes/chat'));
 app.use('/invite',           require('./routes/invite'));
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
+
+// Después de todas las rutas y antes del handler propio: Sentry necesita ver el
+// error para reportarlo, y el handler de abajo cierra la respuesta.
+montarManejadorDeErrores(app);
 
 // Manejo de errores no capturados (Prisma u otros)
 app.use((err, _req, res, _next) => {

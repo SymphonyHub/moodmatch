@@ -40,9 +40,15 @@ import { GrenzeGotisch_600SemiBold } from '@expo-google-fonts/grenze-gotisch/600
 import { GrenzeGotisch_700Bold } from '@expo-google-fonts/grenze-gotisch/700Bold';
 import { Macondo_400Regular } from '@expo-google-fonts/macondo/400Regular';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
+import * as Sentry from '@sentry/react-native';
 import { ThemeProvider, ThemeVeil, useTheme } from '../theme/ThemeContext';
 import { FriendsCountProvider } from '../friends/FriendsCountContext';
 import { PushObserver } from '../notifications/pushRegistration';
+import { iniciarSentry } from '../services/sentry';
+
+// Lo antes posible en el arranque, para que alcance a cubrir el montaje de los
+// providers. Sin EXPO_PUBLIC_SENTRY_DSN no hace nada.
+iniciarSentry();
 
 // El splash queda visible hasta tener el tema guardado y las fuentes cargadas:
 // así el arranque no muestra un flash del tema/tipografía por defecto.
@@ -124,7 +130,9 @@ function ThemedStack() {
   );
 }
 
-export default function RootLayout() {
+// Sentry.wrap añade el error boundary que reporta los errores de render del
+// árbol completo — lo que un try/catch en un handler nunca ve.
+export default Sentry.wrap(function RootLayout() {
   return (
     // KeyboardProvider alimenta KeyboardStickyView con WindowInsets nativos
     // (edge-to-edge no redimensiona la ventana y los eventos Keyboard de RN
@@ -137,4 +145,4 @@ export default function RootLayout() {
       </ThemeProvider>
     </KeyboardProvider>
   );
-}
+});

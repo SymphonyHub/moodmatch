@@ -22,6 +22,7 @@ const {
   retoExpirado,
   sumarCarino,
 } = require('../lib/mascota');
+const { esEspecieValida, nombreEspecie } = require('../lib/catalogoEspeciesInvitacion');
 const {
   dispatchNotification,
   notifyPetInvitation,
@@ -67,15 +68,22 @@ async function exigirAceptada(res, amistadId) {
 }
 
 // Tarjeta ligera para la pantalla lista. No expone ánimos individuales, solo la
-// etapa y si necesita atención (mismo umbral de 48h que la push de Fase 12).
+// especie, la etapa y si necesita atención (mismo umbral de 48h que la push de
+// Fase 12).
 const presentarResumen = (mascota, amigo, ahora) => ({
   amistadId: mascota.amistadId,
   amigo,
   nombre: mascota.nombre,
   nivelCarino: mascota.nivelCarino,
+  especie: mascota.especie ?? null,
   etapa: etapaVisual(mascota.nivelCarino),
   necesitaAtencion: necesitaAtencion(mascota, ahora),
 });
+
+// En una negociación de especie, quien hizo la última propuesta espera; el otro
+// responde. El pivote es especiePropuestaPor (con fallback a invitadaPor para
+// invitaciones creadas antes de la selección de especie).
+const proponenteDe = (mascota) => mascota.especiePropuestaPor ?? mascota.invitadaPor ?? null;
 
 // GET /api/mascota — índice de la sección: mascotas activas del usuario,
 // invitaciones (recibidas y enviadas) y amigos elegibles para invitar.
@@ -115,8 +123,9 @@ router.get('/', requireAuth, async (req, res) => {
       // Sin mascota, o rechazada: el vínculo puede (re)invitar cuando quiera.
       amigosElegibles.push(amigo);
     } else if (m.invitacionEstado === 'pendiente') {
-      const invitacion = { ...amigo, mascotaNombre: m.nombre };
-      if (m.invitadaPor === me) enviadas.push(invitacion);
+      const invitacion = { ...amigo, mascotaNombre: m.nombre, especie: m.especie ?? null };
+      // Quien hizo la última propuesta la ve como "enviada"; el otro la responde.
+      if (proponenteDe(m) === me) enviadas.push(invitacion);
       else recibidas.push(invitacion);
     } else if (mascotaAceptada(m)) {
       mascotas.push(presentarResumen(m, amigo, ahora));
@@ -127,11 +136,14 @@ router.get('/', requireAuth, async (req, res) => {
   return res.json({ mascotas, invitaciones: { recibidas, enviadas }, amigosElegibles });
 });
 
-// POST /api/mascota/invitacion — crea la mascota en estado "pendiente" y avisa
-// al otro integrante. Reutiliza la fila si una invitación previa fue rechazada.
+// POST /api/mascota/invitacion — crea la mascota en estado "pendiente" con la
+// especie propuesta y avisa al otro integrante. Reutiliza la fila si una
+// invitación previa fue rechazada.
 router.post('/invitacion', requireAuth, async (req, res) => {
   const amistadId = parseAmistadId(req.body.amistadId);
   if (!amistadId) return res.status(400).json({ error: 'amistadId inválido' });
+  const especie = req.body.especie;
+  if (!esEspecieValida(especie)) return res.status(400).json({ error: 'Especie inválida' });
 
   const amistad = await buscarAmistadPropia(amistadId, req.user.userId);
   if (!amistad) return res.status(404).json({ error: 'Amistad no encontrada' });
@@ -144,6 +156,8 @@ router.post('/invitacion', requireAuth, async (req, res) => {
   const datos = {
     invitacionEstado: 'pendiente',
     invitadaPor: req.user.userId,
+    especie,
+    especiePropuestaPor: req.user.userId,
     activa: true,
   };
   const mascota = existente
@@ -153,9 +167,44 @@ router.post('/invitacion', requireAuth, async (req, res) => {
     });
 
   const otroId = amistad.userId === req.user.userId ? amistad.friendId : amistad.userId;
-  dispatchNotification(notifyPetInvitation({ toUserId: otroId, friendshipId: amistadId }));
+  dispatchNotification(notifyPetInvitation({
+    toUserId: otroId, friendshipId: amistadId, nombreEspecie: nombreEspecie(especie),
+  }));
 
   return res.status(201).json({ mascota: await mascotaVisible(prisma, mascota, amistad, req.user.userId) });
+});
+
+// POST /api/mascota/:amistadId/invitacion/contraproponer — el que recibió la
+// última propuesta ofrece otra especie: rota la propuesta y avisa de vuelta,
+// sin cerrar la invitación (sigue "pendiente" hasta que alguien acepte).
+router.post('/:amistadId/invitacion/contraproponer', requireAuth, async (req, res) => {
+  const amistadId = parseAmistadId(req.params.amistadId);
+  if (!amistadId) return res.status(400).json({ error: 'amistadId inválido' });
+  const especie = req.body.especie;
+  if (!esEspecieValida(especie)) return res.status(400).json({ error: 'Especie inválida' });
+
+  const amistad = await buscarAmistadPropia(amistadId, req.user.userId);
+  if (!amistad) return res.status(404).json({ error: 'Amistad no encontrada' });
+
+  const existente = await prisma.mascotaAmistad.findUnique({ where: { amistadId } });
+  if (!existente || existente.invitacionEstado !== 'pendiente') {
+    return res.status(409).json({ error: 'No hay una invitación pendiente para esta amistad' });
+  }
+  if (proponenteDe(existente) === req.user.userId) {
+    return res.status(403).json({ error: 'Ya hiciste la última propuesta; espera la respuesta' });
+  }
+
+  const mascota = await prisma.mascotaAmistad.update({
+    where: { amistadId },
+    data: { especie, especiePropuestaPor: req.user.userId },
+  });
+
+  const otroId = amistad.userId === req.user.userId ? amistad.friendId : amistad.userId;
+  dispatchNotification(notifyPetInvitation({
+    toUserId: otroId, friendshipId: amistadId, nombreEspecie: nombreEspecie(especie),
+  }));
+
+  return res.json({ mascota: await mascotaVisible(prisma, mascota, amistad, req.user.userId) });
 });
 
 // POST /api/mascota/:amistadId/invitacion/aceptar — solo el invitado responde.
@@ -170,10 +219,15 @@ router.post('/:amistadId/invitacion/aceptar', requireAuth, async (req, res) => {
   if (!existente || existente.invitacionEstado !== 'pendiente') {
     return res.status(409).json({ error: 'No hay una invitación pendiente para esta amistad' });
   }
-  if (existente.invitadaPor === req.user.userId) {
-    return res.status(403).json({ error: 'No puedes responder tu propia invitación' });
+  if (proponenteDe(existente) === req.user.userId) {
+    return res.status(403).json({ error: 'No puedes aceptar tu propia propuesta de especie' });
+  }
+  if (!existente.especie) {
+    return res.status(409).json({ error: 'La invitación no tiene una especie propuesta' });
   }
 
+  // Al aceptar, la especie ya elegida queda fija: ningún endpoint la modifica
+  // una vez la invitación está "aceptada".
   const mascota = await prisma.mascotaAmistad.update({
     where: { amistadId },
     data: { invitacionEstado: 'aceptada', activa: true },
@@ -194,8 +248,8 @@ router.post('/:amistadId/invitacion/rechazar', requireAuth, async (req, res) => 
   if (!existente || existente.invitacionEstado !== 'pendiente') {
     return res.status(409).json({ error: 'No hay una invitación pendiente para esta amistad' });
   }
-  if (existente.invitadaPor === req.user.userId) {
-    return res.status(403).json({ error: 'No puedes responder tu propia invitación' });
+  if (proponenteDe(existente) === req.user.userId) {
+    return res.status(403).json({ error: 'No puedes rechazar tu propia propuesta' });
   }
 
   await prisma.mascotaAmistad.update({

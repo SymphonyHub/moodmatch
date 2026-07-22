@@ -45,6 +45,13 @@ planificada en `FASE14-mascota-perfil.md`, con una Fase 0 (migración base)
 bloqueante. Reparto de agentes A/B/C/D y dueños de archivos por worktree: ver
 ese doc.
 
+> **AVISO (Agente A, 2026-07-21) — `schema.prisma` reabierto de forma aditiva
+> (Fase 0-bis):** se agregan a `MascotaAmistad` los campos `especie String?` y
+> `especiePropuestaPor Int?` para la selección conjunta de especie al invitar
+> (multi-especie). Migración `fase14-especie-mascota`, ejecutada por A en su
+> rama. Cambio nullable de bajo riesgo; el resto de agentes no necesita esos
+> campos, pero avisar antes de volver a tocar el modelo.
+
 **Fase 13 en curso** (refactor de contexto): reducir el peso de docs y código
 que se le pasa a los agentes por sesión. Acciones 1 y 2 (adelgazar `CLAUDE.md`
 y `COORDINACION.md`, archivar fases cerradas) hechas; acciones 3-5 pendientes de

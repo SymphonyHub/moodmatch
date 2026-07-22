@@ -172,10 +172,17 @@ export const apiGetSeccionMascota = async () => {
   return fetch(`${API_URL}/api/mascota`, { headers }).then((r) => r.json());
 };
 
-export const apiInvitarMascota = async (amistadId) => {
+export const apiInvitarMascota = async (amistadId, especie) => {
   const headers = await authHeaders();
   return fetch(`${API_URL}/api/mascota/invitacion`, {
-    method: 'POST', headers, body: JSON.stringify({ amistadId }),
+    method: 'POST', headers, body: JSON.stringify({ amistadId, especie }),
+  }).then((r) => r.json());
+};
+
+export const apiContraproponerEspecie = async (amistadId, especie) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/mascota/${amistadId}/invitacion/contraproponer`, {
+    method: 'POST', headers, body: JSON.stringify({ especie }),
   }).then((r) => r.json());
 };
 

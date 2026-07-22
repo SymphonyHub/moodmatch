@@ -124,6 +124,8 @@ model MascotaAmistad {
   activa                  Boolean  @default(true)
   invitacionEstado        String   @default("pendiente")
   invitadaPor             Int?
+  especie                 String?
+  especiePropuestaPor     Int?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 }

@@ -2,7 +2,7 @@
 
 **Proyecto:** Hora Azul (ex MoodMatch)
 **Fecha:** Julio 2026
-**Herramienta de ejecución:** Kimi K3, 4 agentes en paralelo (A, B, C, D) sobre Git Worktrees + 1 pasada final de responsividad
+**Herramienta de ejecución:** 4 agentes en paralelo (A, B, C, D) sobre Git Worktrees + 1 pasada final de responsividad
 **Estado previo:** Fase 10 cerrada y mergeada en `main` (Hub de Actividades, respiración guiada 4-4-4-4, acciones sociales, ícono v2, personalización de Ajustes)
 
 ---

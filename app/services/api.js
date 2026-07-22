@@ -231,6 +231,15 @@ export const apiProponerNombreMascota = async (amistadId, nombre) => {
   }).then((r) => r.json());
 };
 
+// Equipa/desequipa accesorios cosméticos ({ cabeza?, color? }; null desequipa).
+// El backend valida que estén desbloqueados; devuelve la mascota actualizada.
+export const apiEquiparAccesorioMascota = async (amistadId, seleccion) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/mascota/${amistadId}/accesorios`, {
+    method: 'PATCH', headers, body: JSON.stringify(seleccion),
+  }).then((r) => r.json());
+};
+
 export const apiGetUnreadCount = async () => {
   const headers = await authHeaders();
   return fetch(`${API_URL}/api/messages/unread-count`, { headers }).then((r) => r.json());

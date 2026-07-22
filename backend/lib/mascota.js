@@ -1,3 +1,6 @@
+const { derivarEspecie } = require('./especies');
+const { derivarDesbloqueados } = require('./accesorios');
+
 const NOMBRE_MASCOTA = 'Lumi';
 const CARINO_POR_PAR_DE_MENSAJES = 2;
 const CARINO_POR_ACTIVIDAD = 3;
@@ -167,7 +170,16 @@ function presentarMascota(mascota, amistad, userId, personalidad) {
     nombre: mascota.nombre,
     nivelCarino: mascota.nivelCarino,
     personalidad,
+    // Fuente de verdad: la especie negociada por ambos (Agente A), persistida en
+    // MascotaAmistad.especie. derivarEspecie es solo fallback para las mascotas
+    // previas a Fase 14 (especie null tras el backfill de Fase 0).
+    especie: mascota.especie ?? derivarEspecie(mascota.amistadId),
     etapa: etapaVisual(mascota.nivelCarino),
+    accesorios: {
+      desbloqueados: derivarDesbloqueados(mascota.nivelCarino, mascota.historialHitos),
+      cabeza: mascota.accesorioCabeza ?? null,
+      color: mascota.accesorioColor ?? null,
+    },
     invitacionEstado: mascota.invitacionEstado ?? 'aceptada',
     invitacionMia: mascota.invitadaPor != null && mascota.invitadaPor === userId,
     activa: mascota.activa !== false,

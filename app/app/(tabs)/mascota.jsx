@@ -15,7 +15,6 @@ import Tappable from '../../components/Tappable';
 import Entrance from '../../components/Entrance';
 import Avatar from '../../components/profile/Avatar';
 import MascotaSprite from '../../mascota/MascotaSprite';
-import { estadoMascota } from '../../mascota/estadoMascota';
 import { clasificarSeccion } from '../../mascota/seccionMascota';
 
 function abrirDetalle(amistadId) {
@@ -27,12 +26,19 @@ function abrirDetalle(amistadId) {
 function MascotaCard({ mascota, index }) {
   const { theme } = useTheme();
   const styles = useStyles();
-  const sprite = estadoMascota(mascota.nivelCarino).sprite;
 
   return (
     <Entrance index={index}>
       <Tappable style={styles.card} onPress={() => abrirDetalle(mascota.amistadId)} haptic={false}>
-        <View style={styles.spriteMini}><MascotaSprite etapa={sprite} size={46} /></View>
+        <View style={styles.spriteMini}>
+          <MascotaSprite
+            especie={mascota.especie}
+            etapa={mascota.etapa?.numero ?? 1}
+            accesorioCabeza={mascota.accesorioCabeza}
+            accesorioColor={mascota.accesorioColor}
+            size={46}
+          />
+        </View>
         <View style={styles.info}>
           <Text style={styles.nombre} numberOfLines={1}>{mascota.nombre}</Text>
           <Text style={styles.etapa}>

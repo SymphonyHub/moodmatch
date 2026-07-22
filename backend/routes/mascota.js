@@ -31,6 +31,8 @@ const {
 } = require('../lib/mascota');
 const { esEspecieValida, nombreEspecie } = require('../lib/catalogoEspeciesInvitacion');
 const { diaUTC } = require('../lib/interaccionesSociales');
+const { derivarEspecie } = require('../lib/especies');
+const { CATEGORIAS, derivarDesbloqueados, puedeEquipar } = require('../lib/accesorios');
 const {
   dispatchNotification,
   notifyPetInvitation,
@@ -149,8 +151,12 @@ const presentarResumen = (mascota, amigo, ahora) => ({
   amigo,
   nombre: mascota.nombre,
   nivelCarino: mascota.nivelCarino,
-  especie: mascota.especie ?? null,
+  // Especie negociada (MascotaAmistad.especie); derivarEspecie solo como
+  // fallback para mascotas previas a Fase 14 (especie null tras el backfill).
+  especie: mascota.especie ?? derivarEspecie(mascota.amistadId),
   etapa: etapaVisual(mascota.nivelCarino),
+  accesorioCabeza: mascota.accesorioCabeza ?? null,
+  accesorioColor: mascota.accesorioColor ?? null,
   necesitaAtencion: necesitaAtencion(mascota, ahora),
 });
 
@@ -592,6 +598,42 @@ router.post('/:amistadId/actividad', requireAuth, async (req, res) => {
       ? await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId)
       : null,
   });
+});
+
+// PATCH /api/mascota/:amistadId/accesorios — equipa/desequipa accesorios
+// cosméticos. Solo se aceptan ids desbloqueados de la categoría correcta; `null`
+// desequipa. Los accesorios son visibles para ambos integrantes del vínculo.
+router.patch('/:amistadId/accesorios', requireAuth, async (req, res) => {
+  const amistadId = parseAmistadId(req.params.amistadId);
+  if (!amistadId) return res.status(400).json({ error: 'amistadId inválido' });
+
+  const amistad = await buscarAmistadPropia(amistadId, req.user.userId);
+  if (!amistad) return res.status(404).json({ error: 'Amistad no encontrada' });
+  const mascota = await exigirAceptada(res, amistadId);
+  if (!mascota) return undefined;
+
+  const normalizar = (valor) => {
+    if (valor === null) return null;
+    return typeof valor === 'string' && valor.trim() ? valor.trim() : undefined;
+  };
+
+  const desbloqueados = derivarDesbloqueados(mascota.nivelCarino, mascota.historialHitos);
+  const data = {};
+  const campos = { cabeza: 'accesorioCabeza', color: 'accesorioColor' };
+  for (const [categoria, campo] of Object.entries(campos)) {
+    if (!(categoria in req.body)) continue;
+    const id = normalizar(req.body[categoria]);
+    if (id === undefined || !puedeEquipar(id, categoria, desbloqueados)) {
+      return res.status(400).json({ error: `Accesorio de ${categoria} no disponible` });
+    }
+    data[campo] = id;
+  }
+  if (!CATEGORIAS.some((c) => c in req.body) || Object.keys(data).length === 0) {
+    return res.status(400).json({ error: 'Nada que actualizar' });
+  }
+
+  const actualizada = await prisma.mascotaAmistad.update({ where: { amistadId }, data });
+  return res.json({ mascota: await mascotaVisible(prisma, actualizada, amistad, req.user.userId) });
 });
 
 module.exports = router;

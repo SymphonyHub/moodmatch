@@ -7,7 +7,7 @@ import { mensajeRacha, tituloRacha, estadoRegalo } from './interaccionesSociales
 // Contenido social de la pantalla de detalle de la mascota (Fase 14). Se monta
 // en el slot que deja la estructura de la pantalla, sin reescribir el resto:
 // racha compartida (constancia conjunta, no competitiva) y regalo entre amigos.
-export default function InteraccionesSociales({ mascota, onRegalar, regalando = false }) {
+export default function SeccionSocial({ mascota, onRegalar, regalando = false }) {
   const { theme } = useTheme();
   const styles = useStyles();
 

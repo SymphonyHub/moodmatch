@@ -12,13 +12,15 @@ import {
   apiIniciarRetoMascota,
   apiProponerNombreMascota,
   apiRegalarMascota,
+  apiEquiparAccesorioMascota,
 } from '../../services/api';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../../components/Tappable';
-import MascotaSprite from '../../mascota/MascotaSprite';
+import MascotaAnimada from '../../mascota/animation/MascotaAnimada';
+import { CATALOGO_ACCESORIOS } from '../../mascota/sprites/accesorios';
 import { estadoMascota } from '../../mascota/estadoMascota';
 import { nombreEspecie } from '../../mascota/especiesCatalogo';
-import InteraccionesSociales from '../../mascota/InteraccionesSociales';
+import SeccionSocial from '../../mascota/SeccionSocial';
 
 // Progreso hacia la próxima evolución (Cachorro→Joven en 16, Joven→Adulta en
 // 36). El backend ya entrega la etapa; aquí solo se dibuja el avance. La
@@ -29,6 +31,61 @@ function progresoEvolucion(nivelCarino = 0) {
   const base = nivel < 16 ? 0 : 16;
   const meta = nivel < 16 ? 16 : 36;
   return Math.min(1, (nivel - base) / (meta - base));
+}
+
+// Grid de accesorios por categoría. Los desbloqueados se pueden equipar/quitar;
+// los bloqueados muestran candado + pista de cómo se consiguen.
+function AccesoriosGrid({
+  accesorios, onEquipar, styles, theme,
+}) {
+  const desbloqueados = new Set(accesorios?.desbloqueados ?? []);
+  const equipado = { cabeza: accesorios?.cabeza ?? null, color: accesorios?.color ?? null };
+  const grupos = [
+    { categoria: 'cabeza', titulo: 'Cabeza' },
+    { categoria: 'color', titulo: 'Color y patrón' },
+  ];
+  return (
+    <View style={styles.accWrap}>
+      {grupos.map(({ categoria, titulo }) => (
+        <View key={categoria} style={styles.accGrupo}>
+          <Text style={styles.accGrupoTitulo}>{titulo}</Text>
+          <View style={styles.accFila}>
+            {CATALOGO_ACCESORIOS.filter((a) => a.categoria === categoria).map((a) => {
+              const desbloqueado = desbloqueados.has(a.id);
+              const on = equipado[categoria] === a.id;
+              return (
+                <Tappable
+                  key={a.id}
+                  style={[styles.accChip, on && styles.accChipOn, !desbloqueado && styles.accChipLock]}
+                  onPress={() => desbloqueado && onEquipar(categoria, a.id)}
+                  disabled={!desbloqueado}
+                  haptic={false}
+                  accessibilityLabel={desbloqueado
+                    ? `${on ? 'Quitar' : 'Equipar'} ${a.nombre}`
+                    : `${a.nombre} bloqueado: ${a.pista}`}
+                >
+                  <View style={styles.accChipFila}>
+                    {!desbloqueado && (
+                      <Ionicons name="lock-closed" size={11} color={theme.colors.textFaint} />
+                    )}
+                    <Text style={[
+                      styles.accChipTxt,
+                      on && styles.accChipTxtOn,
+                      !desbloqueado && styles.accChipTxtLock,
+                    ]}
+                    >
+                      {a.nombre}
+                    </Text>
+                  </View>
+                  {!desbloqueado && <Text style={styles.accPista}>{a.pista}</Text>}
+                </Tappable>
+              );
+            })}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
 }
 
 export default function MascotaDetalleScreen() {
@@ -43,6 +100,7 @@ export default function MascotaDetalleScreen() {
   const [aviso, setAviso] = useState('');
   const [editarNombre, setEditarNombre] = useState(false);
   const [nombre, setNombre] = useState('');
+  const [celebracion, setCelebracion] = useState(0);
 
   const cargar = useCallback(async () => {
     if (!amistadId) return;
@@ -68,6 +126,10 @@ export default function MascotaDetalleScreen() {
       const data = await request();
       if (data?.error) throw new Error(data.error);
       if (!data?.mascota) throw new Error('No se pudo actualizar a la mascota');
+      // Celebración cuando el cariño sube (cuidado/reto): el rig muestra confetti.
+      if (mascota && data.mascota.nivelCarino > mascota.nivelCarino) {
+        setCelebracion((c) => c + 1);
+      }
       setMascota(data.mascota);
       setAviso(exito);
       setEditarNombre(false);
@@ -101,6 +163,23 @@ export default function MascotaDetalleScreen() {
       () => apiProponerNombreMascota(amistadId, propuesto),
       mascota.nombrePropuesto?.puedeConfirmar ? 'Nombre confirmado.' : 'Propuesta enviada a tu amistad.',
     );
+  };
+
+  // Equipa o desequipa un accesorio (toca el equipado → lo quita). Update
+  // optimista: el sprite hero refleja el cambio de inmediato.
+  const equipar = async (categoria, id) => {
+    const actual = mascota.accesorios?.[categoria] ?? null;
+    const destino = actual === id ? null : id;
+    setMascota((m) => ({
+      ...m, accesorios: { ...m.accesorios, [categoria]: destino },
+    }));
+    try {
+      const data = await apiEquiparAccesorioMascota(amistadId, { [categoria]: destino });
+      if (data?.error) throw new Error(data.error);
+      if (data?.mascota) setMascota(data.mascota);
+    } catch {
+      cargar();
+    }
   };
 
   const encabezado = (
@@ -151,11 +230,20 @@ export default function MascotaDetalleScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       {encabezado}
 
-      {/* Header hero. El sprite estático es un placeholder: el Agente C lo
-          reemplaza por el sprite animado por etapa (idle, reacción al toque…). */}
+      {/* Header hero: sprite animado por etapa (idle, reacción al toque,
+          celebración, evolución, necesita atención) — rig único de las 7 especies. */}
       <View style={styles.hero}>
         <View style={styles.spriteHero}>
-          <MascotaSprite etapa={estado.sprite} size={132} />
+          <MascotaAnimada
+            especie={mascota.especie}
+            etapa={mascota.etapa?.numero ?? 1}
+            personalidad={mascota.personalidad}
+            accesorioCabeza={mascota.accesorios?.cabeza ?? null}
+            accesorioColor={mascota.accesorios?.color ?? null}
+            necesitaAtencion={mascota.necesitaAtencion}
+            celebracionKey={celebracion}
+            size={132}
+          />
         </View>
         <Text style={styles.nombreHero} numberOfLines={1}>{mascota.nombre}</Text>
         <Text style={styles.etapaHero}>
@@ -226,7 +314,7 @@ export default function MascotaDetalleScreen() {
       {/* Slot del Agente B: regalos, racha compartida y catálogo ampliado de
           retos se integran aquí sin reescribir el resto de la pantalla. */}
       {/* __SLOT_INTERACCIONES_SOCIALES__ */}
-      <InteraccionesSociales
+      <SeccionSocial
         mascota={mascota}
         onRegalar={regalar}
         regalando={accion === 'regalo'}
@@ -250,14 +338,20 @@ export default function MascotaDetalleScreen() {
         </View>
       )}
 
-      {/* Slot del Agente C: grid de accesorios desbloqueados (equipar cabeza y
-          color/patrón). Estructura reservada, la completa la Parte B visual. */}
+      {/* Slot del Agente C: accesorios cosméticos (cabeza y color/patrón). Se
+          desbloquean por nivel/hitos; visibles para ambos integrantes. */}
       <View style={styles.bloque}>
         <Text style={styles.bloqueTitulo}>Accesorios</Text>
         <Text style={styles.bloqueTexto}>
-          Se desbloquean a medida que su vínculo crece. Muy pronto.
+          Se desbloquean a medida que su vínculo crece. Toca uno para equiparlo.
         </Text>
         {/* __SLOT_ACCESORIOS__ */}
+        <AccesoriosGrid
+          accesorios={mascota.accesorios}
+          onEquipar={equipar}
+          styles={styles}
+          theme={theme}
+        />
       </View>
 
       {/* Configuración: cambiar nombre (negociación entre ambos) */}
@@ -399,4 +493,31 @@ const useStyles = makeThemedStyles((t) => ({
     paddingHorizontal: 14,
   },
   enviarNombreTxt: { color: t.colors.primary, fontSize: t.fontSize(13), ...t.typography.fonts.semibold },
+  accWrap: { marginTop: 12, gap: 14 },
+  accGrupo: { gap: 8 },
+  accGrupoTitulo: {
+    fontSize: t.fontSize(12),
+    color: t.colors.textFaint,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    ...t.typography.fonts.semibold,
+  },
+  accFila: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  accChip: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: t.shape.radiusMd,
+    backgroundColor: t.colors.primarySoft,
+    borderWidth: t.shape.borderThin,
+    borderColor: 'transparent',
+  },
+  accChipOn: { borderColor: t.colors.primary, backgroundColor: t.colors.accentSoft },
+  accChipLock: { backgroundColor: t.colors.surface, borderColor: t.colors.border },
+  accChipFila: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  accChipTxt: { fontSize: t.fontSize(13), color: t.colors.text, ...t.typography.fonts.semibold },
+  accChipTxtOn: { color: t.colors.primary },
+  accChipTxtLock: { color: t.colors.textFaint, ...t.typography.fonts.regular },
+  accPista: { fontSize: t.fontSize(10), color: t.colors.textFaint, marginTop: 2 },
 }));

@@ -311,3 +311,80 @@ describe('POST /api/mascota/:amistadId/actividad', () => {
     expect(prisma.friendship.findFirst).not.toHaveBeenCalled();
   });
 });
+
+describe('PATCH /api/mascota/:amistadId/accesorios', () => {
+  // Nivel alto → muchos accesorios desbloqueados para las pruebas de equipar.
+  const mascotaNivelAlto = { ...mascota, nivelCarino: 50, historialHitos: [] };
+
+  test('equipa un accesorio desbloqueado de la categoría correcta', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.findUnique.mockResolvedValue(mascotaNivelAlto);
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascotaNivelAlto, accesorioCabeza: 'gorrito' });
+
+    const res = await request(app)
+      .patch(`/api/mascota/${AMISTAD_ID}/accesorios`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ cabeza: 'gorrito' });
+
+    expect(res.status).toBe(200);
+    expect(prisma.mascotaAmistad.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: { accesorioCabeza: 'gorrito' },
+    }));
+    expect(res.body.mascota.accesorios.cabeza).toBe('gorrito');
+  });
+
+  test('rechaza un accesorio no desbloqueado', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({ ...mascota, nivelCarino: 2, historialHitos: [] });
+
+    const res = await request(app)
+      .patch(`/api/mascota/${AMISTAD_ID}/accesorios`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ cabeza: 'corona' });
+
+    expect(res.status).toBe(400);
+    expect(prisma.mascotaAmistad.update).not.toHaveBeenCalled();
+  });
+
+  test('rechaza un id de la categoría equivocada', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.findUnique.mockResolvedValue(mascotaNivelAlto);
+
+    const res = await request(app)
+      .patch(`/api/mascota/${AMISTAD_ID}/accesorios`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ color: 'gorrito' });
+
+    expect(res.status).toBe(400);
+    expect(prisma.mascotaAmistad.update).not.toHaveBeenCalled();
+  });
+
+  test('permite desequipar con null', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.findUnique.mockResolvedValue(mascotaNivelAlto);
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascotaNivelAlto, accesorioColor: null });
+
+    const res = await request(app)
+      .patch(`/api/mascota/${AMISTAD_ID}/accesorios`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ color: null });
+
+    expect(res.status).toBe(200);
+    expect(prisma.mascotaAmistad.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: { accesorioColor: null },
+    }));
+  });
+
+  test('404 si la mascota no está aceptada (opt-in)', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({ ...mascotaNivelAlto, invitacionEstado: 'pendiente' });
+
+    const res = await request(app)
+      .patch(`/api/mascota/${AMISTAD_ID}/accesorios`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ cabeza: 'gorrito' });
+
+    expect(res.status).toBe(404);
+    expect(prisma.mascotaAmistad.update).not.toHaveBeenCalled();
+  });
+});

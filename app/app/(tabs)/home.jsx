@@ -23,6 +23,7 @@ import ChatInputBar from '../../components/chat/ChatInputBar';
 import FallbackMessage from '../../components/chat/FallbackMessage';
 import useAutoScroll from '../../components/chat/useAutoScroll';
 import Avatar from '../../components/profile/Avatar';
+import Tappable from '../../components/Tappable';
 import { rachaDeDias } from '../../features/wellness/racha';
 
 // Pausa de "escribiendo" antes de cada burbuja del bot: apenas por encima de
@@ -231,7 +232,14 @@ export default function HomeScreen() {
   return (
     <View style={{ flex: 1 }}>
       <View style={styles.profileHeader}>
-        <Avatar avatarUrl={profile?.avatarUrl} nombre={profile?.nombre} size={44} racha={racha} />
+        <Tappable
+          onPress={() => router.push('/perfil')}
+          haptic={false}
+          accessibilityRole="button"
+          accessibilityLabel="Ver mi perfil"
+        >
+          <Avatar avatarUrl={profile?.avatarUrl} nombre={profile?.nombre} size={44} racha={racha} />
+        </Tappable>
         <View style={styles.profileCopy}>
           <Text style={styles.greeting}>{profile?.nombre ? `Hola, ${profile.nombre}` : 'Tu espacio de hoy'}</Text>
           <Text style={styles.greetingHint}>¿Cómo estás hoy?</Text>

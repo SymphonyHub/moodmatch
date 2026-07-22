@@ -3,6 +3,9 @@ jest.mock('../lib/prisma', () => ({
     findUnique: jest.fn(),
     update: jest.fn(),
   },
+  friendship: {
+    findMany: jest.fn(),
+  },
 }));
 
 const request = require('supertest');
@@ -28,6 +31,7 @@ const usuarioBase = {
   customTheme: null,
   perfilPersonalidad: null,
   avatarUrl: null,
+  racha: 4,
   createdAt: new Date(),
 };
 
@@ -367,5 +371,164 @@ describe('PATCH /api/users/me — paleta personalizada', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/inválida/i);
     expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('racha', () => {
+  test('GET /me expone racha para el perfil', async () => {
+    prisma.user.findUnique.mockResolvedValue({ ...usuarioBase, racha: 7 });
+
+    const res = await request(app)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.user.racha).toBe(7);
+    expect(prisma.user.findUnique.mock.calls[0][0].select.racha).toBe(true);
+  });
+
+  test('PATCH /me persiste una racha entera válida', async () => {
+    prisma.user.update.mockResolvedValue({ ...usuarioBase, racha: 12 });
+
+    const res = await request(app)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ racha: 12 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.user.racha).toBe(12);
+    expect(prisma.user.update.mock.calls[0][0].data).toEqual({ racha: 12 });
+  });
+
+  test('PATCH /me acepta racha 0', async () => {
+    prisma.user.update.mockResolvedValue({ ...usuarioBase, racha: 0 });
+
+    const res = await request(app)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ racha: 0 });
+
+    expect(res.status).toBe(200);
+    expect(prisma.user.update.mock.calls[0][0].data).toEqual({ racha: 0 });
+  });
+
+  test.each([
+    ['negativa', -1],
+    ['no entera', 3.5],
+    ['string', '5'],
+    ['fuera de rango', 100001],
+  ])('rechaza racha inválida (%s) con 400', async (_caso, racha) => {
+    const res = await request(app)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ racha });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/racha inválida/i);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/users/me/mascotas', () => {
+  const mascotaAceptada = {
+    id: 'm1',
+    nombre: 'Lumi',
+    nivelCarino: 12,
+    activa: true,
+    invitacionEstado: 'aceptada',
+  };
+
+  test('lista solo mascotas activas y aceptadas, en formato compacto', async () => {
+    prisma.friendship.findMany.mockResolvedValue([
+      {
+        id: 10,
+        userId: MY_USER_ID,
+        friendId: 2,
+        user: { id: MY_USER_ID, nombre: 'Yo', avatarUrl: null },
+        friend: { id: 2, nombre: 'Ana', avatarUrl: 'https://x/a.jpg' },
+        mascota: mascotaAceptada,
+      },
+      // Invitación enviada pero aún no aceptada: NO debe aparecer.
+      {
+        id: 11,
+        userId: MY_USER_ID,
+        friendId: 3,
+        user: { id: MY_USER_ID, nombre: 'Yo', avatarUrl: null },
+        friend: { id: 3, nombre: 'Beto', avatarUrl: null },
+        mascota: { ...mascotaAceptada, id: 'm2', invitacionEstado: 'pendiente' },
+      },
+      // Mascota archivada (amistad eliminada): NO debe aparecer.
+      {
+        id: 12,
+        userId: 4,
+        friendId: MY_USER_ID,
+        user: { id: 4, nombre: 'Caro', avatarUrl: null },
+        friend: { id: MY_USER_ID, nombre: 'Yo', avatarUrl: null },
+        mascota: { ...mascotaAceptada, id: 'm3', activa: false },
+      },
+    ]);
+
+    const res = await request(app)
+      .get('/api/users/me/mascotas')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.mascotas).toEqual([
+      {
+        amistadId: 10,
+        amigoId: 2,
+        amigoNombre: 'Ana',
+        amigoAvatarUrl: 'https://x/a.jpg',
+        nombre: 'Lumi',
+        nivelCarino: 12,
+      },
+    ]);
+  });
+
+  test('deduplica por el otro usuario en vínculos espejo', async () => {
+    prisma.friendship.findMany.mockResolvedValue([
+      {
+        id: 10,
+        userId: MY_USER_ID,
+        friendId: 2,
+        user: { id: MY_USER_ID, nombre: 'Yo', avatarUrl: null },
+        friend: { id: 2, nombre: 'Ana', avatarUrl: null },
+        mascota: mascotaAceptada,
+      },
+      {
+        id: 20,
+        userId: 2,
+        friendId: MY_USER_ID,
+        user: { id: 2, nombre: 'Ana', avatarUrl: null },
+        friend: { id: MY_USER_ID, nombre: 'Yo', avatarUrl: null },
+        mascota: { ...mascotaAceptada, id: 'm9' },
+      },
+    ]);
+
+    const res = await request(app)
+      .get('/api/users/me/mascotas')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.mascotas).toHaveLength(1);
+    expect(res.body.mascotas[0].amigoId).toBe(2);
+  });
+
+  test('responde lista vacía sin mascotas', async () => {
+    prisma.friendship.findMany.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/api/users/me/mascotas')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.mascotas).toEqual([]);
+  });
+
+  test('rechaza sin token con 401', async () => {
+    const res = await request(app).get('/api/users/me/mascotas');
+
+    expect(res.status).toBe(401);
+    expect(prisma.friendship.findMany).not.toHaveBeenCalled();
   });
 });

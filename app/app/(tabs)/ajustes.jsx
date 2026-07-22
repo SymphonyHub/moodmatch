@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Switch, View, Text, TextInput, useColorScheme } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { THEMES, AUTO_THEME_ID, CUSTOM_THEME_ID, resolveThemeId } from '../../theme/themes';
 import { useTheme, makeThemedStyles, ThemeScope } from '../../theme/ThemeContext';
 import {
@@ -23,8 +23,6 @@ import {
 import { MOODS } from '../../constants/moods';
 import Tappable from '../../components/Tappable';
 import { HueBar, LumBar } from '../../components/color/HueBar';
-import AvatarPicker from '../../components/profile/AvatarPicker';
-import { apiGetMe } from '../../services/api';
 import { LARGE_TEXT_SCALE } from '../../theme/persistence';
 import { unregisterPushTokenForLogout } from '../../notifications/pushRegistration';
 
@@ -390,21 +388,6 @@ export default function AjustesScreen() {
   const [candidate, setCandidate] = useState(themeChoice);
   // draft = paleta en edición (copia local con id/name/config). Arranca en la activa.
   const [draft, setDraft] = useState(() => ({ ...paletaActiva(customConfig) }));
-  const [profile, setProfile] = useState(null);
-
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      apiGetMe()
-        .then((data) => {
-          if (active && data.user) setProfile(data.user);
-        })
-        .catch(() => {});
-      return () => {
-        active = false;
-      };
-    }, []),
-  );
 
   const isCustomCandidate = candidate === CUSTOM_THEME_ID;
   const draftTheme = useMemo(() => makeCustomTheme(configDe(draft)), [draft]);
@@ -566,11 +549,17 @@ export default function AjustesScreen() {
       </SectionCard>
 
       <SectionCard title="Cuenta">
-        <AvatarPicker
-          avatarUrl={profile?.avatarUrl}
-          nombre={profile?.nombre}
-          onChange={(avatarUrl) => setProfile((current) => ({ ...current, avatarUrl }))}
-        />
+        <Tappable
+          style={styles.settingsLink}
+          onPress={() => router.push('/perfil')}
+          accessibilityLabel="Ver mi perfil"
+        >
+          <View style={styles.settingsLinkCopy}>
+            <Text style={styles.settingsLinkTitle}>Ver mi perfil</Text>
+            <Text style={styles.settingsLinkHint}>Tu foto, racha, amigos y mascotas</Text>
+          </View>
+          <Text style={styles.settingsLinkArrow}>›</Text>
+        </Tappable>
         <View style={styles.accountDivider} />
         <Tappable style={styles.btnSalir} onPress={handleCerrarSesion} haptic={false}>
           <Text style={styles.btnSalirTxt}>Cerrar sesión</Text>

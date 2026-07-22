@@ -27,7 +27,8 @@ Estos archivos afectan a todos los agentes; coordinar con el usuario y el dueño
 de esa área en la fase vigente antes de tocarlos:
 
 - `theme/` (tokens de tema)
-- Layout raíz de navegación (`app/_layout.jsx` / `(tabs)/_layout.jsx`)
+- Layout raíz de navegación (`app/app/_layout.jsx` / `app/app/(tabs)/_layout.jsx`)
+  y la lista de destinos de la barra (`app/components/tabsConfig.js`)
 - `prisma/schema.prisma` (un cambio de schema afecta a todos los que usan Prisma)
 - `package.json` (dependencias nuevas: avisar antes de agregar, para no instalar
   versiones distintas de la misma librería en ramas distintas)
@@ -40,10 +41,24 @@ necesitas un endpoint que no existe aún, créalo tú mismo dentro de tu propia 
 
 ## Estado actual
 
-Fase activa: **Fase 14** (mascota independiente + perfil de usuario) —
-planificada en `FASE14-mascota-perfil.md`, con una Fase 0 (migración base)
-bloqueante. Reparto de agentes A/B/C/D y dueños de archivos por worktree: ver
-ese doc.
+Fase activa: **Fase 16** (navegación tipo Instagram + eliminar mascota),
+planificada en `FASE16-navegacion-mascota.md`. Alcance chico, dos partes que se
+trabajan en paralelo sin solapamiento de archivos:
+
+- **Parte 1 — navegación** (`feature/perfil-navegacion`): Perfil pasa a ser tab
+  y Ajustes cuelga de él como pantalla push. **Toma la definición de tabs**
+  (`app/app/(tabs)/_layout.jsx`, `app/app/_layout.jsx` y el nuevo
+  `app/components/tabsConfig.js`): nadie más los toca mientras dure la parte.
+- **Parte 2 — eliminar mascota** (`feature/eliminar-mascota`): archivar la
+  mascota compartida. No toca navegación raíz.
+
+> **Nota de rutas (Parte 1, 2026-07-22):** Ajustes dejó de ser tab. Vive en
+> `app/app/ajustes/index.jsx` — la ruta pública sigue siendo `/ajustes` y
+> `/ajustes/notificaciones` sigue colgando de ella. El Perfil se movió a
+> `app/app/(tabs)/perfil.jsx`; `/perfil` no cambió.
+
+Fase 14 cerrada (mascota independiente + perfil de usuario), planificada en
+`FASE14-mascota-perfil.md`.
 
 > **AVISO (Agente A, 2026-07-21) — `schema.prisma` reabierto de forma aditiva
 > (Fase 0-bis):** se agregan a `MascotaAmistad` los campos `especie String?` y

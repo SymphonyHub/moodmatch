@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { Switch, View, Text, TextInput, useColorScheme } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { THEMES, AUTO_THEME_ID, CUSTOM_THEME_ID, resolveThemeId } from '../../theme/themes';
 import { useTheme, makeThemedStyles, ThemeScope } from '../../theme/ThemeContext';
 import {
@@ -441,6 +443,13 @@ export default function AjustesScreen() {
     }
   };
 
+  // Ajustes cuelga del Perfil, así que "Ver mi perfil" casi siempre es volver a
+  // la pantalla anterior; navegar de nuevo apilaría un duplicado.
+  const handleVerPerfil = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/perfil');
+  };
+
   const handleCerrarSesion = async () => {
     await unregisterPushTokenForLogout();
     await AsyncStorage.removeItem('token');
@@ -448,128 +457,157 @@ export default function AjustesScreen() {
   };
 
   return (
-    <KeyboardAwareScrollView
-      contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
-      bottomOffset={24}
-    >
-      <SectionCard
-        title="Apariencia"
-        hint="Toca un tema para previsualizarlo. Nada cambia hasta que lo apliques."
-      >
-        <ThemeScope theme={previewTheme}>
-          <PreviewMock />
-        </ThemeScope>
+    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+      <View style={styles.header}>
+        <Tappable
+          style={styles.back}
+          onPress={() => router.back()}
+          haptic={false}
+          accessibilityLabel="Volver a mi perfil"
+        >
+          <Ionicons name="arrow-back" size={22} color={theme.colors.onHeader} />
+        </Tappable>
+        <View style={styles.headerCopy}>
+          <Text style={styles.headerTitle}>Ajustes</Text>
+        </View>
+      </View>
 
-        <View style={styles.opciones}>
-          {THEME_OPTIONS.map((opt) => (
-            <ThemeOptionRow
-              key={opt.id}
-              option={opt}
-              selected={candidate === opt.id}
-              onPress={() => setCandidate(opt.id)}
-              customDraft={draft}
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        bottomOffset={24}
+      >
+        <SectionCard
+          title="Apariencia"
+          hint="Toca un tema para previsualizarlo. Nada cambia hasta que lo apliques."
+        >
+          <ThemeScope theme={previewTheme}>
+            <PreviewMock />
+          </ThemeScope>
+
+          <View style={styles.opciones}>
+            {THEME_OPTIONS.map((opt) => (
+              <ThemeOptionRow
+                key={opt.id}
+                option={opt}
+                selected={candidate === opt.id}
+                onPress={() => setCandidate(opt.id)}
+                customDraft={draft}
+              />
+            ))}
+          </View>
+
+          {isCustomCandidate && (
+            <CustomThemeEditor
+              draft={draft}
+              onChangeConfig={changeConfig}
+              onRename={renameDraft}
+              issues={contrastIssues}
+              palettes={customConfig.palettes}
+              activeId={customConfig.activeId}
+              applied={applied}
+              onSelectPalette={selectPalette}
+              onDeletePalette={removePaletteById}
+              onNewPalette={newPalette}
+              onSavePalette={savePaletteDraft}
+              canSave={canSave}
             />
-          ))}
-        </View>
+          )}
 
-        {isCustomCandidate && (
-          <CustomThemeEditor
-            draft={draft}
-            onChangeConfig={changeConfig}
-            onRename={renameDraft}
-            issues={contrastIssues}
-            palettes={customConfig.palettes}
-            activeId={customConfig.activeId}
-            applied={applied}
-            onSelectPalette={selectPalette}
-            onDeletePalette={removePaletteById}
-            onNewPalette={newPalette}
-            onSavePalette={savePaletteDraft}
-            canSave={canSave}
-          />
-        )}
+          <Tappable
+            style={[
+              styles.btnAplicar,
+              (!isDirty || isApplying || (isCustomCandidate && !customPassesAA)) &&
+                styles.btnAplicarDisabled,
+            ]}
+            onPress={handleAplicar}
+            disabled={!isDirty || isApplying || (isCustomCandidate && !customPassesAA)}
+            accessibilityHint={
+              isCustomCandidate && !customPassesAA
+                ? 'Corrige el contraste de la paleta antes de aplicarla'
+                : undefined
+            }
+          >
+            <Text style={styles.btnAplicarTxt}>
+              {isCustomCandidate && !customPassesAA
+                ? 'Corrige el contraste para aplicar'
+                : isDirty
+                  ? `Aplicar tema ${candidateName}`
+                  : 'Este es tu tema actual'}
+            </Text>
+          </Tappable>
+        </SectionCard>
 
-        <Tappable
-          style={[
-            styles.btnAplicar,
-            (!isDirty || isApplying || (isCustomCandidate && !customPassesAA)) &&
-              styles.btnAplicarDisabled,
-          ]}
-          onPress={handleAplicar}
-          disabled={!isDirty || isApplying || (isCustomCandidate && !customPassesAA)}
-          accessibilityHint={
-            isCustomCandidate && !customPassesAA
-              ? 'Corrige el contraste de la paleta antes de aplicarla'
-              : undefined
-          }
-        >
-          <Text style={styles.btnAplicarTxt}>
-            {isCustomCandidate && !customPassesAA
-              ? 'Corrige el contraste para aplicar'
-              : isDirty
-                ? `Aplicar tema ${candidateName}`
-                : 'Este es tu tema actual'}
-          </Text>
-        </Tappable>
-      </SectionCard>
-
-      <SectionCard title="Accesibilidad" hint="Ajusta la lectura sin cambiar tu tema ni tu fuente.">
-        <View style={styles.accessibilityRow}>
-          <View style={styles.accessibilityCopy}>
-            <Text style={styles.accessibilityTitle}>Texto grande</Text>
-            <Text style={styles.accessibilityHint}>Aumenta los textos de toda la app.</Text>
+        <SectionCard title="Accesibilidad" hint="Ajusta la lectura sin cambiar tu tema ni tu fuente.">
+          <View style={styles.accessibilityRow}>
+            <View style={styles.accessibilityCopy}>
+              <Text style={styles.accessibilityTitle}>Texto grande</Text>
+              <Text style={styles.accessibilityHint}>Aumenta los textos de toda la app.</Text>
+            </View>
+            <Switch
+              value={textScale === LARGE_TEXT_SCALE}
+              onValueChange={(enabled) => setTextScale(enabled ? LARGE_TEXT_SCALE : 1)}
+              trackColor={{ false: theme.colors.border, true: theme.colors.primarySoftBorder }}
+              thumbColor={textScale === LARGE_TEXT_SCALE ? theme.colors.primary : theme.colors.surface}
+              accessibilityLabel="Texto grande"
+              accessibilityHint="Aumenta el tamaño de los textos de la aplicación"
+            />
           </View>
-          <Switch
-            value={textScale === LARGE_TEXT_SCALE}
-            onValueChange={(enabled) => setTextScale(enabled ? LARGE_TEXT_SCALE : 1)}
-            trackColor={{ false: theme.colors.border, true: theme.colors.primarySoftBorder }}
-            thumbColor={textScale === LARGE_TEXT_SCALE ? theme.colors.primary : theme.colors.surface}
-            accessibilityLabel="Texto grande"
-            accessibilityHint="Aumenta el tamaño de los textos de la aplicación"
-          />
-        </View>
-      </SectionCard>
+        </SectionCard>
 
-      <SectionCard
-        title="Notificaciones"
-        hint="Elige qué avisos quieres recibir y cuándo prefieres silencio."
-      >
-        <Tappable
-          style={styles.settingsLink}
-          onPress={() => router.push('/ajustes/notificaciones')}
-          accessibilityLabel="Abrir preferencias de notificaciones"
+        <SectionCard
+          title="Notificaciones"
+          hint="Elige qué avisos quieres recibir y cuándo prefieres silencio."
         >
-          <View style={styles.settingsLinkCopy}>
-            <Text style={styles.settingsLinkTitle}>Preferencias y no molestar</Text>
-            <Text style={styles.settingsLinkHint}>Mensajes, mascota, actividades y recordatorios</Text>
-          </View>
-          <Text style={styles.settingsLinkArrow}>›</Text>
-        </Tappable>
-      </SectionCard>
+          <Tappable
+            style={styles.settingsLink}
+            onPress={() => router.push('/ajustes/notificaciones')}
+            accessibilityLabel="Abrir preferencias de notificaciones"
+          >
+            <View style={styles.settingsLinkCopy}>
+              <Text style={styles.settingsLinkTitle}>Preferencias y no molestar</Text>
+              <Text style={styles.settingsLinkHint}>Mensajes, mascota, actividades y recordatorios</Text>
+            </View>
+            <Text style={styles.settingsLinkArrow}>›</Text>
+          </Tappable>
+        </SectionCard>
 
-      <SectionCard title="Cuenta">
-        <Tappable
-          style={styles.settingsLink}
-          onPress={() => router.push('/perfil')}
-          accessibilityLabel="Ver mi perfil"
-        >
-          <View style={styles.settingsLinkCopy}>
-            <Text style={styles.settingsLinkTitle}>Ver mi perfil</Text>
-            <Text style={styles.settingsLinkHint}>Tu foto, racha, amigos y mascotas</Text>
-          </View>
-          <Text style={styles.settingsLinkArrow}>›</Text>
-        </Tappable>
-        <View style={styles.accountDivider} />
-        <Tappable style={styles.btnSalir} onPress={handleCerrarSesion} haptic={false}>
-          <Text style={styles.btnSalirTxt}>Cerrar sesión</Text>
-        </Tappable>
-      </SectionCard>
-    </KeyboardAwareScrollView>
+        <SectionCard title="Cuenta">
+          <Tappable
+            style={styles.settingsLink}
+            onPress={handleVerPerfil}
+            accessibilityLabel="Ver mi perfil"
+          >
+            <View style={styles.settingsLinkCopy}>
+              <Text style={styles.settingsLinkTitle}>Ver mi perfil</Text>
+              <Text style={styles.settingsLinkHint}>Tu foto, racha, amigos y mascotas</Text>
+            </View>
+            <Text style={styles.settingsLinkArrow}>›</Text>
+          </Tappable>
+          <View style={styles.accountDivider} />
+          <Tappable style={styles.btnSalir} onPress={handleCerrarSesion} haptic={false}>
+            <Text style={styles.btnSalirTxt}>Cerrar sesión</Text>
+          </Tappable>
+        </SectionCard>
+      </KeyboardAwareScrollView>
+    </SafeAreaView>
   );
 }
 
 const useStyles = makeThemedStyles((t) => ({
+  // Ajustes se abre como push desde el Perfil, así que trae su propio header
+  // (mismo patrón que app/ajustes/notificaciones.jsx) en vez del del navegador.
+  screen: { flex: 1, backgroundColor: t.colors.background },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: t.colors.headerBackground,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  back: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  headerCopy: { marginLeft: 6 },
+  headerTitle: { ...t.typography.type.title, color: t.colors.onHeader },
   container: {
     width: '100%',
     maxWidth: 680,

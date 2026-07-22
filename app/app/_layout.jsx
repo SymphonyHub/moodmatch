@@ -123,6 +123,8 @@ function ThemedStack() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="chat/[friendId]" animation="slide_from_right" />
         <Stack.Screen name="mascota/[amistadId]" animation="slide_from_right" />
+        {/* Ajustes ya no es tab: se abre desde el engranaje del Perfil. */}
+        <Stack.Screen name="ajustes/index" animation="slide_from_right" />
         <Stack.Screen name="add-friend" />
       </Stack>
       <ThemeVeil />

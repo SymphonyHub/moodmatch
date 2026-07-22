@@ -233,7 +233,8 @@ export default function HomeScreen() {
     <View style={{ flex: 1 }}>
       <View style={styles.profileHeader}>
         <Tappable
-          onPress={() => router.push('/perfil')}
+          // Perfil ahora es tab: navigate cambia de pestaña en vez de apilarla.
+          onPress={() => router.navigate('/perfil')}
           haptic={false}
           accessibilityRole="button"
           accessibilityLabel="Ver mi perfil"

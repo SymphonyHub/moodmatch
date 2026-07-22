@@ -29,9 +29,11 @@ const CONTENT = {
     body: 'Una amistad aceptó tu invitación.',
     data: { url: '/(tabs)/amigos', type: 'amistad' },
   }),
-  invitacion_mascota: () => ({
+  invitacion_mascota: (nombreEspecie) => ({
     title: 'Te invitaron a cuidar una mascota',
-    body: 'Una amistad quiere cuidar una mascota contigo. Puedes aceptar cuando quieras.',
+    body: nombreEspecie
+      ? `Te proponen cuidar a ${nombreEspecie} juntos. Puedes aceptar, proponer otra especie o rechazar.`
+      : 'Una amistad quiere cuidar una mascota contigo. Puedes aceptar cuando quieras.',
     data: { url: '/(tabs)/mascota', type: 'invitacion_mascota' },
   }),
 };
@@ -102,8 +104,8 @@ const notifyPetNeedsAttention = (userId, friendshipId, options = {}) =>
     collapseId: `mascota-${friendshipId}`,
   });
 
-const notifyPetInvitation = ({ toUserId, friendshipId }, options = {}) =>
-  sendUserNotification(toUserId, 'invitacion_mascota', CONTENT.invitacion_mascota(), {
+const notifyPetInvitation = ({ toUserId, friendshipId, nombreEspecie }, options = {}) =>
+  sendUserNotification(toUserId, 'invitacion_mascota', CONTENT.invitacion_mascota(nombreEspecie), {
     ...options,
     collapseId: `invitacion-mascota-${friendshipId}`,
   });

@@ -16,6 +16,7 @@ import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../../components/Tappable';
 import MascotaSprite from '../../mascota/MascotaSprite';
 import { estadoMascota } from '../../mascota/estadoMascota';
+import { nombreEspecie } from '../../mascota/especiesCatalogo';
 
 // Progreso hacia la próxima evolución (Cachorro→Joven en 16, Joven→Adulta en
 // 36). El backend ya entrega la etapa; aquí solo se dibuja el avance. La
@@ -151,7 +152,7 @@ export default function MascotaDetalleScreen() {
         </View>
         <Text style={styles.nombreHero} numberOfLines={1}>{mascota.nombre}</Text>
         <Text style={styles.etapaHero}>
-          {etapaNombre} · {estado.etiqueta}
+          {nombreEspecie(mascota.especie)} · {etapaNombre} · {estado.etiqueta}
         </Text>
       </View>
 

@@ -11,22 +11,26 @@ jest.mock('@expo/vector-icons/Ionicons', () => 'Ionicons');
 
 import MascotaScreen from '../app/(tabs)/mascota';
 import MascotaDetalleScreen from '../app/mascota/[amistadId]';
+import SelectorEspecie from '../components/mascota/SelectorEspecie';
 import {
   apiGetSeccionMascota,
   apiInvitarMascota,
+  apiContraproponerEspecie,
   apiAceptarInvitacionMascota,
   apiRechazarInvitacionMascota,
 } from '../services/api';
 
-test('las pantallas de la sección Mascota exportan componentes', () => {
+test('las pantallas y el selector de especie exportan componentes', () => {
   expect(typeof MascotaScreen).toBe('function');
   expect(typeof MascotaDetalleScreen).toBe('function');
+  expect(typeof SelectorEspecie).toBe('function');
 });
 
 test('la API de la sección Mascota está disponible', () => {
   [
     apiGetSeccionMascota,
     apiInvitarMascota,
+    apiContraproponerEspecie,
     apiAceptarInvitacionMascota,
     apiRechazarInvitacionMascota,
   ].forEach((fn) => expect(typeof fn).toBe('function'));

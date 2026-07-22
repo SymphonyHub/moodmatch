@@ -1,6 +1,7 @@
 export const DEFAULT_NOTIFICATION_PREFERENCES = Object.freeze({
   mensajes: true,
   mascota: true,
+  mascota_social: true,
   actividades: true,
   recordatorio: true,
   amistad: true,
@@ -11,6 +12,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES = Object.freeze({
 export const NOTIFICATION_OPTIONS = [
   { key: 'mensajes', label: 'Mensajes nuevos', hint: 'Cuando una amistad te escribe.' },
   { key: 'mascota', label: 'Mascota', hint: 'Si lleva más de 48 horas sin cuidados.' },
+  { key: 'mascota_social', label: 'Cuidados de tu amistad', hint: 'Cuando tu amistad pasa a cuidar a la mascota.' },
   { key: 'actividades', label: 'Actividades compartidas', hint: 'Cuando completan una actividad contigo.' },
   { key: 'recordatorio', label: 'Registro de ánimo', hint: 'Un recordatorio suave después de varios días.' },
   { key: 'amistad', label: 'Invitaciones', hint: 'Cuando una amistad acepta tu invitación.' },

@@ -1,9 +1,10 @@
-const NOTIFICATION_TYPES = ['mensajes', 'mascota', 'actividades', 'recordatorio', 'amistad', 'invitacion_mascota'];
+const NOTIFICATION_TYPES = ['mensajes', 'mascota', 'mascota_social', 'actividades', 'recordatorio', 'amistad', 'invitacion_mascota'];
 const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
 const DEFAULT_NOTIFICATION_PREFERENCES = Object.freeze({
   mensajes: true,
   mascota: true,
+  mascota_social: true,
   actividades: true,
   recordatorio: true,
   amistad: true,

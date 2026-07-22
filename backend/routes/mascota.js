@@ -4,29 +4,38 @@ const { requireAuth } = require('../middleware/auth');
 const {
   CARINO_POR_ACTIVIDAD,
   CARINO_POR_CUIDADO,
+  CARINO_POR_REGALO,
   COOLDOWN_CUIDADO_MS,
   NOMBRE_MASCOTA,
+  PREFIJO_ACTIVIDAD,
+  PREFIJO_REGALO,
   agregarHito,
+  aplicarProgresoReto,
   asegurarMascota,
   bonusReto,
   calcularPersonalidad,
-  claveUsuarioReto,
   crearReto,
+  estadoRegalo,
   etapaVisual,
+  filtroMensajesVisibles,
   guardarPropuesta,
   leerPropuesta,
+  marcadorRegalo,
   mascotaAceptada,
   mensajeActividad,
   necesitaAtencion,
   presentarMascota,
   retoExpirado,
+  senalDeReto,
   sumarCarino,
 } = require('../lib/mascota');
 const { esEspecieValida, nombreEspecie } = require('../lib/catalogoEspeciesInvitacion');
+const { diaUTC } = require('../lib/interaccionesSociales');
 const {
   dispatchNotification,
   notifyPetInvitation,
   notifySharedActivity,
+  notifySharedCare,
 } = require('../lib/notificationEvents');
 
 const buscarAmistadPropia = (amistadId, userId, db = prisma) =>
@@ -42,7 +51,25 @@ const parseAmistadId = (raw) => {
   return Number.isInteger(id) && id > 0 ? id : null;
 };
 
-async function mascotaVisible(db, mascota, amistad, userId) {
+// Último regalo del vínculo (en cualquier dirección) para saber si se puede
+// mandar otro. Un regalo se registra como un Cheer marcado con PREFIJO_REGALO,
+// mismo patrón idempotente que las actividades compartidas.
+async function estadoRegaloVinculo(db, amistad, ahora = new Date()) {
+  const ultimo = await db.cheer.findFirst({
+    where: {
+      message: { startsWith: PREFIJO_REGALO },
+      OR: [
+        { fromUserId: amistad.userId, toUserId: amistad.friendId },
+        { fromUserId: amistad.friendId, toUserId: amistad.userId },
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+    select: { createdAt: true },
+  });
+  return estadoRegalo(ultimo ? new Date(ultimo.createdAt).getTime() : null, ahora);
+}
+
+async function mascotaVisible(db, mascota, amistad, userId, opciones = {}) {
   const entries = await db.moodEntry.findMany({
     where: {
       userId: { in: [amistad.userId, amistad.friendId] },
@@ -52,7 +79,54 @@ async function mascotaVisible(db, mascota, amistad, userId) {
     orderBy: { createdAt: 'desc' },
     take: 20,
   });
-  return presentarMascota(mascota, amistad, userId, calcularPersonalidad(entries));
+  // El estado del regalo solo se consulta en las pantallas de detalle que lo
+  // muestran (conRegalo), para no pagar la consulta en los flujos de lista.
+  const regalo = opciones.conRegalo ? await estadoRegaloVinculo(db, amistad) : null;
+  return presentarMascota(mascota, amistad, userId, calcularPersonalidad(entries), { regalo });
+}
+
+// Reúne de la base solo la señal que el tipo de reto activo necesita para
+// evaluar su progreso, dentro de su ventana. Los tipos de cuidado no consultan
+// nada (el propio cuidado marca el avance). u1/u2 son los dos lados del vínculo.
+async function reunirSenales(db, reto, amistad) {
+  const senal = senalDeReto(reto.tipo);
+  const u1 = amistad.userId;
+  const u2 = amistad.friendId;
+  const ventana = { gte: new Date(reto.iniciadoEn), lte: new Date(reto.expiraEn) };
+
+  if (senal === 'animo') {
+    const entries = await db.moodEntry.findMany({
+      where: { userId: { in: [u1, u2] }, createdAt: ventana },
+      select: { userId: true, createdAt: true },
+    });
+    const dias = { [u1]: new Set(), [u2]: new Set() };
+    for (const e of entries) dias[e.userId]?.add(diaUTC(e.createdAt));
+    const ambosMismoDia = [...dias[u1]].some((d) => dias[u2].has(d));
+    return {
+      animoUsuario1: dias[u1].size > 0,
+      animoUsuario2: dias[u2].size > 0,
+      ambosMismoDia,
+    };
+  }
+
+  if (senal === 'mensajes') {
+    const [a, b] = await Promise.all([
+      db.cheer.count({ where: { fromUserId: u1, toUserId: u2, createdAt: ventana, ...filtroMensajesVisibles } }),
+      db.cheer.count({ where: { fromUserId: u2, toUserId: u1, createdAt: ventana, ...filtroMensajesVisibles } }),
+    ]);
+    return { mensajesUsuario1: a, mensajesUsuario2: b, paresMensajes: Math.min(a, b) };
+  }
+
+  if (senal === 'actividad') {
+    const marcador = { message: { startsWith: PREFIJO_ACTIVIDAD }, createdAt: ventana };
+    const [a, b] = await Promise.all([
+      db.cheer.count({ where: { fromUserId: u1, toUserId: u2, ...marcador } }),
+      db.cheer.count({ where: { fromUserId: u2, toUserId: u1, ...marcador } }),
+    ]);
+    return { actividadUsuario1: a > 0, actividadUsuario2: b > 0 };
+  }
+
+  return {};
 }
 
 // Carga la mascota sin crearla y exige que la invitación esté aceptada. Si no,
@@ -271,7 +345,7 @@ router.get('/:amistadId', requireAuth, async (req, res) => {
   const mascota = await exigirAceptada(res, amistadId);
   if (!mascota) return undefined;
 
-  return res.json({ mascota: await mascotaVisible(prisma, mascota, amistad, req.user.userId) });
+  return res.json({ mascota: await mascotaVisible(prisma, mascota, amistad, req.user.userId, { conRegalo: true }) });
 });
 
 // POST /api/mascota/:amistadId/cuidado — cada integrante tiene su propio
@@ -296,11 +370,17 @@ router.post('/:amistadId/cuidado', requireAuth, async (req, res) => {
     }
 
     let reto = actual.retoCooperativo;
-    if (!reto || retoExpirado(reto, ahora) || reto.completado) reto = crearReto(ahora);
-    const clavePropia = claveUsuarioReto(amistad, req.user.userId);
-    reto[clavePropia] = true;
-    const completado = reto.progresoUsuario1 && reto.progresoUsuario2;
-    reto.completado = completado;
+    if (!reto || retoExpirado(reto, ahora) || reto.completado) {
+      reto = crearReto(ahora, reto?.tipo);
+    }
+    // El progreso del reto activo se recalcula con la señal que le corresponde
+    // (cuidado en dúo, ánimo el mismo día, mensajes o actividad compartida).
+    const senales = await reunirSenales(tx, reto, amistad);
+    reto = aplicarProgresoReto(reto, {
+      esUsuario1: amistad.userId === req.user.userId,
+      senales,
+    });
+    const completado = reto.completado;
 
     const premioReto = completado ? bonusReto(actual.nivelCarino + CARINO_POR_CUIDADO) : 0;
     const nuevoNivel = actual.nivelCarino + CARINO_POR_CUIDADO + premioReto;
@@ -324,10 +404,20 @@ router.post('/:amistadId/cuidado', requireAuth, async (req, res) => {
   if (resultado.cooldown) {
     return res.status(429).json({
       error: 'Tu próximo cuidado estará disponible en menos de 24 horas',
-      mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId),
+      mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId, { conRegalo: true }),
     });
   }
-  return res.status(201).json({ mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId) });
+
+  // Notificación social suave hacia la otra persona: "tu amistad cuidó a Lumi".
+  // El cooldown de 24h ya la acota a ~1 por persona/día.
+  const otroId = amistad.userId === req.user.userId ? amistad.friendId : amistad.userId;
+  dispatchNotification(notifySharedCare({
+    toUserId: otroId,
+    friendshipId: amistad.id,
+    nombre: resultado.mascota.nombre,
+  }));
+
+  return res.status(201).json({ mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId, { conRegalo: true }) });
 });
 
 router.post('/:amistadId/reto', requireAuth, async (req, res) => {
@@ -342,14 +432,56 @@ router.post('/:amistadId/reto', requireAuth, async (req, res) => {
     if (actual.retoCooperativo && !actual.retoCooperativo.completado && !retoExpirado(actual.retoCooperativo)) {
       return { activo: true, mascota: actual };
     }
+    // Rota al siguiente tipo del catálogo, distinto al anterior.
     const mascota = await tx.mascotaAmistad.update({
       where: { amistadId: amistad.id },
-      data: { retoCooperativo: crearReto() },
+      data: { retoCooperativo: crearReto(new Date(), actual.retoCooperativo?.tipo) },
     });
     return { activo: false, mascota };
   });
   if (resultado.activo) return res.status(409).json({ error: 'Ya hay un reto cooperativo en curso' });
-  return res.status(201).json({ mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId) });
+  return res.status(201).json({ mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId, { conRegalo: true }) });
+});
+
+// POST /api/mascota/:amistadId/regalo — un integrante manda un empujón de
+// cariño a la mascota del vínculo. Máximo uno por semana por amistad (da igual
+// quién lo envíe). Se registra como Cheer marcado, idempotente y sin migración.
+router.post('/:amistadId/regalo', requireAuth, async (req, res) => {
+  const amistadId = parseAmistadId(req.params.amistadId);
+  if (!amistadId) return res.status(400).json({ error: 'amistadId inválido' });
+
+  const amistad = await buscarAmistadPropia(amistadId, req.user.userId);
+  if (!amistad) return res.status(404).json({ error: 'Amistad no encontrada' });
+  if (!(await exigirAceptada(res, amistadId))) return undefined;
+
+  const otroId = amistad.userId === req.user.userId ? amistad.friendId : amistad.userId;
+  const ahora = new Date();
+
+  const resultado = await prisma.$transaction(async (tx) => {
+    const estado = await estadoRegaloVinculo(tx, amistad, ahora);
+    if (!estado.puedeRegalar) return { limitado: true, disponibleEn: estado.disponibleEn };
+
+    await tx.cheer.create({
+      data: {
+        fromUserId: req.user.userId,
+        toUserId: otroId,
+        message: marcadorRegalo(ahora.getTime()),
+        seen: true,
+      },
+    });
+    const mascota = await sumarCarino(tx, amistad.id, CARINO_POR_REGALO);
+    return { limitado: false, mascota };
+  }, { isolationLevel: 'Serializable' });
+
+  if (resultado.limitado) {
+    return res.status(429).json({
+      error: 'Ya enviaron un regalo esta semana. Podrán mandar otro más adelante.',
+      disponibleEn: resultado.disponibleEn,
+    });
+  }
+  return res.status(201).json({
+    mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId, { conRegalo: true }),
+  });
 });
 
 router.patch('/:amistadId/nombre', requireAuth, async (req, res) => {
@@ -390,7 +522,7 @@ router.patch('/:amistadId/nombre', requireAuth, async (req, res) => {
     return res.status(409).json({ error: 'Tu propuesta está esperando la confirmación de tu amistad' });
   }
   return res.json({
-    mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId),
+    mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId, { conRegalo: true }),
     confirmado: resultado.confirmado,
   });
 });

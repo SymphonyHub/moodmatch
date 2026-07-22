@@ -12,6 +12,7 @@ jest.mock('../lib/notificationEvents', () => ({
   dispatchNotification: jest.fn(),
   notifyPetInvitation: jest.fn(),
   notifySharedActivity: jest.fn(),
+  notifySharedCare: jest.fn(),
 }));
 
 const request = require('supertest');

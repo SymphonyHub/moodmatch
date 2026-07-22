@@ -18,6 +18,9 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Config local de herramientas
+.claude/
+
 # Metro
 .metro-health-check*
 

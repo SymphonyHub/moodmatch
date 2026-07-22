@@ -24,7 +24,7 @@
 
 ## 1. Contexto y estado del proyecto
 
-La app venía trabajándose con Claude Code en 4 agentes paralelos sobre worktrees independientes, cada uno dueño de una porción del código, con merges secuenciales a `main` validados con `npm test` y push diferido en batch. Esta fase se ejecuta con **Kimi K3** en lugar de Claude Code, pero se mantiene exactamente la misma disciplina de trabajo: un agente por worktree, una rama por feature, un merge a la vez.
+La app venía trabajándose en 4 agentes paralelos sobre worktrees independientes, cada uno dueño de una porción del código, con merges secuenciales a `main` validados con `npm test` y push diferido en batch. Esta fase mantiene exactamente la misma disciplina de trabajo: un agente por worktree, una rama por feature, un merge a la vez.
 
 Las capturas de referencia muestran el estado actual de "Amigos" (vacío, invitación por QR), el login (funcional pero visualmente plano), y "Actividades" en sus dos pestañas ("Para mí" con inconsistencias de estilo entre tarjetas, "Con amigos" con solo 3 acciones fijas y sin botón de "hecho").
 

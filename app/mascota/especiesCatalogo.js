@@ -1,23 +1,40 @@
 // Catálogo de especies para el carrusel de propuesta del flujo de invitación.
 //
-// Este módulo NO es la fuente canónica: esa la posee Agente C (Parte B) con las
-// siluetas SVG por etapa. El carrusel solo necesita id + nombre + un ícono chico.
-//
-// Los ids son los canónicos confirmados por C (kebab, sin acentos); los emojis
-// siguen siendo placeholders hasta que lleguen las siluetas SVG por etapa.
-//   Cuando el módulo de especies del frontend de C llegue a esta rama,
-//   reexportar la lista desde ahí (derivando id/nombre + un ícono) en vez de
-//   mantener esta copia, para no tener dos catálogos que se desincronicen. La
-//   UI que consume ESPECIES/emojiEspecie/nombreEspecie no cambia.
-export const ESPECIES = [
-  { id: 'polluelo', nombre: 'Polluelo', emoji: '🐤' },
-  { id: 'nutria-lunar', nombre: 'Nutria lunar', emoji: '🦦' },
-  { id: 'espiritu-calma', nombre: 'Espíritu de calma', emoji: '🌙' },
-  { id: 'pinguino', nombre: 'Pingüino', emoji: '🐧' },
-  { id: 'perro', nombre: 'Perro', emoji: '🐶' },
-  { id: 'dinosaurio', nombre: 'Dinosaurio', emoji: '🦕' },
-  { id: 'huevo', nombre: 'Huevo', emoji: '🥚' },
-];
+// La FUENTE CANÓNICA de qué especies existen es `./sprites/especies` (Parte C):
+// su lista de ids es la única verdad y este módulo la reutiliza tal cual en vez
+// de mantener una copia que se pueda desincronizar. Aquí solo se añaden los datos
+// de presentación que el módulo canónico no tiene: el nombre y un emoji chico
+// para el carrusel de invitación (las siluetas SVG reales las dibujan
+// MascotaSprite/MascotaAnimada). Si C agrega, quita o reordena una especie, esta
+// lista lo sigue sola; solo habría que sumar el nombre/emoji nuevo (con fallback
+// seguro si falta).
+import { ESPECIES as IDS_CANONICOS } from './sprites/especies';
+
+const NOMBRES = {
+  polluelo: 'Polluelo',
+  'nutria-lunar': 'Nutria lunar',
+  'espiritu-calma': 'Espíritu de calma',
+  pinguino: 'Pingüino',
+  perro: 'Perro',
+  dinosaurio: 'Dinosaurio',
+  huevo: 'Huevo',
+};
+
+const EMOJIS = {
+  polluelo: '🐤',
+  'nutria-lunar': '🦦',
+  'espiritu-calma': '🌙',
+  pinguino: '🐧',
+  perro: '🐶',
+  dinosaurio: '🦕',
+  huevo: '🥚',
+};
+
+export const ESPECIES = IDS_CANONICOS.map((id) => ({
+  id,
+  nombre: NOMBRES[id] ?? 'Mascota',
+  emoji: EMOJIS[id] ?? '🐾',
+}));
 
 export const especiePorId = (id) => ESPECIES.find((e) => e.id === id) ?? null;
 

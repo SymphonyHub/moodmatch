@@ -1,36 +1,31 @@
 // Catálogo de especies para el flujo de invitación (Fase 14, multi-especie).
 //
-// Este módulo NO es la fuente canónica de especies: esa la posee Agente C
-// (Parte B) en su propio `backend/lib/especies.js`, con las siluetas/etapas.
-// Aquí solo se necesitan ids + nombres para validar la especie propuesta y
-// armar el texto de la notificación de invitación.
-//
-// Los ids son los canónicos confirmados por C (kebab, sin acentos) y deben
-// coincidir uno a uno con su módulo de especies; su orden es además el índice
-// del fallback determinista para mascotas legadas — no reordenar ni renombrar.
-//
-// Plan de integración con C:
-//   Cuando el módulo de especies de C (con siluetas/etapas) llegue a esta rama,
-//   reemplazar la constante ESPECIES de abajo por un re-export desde ese módulo
-//   (p.ej. `const { ESPECIES } = require('./especies');`) para NO mantener dos
-//   catálogos que se puedan desincronizar. El resto de este archivo
-//   (esEspecieValida / nombreEspecie) queda igual y sigue siendo la interfaz
-//   que usa routes/mascota.js.
-const ESPECIES = [
-  { id: 'polluelo', nombre: 'Polluelo' },
-  { id: 'nutria-lunar', nombre: 'Nutria lunar' },
-  { id: 'espiritu-calma', nombre: 'Espíritu de calma' },
-  { id: 'pinguino', nombre: 'Pingüino' },
-  { id: 'perro', nombre: 'Perro' },
-  { id: 'dinosaurio', nombre: 'Dinosaurio' },
-  { id: 'huevo', nombre: 'Huevo' },
-];
+// La FUENTE CANÓNICA de qué especies existen es `./especies` (Parte C): su lista
+// de ids es la única verdad y este módulo la reutiliza tal cual en vez de
+// mantener una copia que se pueda desincronizar. Aquí solo se añaden los nombres
+// de display —dato de presentación que el módulo canónico no tiene— para validar
+// la especie propuesta y armar el texto de la notificación de invitación. Si C
+// agrega, quita o reordena una especie, esta lista lo sigue sola; solo habría
+// que sumar el nombre nuevo al mapa de abajo (con fallback seguro si falta).
+const { ESPECIES: IDS_CANONICOS } = require('./especies');
 
-const ESPECIE_IDS = new Set(ESPECIES.map((e) => e.id));
+const NOMBRES = {
+  polluelo: 'Polluelo',
+  'nutria-lunar': 'Nutria lunar',
+  'espiritu-calma': 'Espíritu de calma',
+  pinguino: 'Pingüino',
+  perro: 'Perro',
+  dinosaurio: 'Dinosaurio',
+  huevo: 'Huevo',
+};
+
+const ESPECIES = IDS_CANONICOS.map((id) => ({ id, nombre: NOMBRES[id] ?? 'Mascota' }));
+
+const ESPECIE_IDS = new Set(IDS_CANONICOS);
 
 const esEspecieValida = (id) => typeof id === 'string' && ESPECIE_IDS.has(id);
 
-const nombreEspecie = (id) => ESPECIES.find((e) => e.id === id)?.nombre ?? 'una mascota';
+const nombreEspecie = (id) => NOMBRES[id] ?? 'una mascota';
 
 module.exports = {
   ESPECIES,

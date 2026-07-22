@@ -224,6 +224,15 @@ export const apiIniciarRetoMascota = async (amistadId) => {
   }).then((r) => r.json());
 };
 
+// Regalo entre amigos: un empujón de cariño a la mascota del vínculo. Máximo
+// uno por semana por amistad (el backend responde 429 con `disponibleEn`).
+export const apiRegalarMascota = async (amistadId) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/mascota/${amistadId}/regalo`, {
+    method: 'POST', headers,
+  }).then((r) => r.json());
+};
+
 export const apiProponerNombreMascota = async (amistadId, nombre) => {
   const headers = await authHeaders();
   return fetch(`${API_URL}/api/mascota/${amistadId}/nombre`, {

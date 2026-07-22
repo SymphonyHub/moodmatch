@@ -34,6 +34,11 @@ const CONTENT = {
     body: 'Una amistad quiere cuidar una mascota contigo. Puedes aceptar cuando quieras.',
     data: { url: '/(tabs)/mascota', type: 'invitacion_mascota' },
   }),
+  mascota_social: (nombre) => ({
+    title: `${nombre} recibió cariño`,
+    body: 'Tu amistad pasó a cuidarla hoy. Cuando puedas, acompáñala tú también.',
+    data: { url: '/(tabs)/mascota', type: 'mascota_social' },
+  }),
 };
 
 async function sendUserNotification(userId, type, content, options = {}) {
@@ -108,6 +113,15 @@ const notifyPetInvitation = ({ toUserId, friendshipId }, options = {}) =>
     collapseId: `invitacion-mascota-${friendshipId}`,
   });
 
+// Notificación social suave: "tu amistad cuidó a Lumi hoy". El cooldown de 24h
+// del cuidado ya la limita a ~1 por persona/día; el collapseId coalesce
+// cualquier repetición del día en un solo aviso. Tono sin presión.
+const notifySharedCare = ({ toUserId, friendshipId, nombre = 'Lumi' }, options = {}) =>
+  sendUserNotification(toUserId, 'mascota_social', CONTENT.mascota_social(nombre), {
+    ...options,
+    collapseId: `mascota-social-${friendshipId}`,
+  });
+
 const notifyMoodReminder = (userId, options = {}) =>
   sendUserNotification(userId, 'recordatorio', CONTENT.recordatorio(), {
     ...options,
@@ -128,5 +142,6 @@ module.exports = {
   notifyPetInvitation,
   notifyPetNeedsAttention,
   notifySharedActivity,
+  notifySharedCare,
   sendUserNotification,
 };

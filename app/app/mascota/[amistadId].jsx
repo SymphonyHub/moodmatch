@@ -11,11 +11,13 @@ import {
   apiCuidarMascota,
   apiIniciarRetoMascota,
   apiProponerNombreMascota,
+  apiRegalarMascota,
 } from '../../services/api';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../../components/Tappable';
 import MascotaSprite from '../../mascota/MascotaSprite';
 import { estadoMascota } from '../../mascota/estadoMascota';
+import InteraccionesSociales from '../../mascota/InteraccionesSociales';
 
 // Progreso hacia la próxima evolución (Cachorro→Joven en 16, Joven→Adulta en
 // 36). El backend ya entrega la etapa; aquí solo se dibuja el avance. La
@@ -84,6 +86,11 @@ export default function MascotaDetalleScreen() {
     'reto',
     () => apiIniciarRetoMascota(amistadId),
     'Nuevo reto cooperativo listo.',
+  );
+  const regalar = () => ejecutar(
+    'regalo',
+    () => apiRegalarMascota(amistadId),
+    `Le enviaste un regalo de cariño a ${mascota.nombre}.`,
   );
   const proponerNombre = () => {
     const propuesto = nombre.trim();
@@ -186,7 +193,7 @@ export default function MascotaDetalleScreen() {
 
       {/* Reto cooperativo activo */}
       <View style={styles.bloque}>
-        <Text style={styles.bloqueTitulo}>Reto cooperativo</Text>
+        <Text style={styles.bloqueTitulo}>Reto cooperativo{reto?.titulo ? ` · ${reto.titulo}` : ''}</Text>
         {reto ? (
           <>
             <Text style={styles.bloqueTexto}>
@@ -194,7 +201,8 @@ export default function MascotaDetalleScreen() {
                 ? '¡Reto completado! La siguiente etapa está más cerca.'
                 : reto.expirado
                   ? 'Este reto venció sin presión. Pueden iniciar otro cuando quieran.'
-                  : `Los dos cuiden a ${mascota.nombre} antes del ${new Date(reto.expiraEn).toLocaleDateString()}.`}
+                  : reto.descripcion
+                    ?? `Los dos cuiden a ${mascota.nombre} antes del ${new Date(reto.expiraEn).toLocaleDateString()}.`}
             </Text>
             {!reto.completado && !reto.expirado && (
               <Text style={styles.retoProgreso}>
@@ -217,6 +225,11 @@ export default function MascotaDetalleScreen() {
       {/* Slot del Agente B: regalos, racha compartida y catálogo ampliado de
           retos se integran aquí sin reescribir el resto de la pantalla. */}
       {/* __SLOT_INTERACCIONES_SOCIALES__ */}
+      <InteraccionesSociales
+        mascota={mascota}
+        onRegalar={regalar}
+        regalando={accion === 'regalo'}
+      />
 
       {/* Historial de hitos */}
       {hitos.length > 0 && (

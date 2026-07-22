@@ -1,9 +1,24 @@
+const {
+  DURACION_RETO_MS,
+  aplicarProgresoReto,
+  crearReto,
+  infoReto,
+  senalDeReto,
+} = require('./retosCooperativos');
+const {
+  CARINO_POR_REGALO,
+  COOLDOWN_REGALO_MS,
+  PREFIJO_REGALO,
+  estadoRegalo,
+  marcadorRegalo,
+  rachaBlanda,
+} = require('./interaccionesSociales');
+
 const NOMBRE_MASCOTA = 'Lumi';
 const CARINO_POR_PAR_DE_MENSAJES = 2;
 const CARINO_POR_ACTIVIDAD = 3;
 const CARINO_POR_CUIDADO = 6;
 const COOLDOWN_CUIDADO_MS = 24 * 60 * 60 * 1000;
-const DURACION_RETO_MS = 48 * 60 * 60 * 1000;
 const PET_ATTENTION_AFTER_MS = 48 * 60 * 60 * 1000;
 const PREFIJO_ACTIVIDAD = '__MASCOTA_ACTIVIDAD__:';
 const UMBRALES_ETAPA = [4, 10, 20, 40];
@@ -73,15 +88,6 @@ const agregarHito = (historial, hito, fecha = new Date()) => [
   { hito, fecha: fecha.toISOString() },
 ].slice(-20);
 
-const crearReto = (ahora = new Date()) => ({
-  tipo: 'CUIDADO_COMPARTIDO',
-  iniciadoEn: ahora.toISOString(),
-  expiraEn: new Date(ahora.getTime() + DURACION_RETO_MS).toISOString(),
-  progresoUsuario1: false,
-  progresoUsuario2: false,
-  completado: false,
-});
-
 const retoExpirado = (reto, ahora = new Date()) => !reto
   || !reto.expiraEn
   || new Date(reto.expiraEn).getTime() <= ahora.getTime();
@@ -120,6 +126,17 @@ function necesitaAtencion(mascota, ahora = new Date()) {
 const mascotaAceptada = (mascota) =>
   Boolean(mascota) && mascota.invitacionEstado === 'aceptada' && mascota.activa !== false;
 
+// Caso borde "amistad eliminada" (Fase 14): la mascota no se borra, se archiva
+// (activa:false) para conservar el historial de hitos por si la amistad se
+// restaura. Todas las mecánicas quedan inertes vía mascotaAceptada(). No hay
+// aún una ruta que elimine amistades, así que este helper es el punto único por
+// donde debería pasar ese archivado cuando exista.
+const archivarMascota = (db, amistadId) =>
+  db.mascotaAmistad.updateMany({
+    where: { amistadId, activa: true },
+    data: { activa: false },
+  });
+
 function calcularPersonalidad(entries) {
   const moods = Array.isArray(entries) ? entries.map((entry) => entry.moodType) : [];
   if (moods.length === 0) return 'curiosa';
@@ -147,7 +164,7 @@ function leerPropuesta(valor) {
 
 const guardarPropuesta = (nombre, propuestoPor) => JSON.stringify({ nombre, propuestoPor });
 
-function presentarMascota(mascota, amistad, userId, personalidad) {
+function presentarMascota(mascota, amistad, userId, personalidad, extra = {}) {
   const reto = mascota.retoCooperativo;
   const propuesta = leerPropuesta(mascota.nombrePropuesto);
   const clavePropia = claveUsuarioReto(amistad, userId);
@@ -176,12 +193,17 @@ function presentarMascota(mascota, amistad, userId, personalidad) {
     proximoCuidadoEn,
     reto: reto ? {
       tipo: reto.tipo,
+      ...infoReto(reto.tipo),
       expiraEn: reto.expiraEn,
       progresoPropio: Boolean(reto[clavePropia]),
       progresoCompanero: Boolean(reto[claveCompanero]),
       completado: Boolean(reto.completado),
       expirado: retoExpirado(reto),
     } : null,
+    racha: rachaBlanda(mascota),
+    // El estado del regalo depende de una consulta (último regalo del vínculo);
+    // la ruta lo pasa en `extra`. Si no viene, se omite en vez de inventarlo.
+    ...(extra.regalo ? { regalo: extra.regalo } : {}),
     nombrePropuesto: propuesta ? {
       nombre: propuesta.nombre,
       puedeConfirmar: propuesta.propuestoPor !== null && propuesta.propuestoPor !== userId,
@@ -193,27 +215,37 @@ function presentarMascota(mascota, amistad, userId, personalidad) {
 module.exports = {
   CARINO_POR_ACTIVIDAD,
   CARINO_POR_CUIDADO,
+  CARINO_POR_REGALO,
   COOLDOWN_CUIDADO_MS,
+  COOLDOWN_REGALO_MS,
   DURACION_RETO_MS,
   ESTADOS_INVITACION,
   NOMBRE_MASCOTA,
   PET_ATTENTION_AFTER_MS,
+  PREFIJO_ACTIVIDAD,
+  PREFIJO_REGALO,
   agregarHito,
+  aplicarProgresoReto,
+  archivarMascota,
   asegurarMascota,
   bonusReto,
   calcularPersonalidad,
   claveUsuarioReto,
   crearReto,
+  estadoRegalo,
   etapaVisual,
   filtroMensajesVisibles,
   guardarPropuesta,
   historialSeguro,
   leerPropuesta,
+  marcadorRegalo,
   mascotaAceptada,
   mensajeActividad,
   necesitaAtencion,
   presentarMascota,
+  rachaBlanda,
   registrarMensajeReciproco,
   retoExpirado,
+  senalDeReto,
   sumarCarino,
 };

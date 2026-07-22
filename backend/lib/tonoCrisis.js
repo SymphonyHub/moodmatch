@@ -84,11 +84,17 @@ const PATRONES_RECURSOS_CRISIS = [
 
 const LARGO_MAXIMO = 600;
 
+// Tope extendido para el único caso en que la brevedad estorba: la persona
+// pidió explícitamente una historia o un chiste (Fase 15). Es una garantía de
+// brevedad, no de seguridad — todos los demás filtros (crisis, listas negras,
+// recursos de crisis) corren idénticos sobre el texto más largo.
+const LARGO_MAXIMO_RELATO = 1100;
+
 // Validador post-respuesta del texto del modelo (CONTRATO-GEMINI.md 2.3):
 // true = utilizable, false = descartar y responder por plantilla.
-function validarTono(texto, mood) {
+function validarTono(texto, mood, { largoMaximo = LARGO_MAXIMO } = {}) {
   const t = normalizar(texto).trim();
-  if (!t || t.length > LARGO_MAXIMO) return false;
+  if (!t || t.length > largoMaximo) return false;
   const sinEspacios = t.replace(/[\s.\-()]/g, '');
   if (PATRONES_RECURSOS_CRISIS.some((p) => p.test(t) || p.test(sinEspacios))) return false;
   if (LISTA_NEGRA_UNIVERSAL.some((frase) => t.includes(frase))) return false;
@@ -106,5 +112,7 @@ module.exports = {
   MOODS_DIFICILES,
   LISTA_NEGRA_UNIVERSAL,
   LISTA_NEGRA_POSITIVIDAD,
+  LARGO_MAXIMO,
+  LARGO_MAXIMO_RELATO,
   validarTono,
 };

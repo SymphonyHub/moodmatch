@@ -40,6 +40,13 @@ necesitas un endpoint que no existe aún, créalo tú mismo dentro de tu propia 
 
 ## Estado actual
 
+> **AVISO (Fase 15, 2026-07-22) — `schema.prisma` tocado de forma aditiva:** se
+> agrega a `User` el campo `memoriaChat Json?` (nullable) para la memoria del
+> chat de emociones entre sesiones. Migración `fase15_memoria_chat`, generada
+> con `--create-only` y aplicada tras autorización explícita del usuario. Es
+> una sola columna nullable: no afecta a ningún otro agente ni a los datos
+> existentes, pero avisar antes de volver a tocar `User`.
+
 Fase activa: **Fase 14** (mascota independiente + perfil de usuario) —
 planificada en `FASE14-mascota-perfil.md`, con una Fase 0 (migración base)
 bloqueante. Reparto de agentes A/B/C/D y dueños de archivos por worktree: ver

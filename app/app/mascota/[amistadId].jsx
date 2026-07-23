@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import {
-  View, Text, ScrollView, ActivityIndicator, TextInput,
+  View, Text, ScrollView, ActivityIndicator, TextInput, Modal,
 } from 'react-native';
 import {
   router, useFocusEffect, useLocalSearchParams, Stack,
@@ -13,6 +13,7 @@ import {
   apiProponerNombreMascota,
   apiRegalarMascota,
   apiEquiparAccesorioMascota,
+  apiArchivarMascota,
 } from '../../services/api';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../../components/Tappable';
@@ -21,6 +22,7 @@ import { CATALOGO_ACCESORIOS } from '../../mascota/sprites/accesorios';
 import { estadoMascota } from '../../mascota/estadoMascota';
 import { nombreEspecie } from '../../mascota/especiesCatalogo';
 import SeccionSocial from '../../mascota/SeccionSocial';
+import { TEXTOS_PAUSA } from '../../mascota/textosPausa';
 
 // Progreso hacia la próxima evolución (Cachorro→Joven en 16, Joven→Adulta en
 // 36). El backend ya entrega la etapa; aquí solo se dibuja el avance. La
@@ -101,6 +103,7 @@ export default function MascotaDetalleScreen() {
   const [editarNombre, setEditarNombre] = useState(false);
   const [nombre, setNombre] = useState('');
   const [celebracion, setCelebracion] = useState(0);
+  const [confirmarPausa, setConfirmarPausa] = useState(false);
 
   const cargar = useCallback(async () => {
     if (!amistadId) return;
@@ -165,6 +168,24 @@ export default function MascotaDetalleScreen() {
     );
   };
 
+  // Pausar no usa `ejecutar`: el backend responde { archivada: true } sin
+  // mascota (ya no hay una que mostrar) y la pantalla se deja atrás.
+  const pausar = async () => {
+    setAccion('pausa');
+    setAviso('');
+    try {
+      const data = await apiArchivarMascota(amistadId);
+      if (!data?.archivada) throw new Error(data?.error || TEXTOS_PAUSA.error);
+      setConfirmarPausa(false);
+      router.replace('/(tabs)/mascota');
+    } catch (e) {
+      setConfirmarPausa(false);
+      setAviso(e.message || TEXTOS_PAUSA.error);
+    } finally {
+      setAccion(null);
+    }
+  };
+
   // Equipa o desequipa un accesorio (toca el equipado → lo quita). Update
   // optimista: el sprite hero refleja el cambio de inmediato.
   const equipar = async (categoria, id) => {
@@ -215,6 +236,15 @@ export default function MascotaDetalleScreen() {
         <Text style={styles.errorTxt}>La mascota está descansando.</Text>
         <Tappable style={styles.btnReintentar} onPress={cargar} haptic={false}>
           <Text style={styles.btnReintentarTxt}>Reintentar</Text>
+        </Tappable>
+        {/* Si la otra persona la puso en pausa mientras esta pantalla estaba
+            abierta, reintentar nunca va a servir: siempre hay salida. */}
+        <Tappable
+          style={styles.enlace}
+          onPress={() => router.replace('/(tabs)/mascota')}
+          haptic={false}
+        >
+          <Text style={styles.enlaceTxt}>Volver a la sección de mascota</Text>
         </Tappable>
       </View>
     );
@@ -390,6 +420,57 @@ export default function MascotaDetalleScreen() {
           </Tappable>
         )}
       </View>
+
+      {/* Configuración: poner en pausa. A diferencia del nombre o la especie,
+          esto no se negocia — cualquiera de los dos puede hacerlo solo. */}
+      <View style={styles.bloque}>
+        <Text style={styles.bloqueTitulo}>{TEXTOS_PAUSA.bloqueTitulo}</Text>
+        <Text style={styles.bloqueTexto}>{TEXTOS_PAUSA.bloqueTexto}</Text>
+        <Tappable
+          style={styles.enlace}
+          onPress={() => setConfirmarPausa(true)}
+          disabled={accion !== null}
+          haptic={false}
+          accessibilityLabel={TEXTOS_PAUSA.accion(mascota.nombre)}
+        >
+          <Text style={styles.enlaceApagado}>{TEXTOS_PAUSA.accion(mascota.nombre)}</Text>
+        </Tappable>
+      </View>
+
+      <Modal
+        visible={confirmarPausa}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmarPausa(false)}
+      >
+        <View style={styles.modalFondo}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitulo}>{TEXTOS_PAUSA.dialogoTitulo(mascota.nombre)}</Text>
+            <Text style={styles.modalSub}>{TEXTOS_PAUSA.dialogoTexto}</Text>
+            <View style={styles.modalAcciones}>
+              <Tappable
+                style={styles.btnCancelar}
+                onPress={() => setConfirmarPausa(false)}
+                disabled={accion === 'pausa'}
+                haptic={false}
+                accessibilityLabel={TEXTOS_PAUSA.cancelar}
+              >
+                <Text style={styles.btnCancelarTxt}>{TEXTOS_PAUSA.cancelar}</Text>
+              </Tappable>
+              <Tappable
+                style={styles.btnConfirmarPausa}
+                onPress={pausar}
+                disabled={accion === 'pausa'}
+                accessibilityLabel={TEXTOS_PAUSA.confirmar}
+              >
+                <Text style={styles.btnConfirmarPausaTxt}>
+                  {accion === 'pausa' ? TEXTOS_PAUSA.enCurso : TEXTOS_PAUSA.confirmar}
+                </Text>
+              </Tappable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -466,6 +547,9 @@ const useStyles = makeThemedStyles((t) => ({
   retoProgreso: { fontSize: t.fontSize(12), color: t.colors.textFaint, marginTop: 6 },
   enlace: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', marginTop: 6 },
   enlaceTxt: { color: t.colors.primary, fontSize: t.fontSize(14), ...t.typography.fonts.semibold },
+  // La pausa no se pinta como acción destructiva en rojo: es una decisión
+  // válida, no una alarma. Queda en tono apagado, sin competir con "cuidar".
+  enlaceApagado: { color: t.colors.textMuted, fontSize: t.fontSize(14), ...t.typography.fonts.semibold },
   timeline: { marginTop: 4 },
   hito: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 10 },
   hitoPunto: {
@@ -520,4 +604,39 @@ const useStyles = makeThemedStyles((t) => ({
   accChipTxtOn: { color: t.colors.primary },
   accChipTxtLock: { color: t.colors.textFaint, ...t.typography.fonts.regular },
   accPista: { fontSize: t.fontSize(10), color: t.colors.textFaint, marginTop: 2 },
+  modalFondo: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    padding: 22,
+  },
+  modalCard: {
+    backgroundColor: t.colors.background,
+    borderRadius: t.shape.radiusLg,
+    padding: 20,
+    ...t.shadows.card,
+  },
+  modalTitulo: {
+    ...t.typography.type.title, fontSize: t.fontSize(19), color: t.colors.text, marginBottom: 4,
+  },
+  modalSub: {
+    fontSize: t.fontSize(13),
+    color: t.colors.textMuted,
+    lineHeight: Math.round(t.fontSize(13) * 1.5),
+  },
+  modalAcciones: {
+    flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 18,
+  },
+  btnCancelar: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16 },
+  btnCancelarTxt: { color: t.colors.textMuted, fontSize: t.fontSize(14) },
+  btnConfirmarPausa: {
+    minHeight: 44,
+    justifyContent: 'center',
+    backgroundColor: t.colors.primary,
+    borderRadius: t.shape.radiusMd,
+    paddingHorizontal: 22,
+  },
+  btnConfirmarPausaTxt: {
+    color: t.colors.onPrimary, fontSize: t.fontSize(14), ...t.typography.fonts.semibold,
+  },
 }));

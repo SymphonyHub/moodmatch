@@ -34,6 +34,7 @@ jest.mock('../services/api', () => ({
   apiIniciarRetoMascota: jest.fn(),
   apiProponerNombreMascota: jest.fn(),
   apiEquiparAccesorioMascota: jest.fn(),
+  apiArchivarMascota: jest.fn(),
 }));
 
 import React from 'react';

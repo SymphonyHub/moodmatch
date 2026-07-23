@@ -263,6 +263,15 @@ export const apiEquiparAccesorioMascota = async (amistadId, seleccion) => {
   }).then((r) => r.json());
 };
 
+// Pone la mascota en pausa. Cualquiera de los dos puede hacerlo sin esperar al
+// otro; el backend la archiva (no la borra) y le avisa a la otra persona.
+export const apiArchivarMascota = async (amistadId) => {
+  const headers = await authHeaders();
+  return fetch(`${API_URL}/api/mascota/${amistadId}/archivar`, {
+    method: 'POST', headers,
+  }).then((r) => r.json());
+};
+
 export const apiGetUnreadCount = async () => {
   const headers = await authHeaders();
   return fetch(`${API_URL}/api/messages/unread-count`, { headers }).then((r) => r.json());

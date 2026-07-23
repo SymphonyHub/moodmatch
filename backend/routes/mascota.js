@@ -11,6 +11,7 @@ const {
   PREFIJO_REGALO,
   agregarHito,
   aplicarProgresoReto,
+  archivarMascota,
   asegurarMascota,
   bonusReto,
   calcularPersonalidad,
@@ -35,6 +36,7 @@ const { derivarEspecie } = require('../lib/especies');
 const { CATEGORIAS, derivarDesbloqueados, puedeEquipar } = require('../lib/accesorios');
 const {
   dispatchNotification,
+  notifyPetArchived,
   notifyPetInvitation,
   notifySharedActivity,
   notifySharedCare,
@@ -199,18 +201,19 @@ router.get('/', requireAuth, async (req, res) => {
       id: other.id, amistadId: f.id, nombre: other.nombre, avatarUrl: other.avatarUrl,
     };
     const m = f.mascota;
-    if (!m || m.invitacionEstado === 'rechazada') {
-      // Sin mascota, o rechazada: el vínculo puede (re)invitar cuando quiera.
-      amigosElegibles.push(amigo);
-    } else if (m.invitacionEstado === 'pendiente') {
+    if (m && m.invitacionEstado === 'pendiente') {
       const invitacion = { ...amigo, mascotaNombre: m.nombre, especie: m.especie ?? null };
       // Quien hizo la última propuesta la ve como "enviada"; el otro la responde.
       if (proponenteDe(m) === me) enviadas.push(invitacion);
       else recibidas.push(invitacion);
     } else if (mascotaAceptada(m)) {
       mascotas.push(presentarResumen(m, amigo, ahora));
+    } else {
+      // Sin mascota, rechazada o pausada: el vínculo puede (re)invitar cuando
+      // quiera. Una mascota pausada vuelve a ofrecerse como invitación para no
+      // dejar al par sin ninguna forma de retomarla.
+      amigosElegibles.push(amigo);
     }
-    // aceptada pero archivada (activa:false) → no se muestra en la lista.
   }
 
   return res.json({ mascotas, invitaciones: { recibidas, enviadas }, amigosElegibles });
@@ -228,8 +231,11 @@ router.post('/invitacion', requireAuth, async (req, res) => {
   const amistad = await buscarAmistadPropia(amistadId, req.user.userId);
   if (!amistad) return res.status(404).json({ error: 'Amistad no encontrada' });
 
+  // Se puede (re)invitar mientras no haya una mascota viva ni una invitación en
+  // curso: una fila rechazada o pausada se reutiliza tal cual, conservando
+  // nivelCarino e historialHitos para que retomarla sea seguir, no empezar.
   const existente = await prisma.mascotaAmistad.findUnique({ where: { amistadId } });
-  if (existente && existente.invitacionEstado !== 'rechazada') {
+  if (existente && (mascotaAceptada(existente) || existente.invitacionEstado === 'pendiente')) {
     return res.status(409).json({ error: 'Ya existe una mascota o una invitación para esta amistad' });
   }
 
@@ -531,6 +537,41 @@ router.patch('/:amistadId/nombre', requireAuth, async (req, res) => {
     mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId, { conRegalo: true }),
     confirmado: resultado.confirmado,
   });
+});
+
+// POST /api/mascota/:amistadId/archivar — cualquiera de los dos pone la mascota
+// en pausa, sin necesitar la aprobación del otro. A diferencia de la especie
+// (que sí se negocia), terminar algo no debería requerir el permiso de nadie:
+// exigirlo dejaría a una persona atrapada en un vínculo que ya no quiere si la
+// otra no acepta soltarlo. No borra nada — archivarMascota deja activa:false y
+// conserva el historial, así el par puede retomarla más adelante.
+router.post('/:amistadId/archivar', requireAuth, async (req, res) => {
+  const amistadId = parseAmistadId(req.params.amistadId);
+  if (!amistadId) return res.status(400).json({ error: 'amistadId inválido' });
+
+  const amistad = await buscarAmistadPropia(amistadId, req.user.userId);
+  if (!amistad) return res.status(404).json({ error: 'Amistad no encontrada' });
+
+  const mascota = await exigirAceptada(res, amistadId);
+  if (!mascota) return undefined;
+
+  const { count } = await archivarMascota(prisma, amistadId, {
+    historialHitos: agregarHito(mascota.historialHitos, 'Pusieron su cuidado en pausa'),
+  });
+  // Si los dos pausan a la vez, solo la llamada que ganó avisa: el otro ya
+  // recibió (o es) el aviso, y repetirlo sonaría a reproche.
+  if (count === 0) {
+    return res.status(404).json({ error: 'No hay una mascota activa para esta amistad' });
+  }
+
+  const otroId = amistad.userId === req.user.userId ? amistad.friendId : amistad.userId;
+  dispatchNotification(notifyPetArchived({
+    toUserId: otroId,
+    friendshipId: amistadId,
+    nombre: mascota.nombre,
+  }));
+
+  return res.json({ archivada: true });
 });
 
 // Una marca representa que la actividad se hizo con el otro integrante del

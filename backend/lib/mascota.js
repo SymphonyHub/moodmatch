@@ -128,15 +128,18 @@ function necesitaAtencion(mascota, ahora = new Date()) {
 const mascotaAceptada = (mascota) =>
   Boolean(mascota) && mascota.invitacionEstado === 'aceptada' && mascota.activa !== false;
 
-// Caso borde "amistad eliminada" (Fase 14): la mascota no se borra, se archiva
-// (activa:false) para conservar el historial de hitos por si la amistad se
-// restaura. Todas las mecánicas quedan inertes vía mascotaAceptada(). No hay
-// aún una ruta que elimine amistades, así que este helper es el punto único por
-// donde debería pasar ese archivado cuando exista.
-const archivarMascota = (db, amistadId) =>
+// La mascota nunca se borra, se archiva (activa:false) conservando el historial
+// de hitos. Todas las mecánicas quedan inertes vía mascotaAceptada(). Es el
+// punto único de archivado: lo usa la pausa que cualquiera de los dos puede
+// pedir (Fase 16) y le corresponderá también al borrado de amistad cuando
+// exista esa ruta. `extra` permite acompañar el archivado con otros campos
+// (por ejemplo el hito de la pausa) en la misma escritura.
+// El filtro activa:true lo vuelve seguro ante carreras: si los dos pausan a la
+// vez, solo una llamada reporta count 1.
+const archivarMascota = (db, amistadId, extra = {}) =>
   db.mascotaAmistad.updateMany({
     where: { amistadId, activa: true },
-    data: { activa: false },
+    data: { activa: false, ...extra },
   });
 
 function calcularPersonalidad(entries) {

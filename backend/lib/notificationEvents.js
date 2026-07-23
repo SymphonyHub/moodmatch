@@ -41,6 +41,14 @@ const CONTENT = {
     body: 'Tu amistad pasó a cuidarla hoy. Cuando puedas, acompáñala tú también.',
     data: { url: '/(tabs)/mascota', type: 'mascota_social' },
   }),
+  // Aviso de que la otra persona puso la mascota en pausa. Enuncia el hecho sin
+  // atribuir un motivo, sin pedir nada de vuelta y sin compensarlo con
+  // optimismo: la pausa es una decisión válida de cualquiera de los dos.
+  mascota_pausada: (nombre) => ({
+    title: `${nombre} está en pausa`,
+    body: 'Tu amistad pausó su cuidado. Sus recuerdos quedan guardados por si más adelante quieren retomarla.',
+    data: { url: '/(tabs)/mascota', type: 'mascota_social' },
+  }),
 };
 
 async function sendUserNotification(userId, type, content, options = {}) {
@@ -124,6 +132,15 @@ const notifySharedCare = ({ toUserId, friendshipId, nombre = 'Lumi' }, options =
     collapseId: `mascota-social-${friendshipId}`,
   });
 
+// Pausa de la mascota: viaja bajo la preferencia mascota_social (es un aviso de
+// algo que hizo la otra persona con la mascota), así quien silenció esa
+// categoría tampoco recibe este.
+const notifyPetArchived = ({ toUserId, friendshipId, nombre = 'Lumi' }, options = {}) =>
+  sendUserNotification(toUserId, 'mascota_social', CONTENT.mascota_pausada(nombre), {
+    ...options,
+    collapseId: `mascota-pausa-${friendshipId}`,
+  });
+
 const notifyMoodReminder = (userId, options = {}) =>
   sendUserNotification(userId, 'recordatorio', CONTENT.recordatorio(), {
     ...options,
@@ -141,6 +158,7 @@ module.exports = {
   notifyFriendAccepted,
   notifyMoodReminder,
   notifyNewMessage,
+  notifyPetArchived,
   notifyPetInvitation,
   notifyPetNeedsAttention,
   notifySharedActivity,

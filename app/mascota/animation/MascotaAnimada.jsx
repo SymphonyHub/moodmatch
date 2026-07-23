@@ -151,6 +151,7 @@ export default function MascotaAnimada({
       style={{ width: size, height: size }}
     >
       <Svg width={size} height={size} viewBox="0 0 100 100">
+        {renderNodos(escena.defs, 'df')}
         {renderNodos(escena.shadow, 'sh')}
         <AG animatedProps={cuerpoProps}>
           <AG animatedProps={apendiceProps}>{renderNodos(escena.apendice, 'ap')}</AG>

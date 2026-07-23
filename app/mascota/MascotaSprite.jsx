@@ -1,14 +1,29 @@
-import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
+import Svg, {
+  Circle, Ellipse, Path, Defs, RadialGradient, Stop,
+} from 'react-native-svg';
 import { escenaPlana } from './sprites/disenoEtapas';
 import { ESPECIE_POR_DEFECTO } from './sprites/especies';
 
 // Materializa un nodo del pipeline de sprites (objeto plano { t, ...attrs }) en
 // un primitivo de react-native-svg. Los atributos ya vienen en camelCase.
+// El nodo `grad` no dibuja: declara el sombreado radial que las masas de la
+// silueta referencian por id (fill="url(#…)"), y debe ir dentro del <Svg>.
 export function renderNodo(nodo, key) {
   const { t, ...attrs } = nodo;
   if (t === 'circle') return <Circle key={key} {...attrs} />;
   if (t === 'ellipse') return <Ellipse key={key} {...attrs} />;
   if (t === 'path') return <Path key={key} {...attrs} />;
+  if (t === 'grad') {
+    return (
+      <Defs key={key}>
+        <RadialGradient id={attrs.id} cx="0.36" cy="0.26" r="0.82">
+          <Stop offset="0" stopColor={attrs.hi} />
+          <Stop offset="0.52" stopColor={attrs.body} />
+          <Stop offset="1" stopColor={attrs.edge} />
+        </RadialGradient>
+      </Defs>
+    );
+  }
   return null;
 }
 

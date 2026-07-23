@@ -3,7 +3,10 @@
 // (MascotaSprite) como el rig de animación (MascotaAnimada). No contiene
 // geometría por-especie: delega en especies.js y accesorios.js.
 //
-// Grupos devueltos (orden de dibujo shadow → apendice → cuerpo → cara → frente):
+// Grupos devueltos (orden de dibujo defs → shadow → apendice → cuerpo → cara →
+// frente):
+//   defs     → definiciones referenciadas por los demás nodos (el gradiente de
+//              sombreado de la especie); no dibuja nada por sí mismo
 //   shadow   → sombra de contacto (estática)
 //   apendice → parte blandita que el rig balancea (detrás del cuerpo)
 //   cuerpo   → masa principal + patrón de color equipado (respira/salta junta)
@@ -24,6 +27,7 @@ export function escenaMascota({
   });
 
   return {
+    defs: base.defs,
     shadow: base.shadow,
     apendice: base.apendice,
     cuerpo: [...base.cuerpo, ...acc.color],
@@ -35,5 +39,8 @@ export function escenaMascota({
 // Lista plana en orden de dibujo (para el sprite estático).
 export function escenaPlana(opciones) {
   const e = escenaMascota(opciones);
-  return [...e.shadow, ...e.apendice, ...e.cuerpo, ...e.cara.resto, ...e.cara.ojos, ...e.frente];
+  return [
+    ...e.defs, ...e.shadow, ...e.apendice, ...e.cuerpo,
+    ...e.cara.resto, ...e.cara.ojos, ...e.frente,
+  ];
 }

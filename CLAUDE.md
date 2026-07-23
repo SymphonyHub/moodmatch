@@ -2,8 +2,8 @@
 
 App de bienestar emocional. Este documento define el stack, las reglas
 invariantes del producto y cómo se trabaja. Para el detalle de la fase en
-curso, ver el `FASE*.md` activo en la raíz (hoy: `FASE14-mascota-perfil.md`).
-Las fases cerradas viven en `docs/fases/`.
+curso, ver el `FASE*.md` activo en la raíz — cuál es la fase vigente lo dice
+`COORDINACION.md`. Las fases cerradas viven en `docs/fases/`.
 
 ## Stack
 

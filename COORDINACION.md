@@ -65,7 +65,7 @@ trabajan en paralelo sin solapamiento de archivos:
 > `app/app/(tabs)/perfil.jsx`; `/perfil` no cambió.
 
 Fase 14 cerrada (mascota independiente + perfil de usuario), planificada en
-`FASE14-mascota-perfil.md`.
+`docs/fases/FASE14-mascota-perfil.md`.
 
 > **AVISO (Agente A, 2026-07-21) — `schema.prisma` reabierto de forma aditiva
 > (Fase 0-bis):** se agregan a `MascotaAmistad` los campos `especie String?` y

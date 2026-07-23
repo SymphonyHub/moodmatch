@@ -9,10 +9,19 @@ jest.mock('expo-image-picker', () => ({
   requestCameraPermissionsAsync: jest.fn(),
   launchCameraAsync: jest.fn(),
 }));
+jest.mock('react-native-safe-area-context', () => {
+  const { View } = require('react-native');
+  return { SafeAreaView: View };
+});
 jest.mock('expo-router', () => {
   const React = require('react');
   return {
-    router: { push: jest.fn(), replace: jest.fn() },
+    router: {
+      push: jest.fn(),
+      replace: jest.fn(),
+      back: jest.fn(),
+      canGoBack: jest.fn(() => true),
+    },
     useFocusEffect: (callback) => React.useEffect(callback, [callback]),
   };
 });
@@ -36,22 +45,46 @@ jest.mock('../services/api', () => ({
 
 import React from 'react';
 import { act, create } from 'react-test-renderer';
-import AjustesScreen from '../app/(tabs)/ajustes';
+import { router } from 'expo-router';
+import AjustesScreen from '../app/ajustes/index';
 import { ThemeProvider } from '../theme/ThemeContext';
+
+function renderAjustes() {
+  return create(
+    <ThemeProvider>
+      <AjustesScreen />
+    </ThemeProvider>,
+  );
+}
 
 test('renderiza la pantalla completa de Ajustes', async () => {
   let renderer;
   await act(async () => {
-    renderer = create(
-      <ThemeProvider>
-        <AjustesScreen />
-      </ThemeProvider>,
-    );
+    renderer = renderAjustes();
     await Promise.resolve();
   });
 
   expect(renderer.root.findByProps({ accessibilityLabel: 'Texto grande' })).toBeTruthy();
   expect(renderer.root.findByProps({ children: 'Cerrar sesión' })).toBeTruthy();
+  // Bloques que Ajustes conserva tras dejar de ser tab.
+  ['Apariencia', 'Accesibilidad', 'Notificaciones', 'Cuenta'].forEach((titulo) => {
+    expect(renderer.root.findByProps({ children: titulo })).toBeTruthy();
+  });
+
+  act(() => renderer.unmount());
+});
+
+// Ajustes se abre como push desde el Perfil, así que trae su propio botón atrás.
+test('el header vuelve a la pantalla anterior', async () => {
+  let renderer;
+  await act(async () => {
+    renderer = renderAjustes();
+    await Promise.resolve();
+  });
+
+  const volver = renderer.root.findByProps({ accessibilityLabel: 'Volver a mi perfil' });
+  act(() => volver.props.onPress());
+  expect(router.back).toHaveBeenCalled();
 
   act(() => renderer.unmount());
 });

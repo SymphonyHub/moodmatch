@@ -13,11 +13,10 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-const mockPush = jest.fn();
 jest.mock('expo-router', () => {
   const React = require('react');
   return {
-    router: { push: mockPush, back: jest.fn() },
+    router: { push: jest.fn(), back: jest.fn(), navigate: jest.fn() },
     useFocusEffect: (callback) => React.useEffect(callback, [callback]),
   };
 });
@@ -47,7 +46,9 @@ jest.mock('../services/api', () => {
 
 import React from 'react';
 import { act, create } from 'react-test-renderer';
-import PerfilScreen from '../app/perfil';
+import { router } from 'expo-router';
+import PerfilScreen from '../app/(tabs)/perfil';
+import BotonAjustes from '../components/profile/BotonAjustes';
 import { ThemeProvider } from '../theme/ThemeContext';
 import { FriendsCountProvider } from '../friends/FriendsCountContext';
 import { apiGetMyMascotas, apiUpdateMe } from '../services/api';
@@ -70,7 +71,8 @@ test('renderiza el perfil con sus secciones', async () => {
     await Promise.resolve();
   });
 
-  expect(renderer.root.findByProps({ children: 'Mi perfil' })).toBeTruthy();
+  // El título "Mi perfil" ya no lo dibuja la pantalla: desde que Perfil es tab
+  // lo pone el header del navegador (app/(tabs)/_layout.jsx).
   ['Tu racha', 'Tu círculo', 'Tus mascotas', 'Tus logros'].forEach((titulo) => {
     expect(renderer.root.findByProps({ children: titulo })).toBeTruthy();
   });
@@ -90,6 +92,24 @@ test('muestra la mascota activa y persiste la racha calculada', async () => {
   expect(renderer.root.findByProps({ children: 'Lumi' })).toBeTruthy();
   // La racha se recalcula en el cliente y se cachea en el backend.
   expect(apiUpdateMe).toHaveBeenCalledWith({ racha: 2 });
+
+  act(() => renderer.unmount());
+});
+
+// El engranaje del header es la única entrada a Ajustes desde que dejó de ser tab.
+test('el engranaje del header abre Ajustes', () => {
+  let renderer;
+  act(() => {
+    renderer = create(
+      <ThemeProvider>
+        <BotonAjustes tintColor="#fff" />
+      </ThemeProvider>,
+    );
+  });
+
+  const boton = renderer.root.findByProps({ accessibilityLabel: 'Abrir ajustes' });
+  act(() => boton.props.onPress());
+  expect(router.push).toHaveBeenCalledWith('/ajustes');
 
   act(() => renderer.unmount());
 });

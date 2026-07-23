@@ -2,16 +2,15 @@ import { useCallback, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { apiGetMe, apiGetMoodHistory, apiGetMyMascotas, apiUpdateMe } from '../services/api';
-import { makeThemedStyles, useTheme } from '../theme/ThemeContext';
-import { useFriendsCount } from '../friends/FriendsCountContext';
-import Tappable from '../components/Tappable';
-import Entrance from '../components/Entrance';
-import AvatarPicker from '../components/profile/AvatarPicker';
-import MascotaSprite from '../mascota/MascotaSprite';
-import { estadoMascota } from '../mascota/estadoMascota';
-import { rachaDeDias, textoRacha, etiquetaDias } from '../features/wellness/racha';
+import { apiGetMe, apiGetMoodHistory, apiGetMyMascotas, apiUpdateMe } from '../../services/api';
+import { makeThemedStyles, useTheme } from '../../theme/ThemeContext';
+import { useFriendsCount } from '../../friends/FriendsCountContext';
+import Tappable from '../../components/Tappable';
+import Entrance from '../../components/Entrance';
+import AvatarPicker from '../../components/profile/AvatarPicker';
+import MascotaSprite from '../../mascota/MascotaSprite';
+import { estadoMascota } from '../../mascota/estadoMascota';
+import { rachaDeDias, textoRacha, etiquetaDias } from '../../features/wellness/racha';
 
 // Tarjeta con título de sección y contenido. Misma jerarquía visual que Ajustes.
 function SectionCard({ title, children, style }) {
@@ -151,9 +150,7 @@ function HitosPlaceholder() {
 }
 
 export default function PerfilScreen() {
-  const { theme } = useTheme();
   const styles = useStyles();
-  const insets = useSafeAreaInsets();
   const { friendsCount, refreshIfStale } = useFriendsCount();
 
   const [profile, setProfile] = useState(null);
@@ -197,14 +194,6 @@ export default function PerfilScreen() {
 
   return (
     <View style={styles.pantalla}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Tappable style={styles.btnVolver} onPress={() => router.back()} haptic={false}>
-          <Ionicons name="chevron-back" size={24} color={theme.colors.onHeader} />
-        </Tappable>
-        <Text style={styles.headerTitulo}>Mi perfil</Text>
-        <View style={styles.btnVolver} />
-      </View>
-
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <SectionCard>
           <AvatarPicker
@@ -225,20 +214,6 @@ export default function PerfilScreen() {
 
 const useStyles = makeThemedStyles((t) => ({
   pantalla: { flex: 1, backgroundColor: t.colors.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: t.colors.headerBackground,
-    paddingBottom: 12,
-    paddingHorizontal: 8,
-  },
-  btnVolver: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerTitulo: {
-    flex: 1,
-    textAlign: 'center',
-    ...t.typography.type.section,
-    color: t.colors.onHeader,
-  },
   container: {
     width: '100%',
     maxWidth: 680,

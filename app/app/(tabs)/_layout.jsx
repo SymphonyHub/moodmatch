@@ -3,6 +3,8 @@ import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../../theme/ThemeContext';
 import TabBar from '../../components/TabBar';
+import BotonAjustes from '../../components/profile/BotonAjustes';
+import { TABS_PRINCIPALES } from '../../components/tabsConfig';
 import { apiGetUnreadCount } from '../../services/api';
 
 const UNREAD_POLL_MS = 30000;
@@ -44,60 +46,30 @@ export default function TabsLayout() {
           animation: 'shift',
         }}
       >
-        <Tabs.Screen
-          name="home"
-          options={{
-            title: 'Estado de ánimo',
-            tabBarLabel: 'Inicio',
-            tabBarIconSet: { outline: 'home-outline', filled: 'home' },
-          }}
-        />
-        <Tabs.Screen
-          name="actividades"
-          options={{
-            title: 'Actividades',
-            tabBarLabel: 'Actividades',
-            tabBarIconSet: { outline: 'sparkles-outline', filled: 'sparkles' },
-          }}
-        />
-        <Tabs.Screen
-          name="mascota"
-          options={{
-            title: 'Mascota',
-            tabBarLabel: 'Mascota',
-            tabBarIconSet: { outline: 'paw-outline', filled: 'paw' },
-          }}
-        />
-        <Tabs.Screen
-          name="amigos"
-          options={{
-            title: 'Amigos',
-            tabBarLabel: 'Amigos',
-            tabBarIconSet: { outline: 'people-outline', filled: 'people' },
-            tabBarBadge: unread > 0 ? (unread > 99 ? '99+' : unread) : undefined,
-            tabBarBadgeStyle: {
-              backgroundColor: theme.colors.primary,
-              color: theme.colors.onPrimary,
-              fontSize: 11,
-            },
-          }}
-        />
-        <Tabs.Screen
-          name="mi-qr"
-          options={{
-            title: 'Mi QR',
-            tabBarLabel: 'Mi QR',
-            tabBarIconSet: { outline: 'qr-code-outline', filled: 'qr-code' },
-          }}
-        />
-        <Tabs.Screen
-          name="ajustes"
-          options={{
-            title: 'Ajustes',
-            tabBarLabel: 'Ajustes',
-            tabBarIconSet: { outline: 'settings-outline', filled: 'settings' },
-          }}
-        />
+        {TABS_PRINCIPALES.map(({ name, title, tabBarLabel, iconSet }) => (
+          <Tabs.Screen
+            key={name}
+            name={name}
+            options={{
+              title,
+              tabBarLabel,
+              tabBarIconSet: iconSet,
+              // El badge de Amigos depende del polling de arriba; el engranaje
+              // del Perfil es la única entrada a Ajustes desde que salió de la barra.
+              ...(name === 'amigos' && {
+                tabBarBadge: unread > 0 ? (unread > 99 ? '99+' : unread) : undefined,
+                tabBarBadgeStyle: {
+                  backgroundColor: theme.colors.primary,
+                  color: theme.colors.onPrimary,
+                  fontSize: 11,
+                },
+              }),
+              ...(name === 'perfil' && {
+                headerRight: ({ tintColor }) => <BotonAjustes tintColor={tintColor} />,
+              }),
+            }}
+          />
+        ))}
       </Tabs>
     </>
   );

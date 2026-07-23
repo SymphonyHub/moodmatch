@@ -6,7 +6,7 @@ const ICON_SETS = {
   home: { outline: 'home-outline', filled: 'home' },
   amigos: { outline: 'people-outline', filled: 'people' },
   'mi-qr': { outline: 'qr-code-outline', filled: 'qr-code' },
-  ajustes: { outline: 'settings-outline', filled: 'settings' },
+  perfil: { outline: 'person-outline', filled: 'person' },
 };
 
 describe('resolveTabIcon', () => {

@@ -48,21 +48,21 @@ necesitas un endpoint que no existe aún, créalo tú mismo dentro de tu propia 
 > una sola columna nullable: no afecta a ningún otro agente ni a los datos
 > existentes, pero avisar antes de volver a tocar `User`.
 
-Fase activa: **Fase 16** (navegación tipo Instagram + eliminar mascota),
-planificada en `FASE16-navegacion-mascota.md`. Alcance chico, dos partes que se
-trabajan en paralelo sin solapamiento de archivos:
+Fase activa: **Fase 17** (rework visual y de mecánicas de la mascota, estilo
+Pou / Pocket Love), planificada en `FASE17-mascota-pou.md`. Se trabaja en
+`feature/mascota-pulido-visual` (worktree `../MoodMatch-agenteC`). **Toma el
+visual de la mascota** — `app/mascota/sprites/` y `app/mascota/animation/`:
+nadie más los toca mientras dure la fase.
 
-- **Parte 1 — navegación** (`feature/perfil-navegacion`): Perfil pasa a ser tab
-  y Ajustes cuelga de él como pantalla push. **Toma la definición de tabs**
-  (`app/app/(tabs)/_layout.jsx`, `app/app/_layout.jsx` y el nuevo
-  `app/components/tabsConfig.js`): nadie más los toca mientras dure la parte.
-- **Parte 2 — eliminar mascota** (`feature/eliminar-mascota`): archivar la
-  mascota compartida. No toca navegación raíz.
+Fases 15 y 16 mergeadas a `main` (2026-07-22) y pusheadas. Pendiente solo la
+prueba visual en dispositivo, que va en el mismo build de preview que valida
+Fase 14 y Sentry.
 
-> **Nota de rutas (Parte 1, 2026-07-22):** Ajustes dejó de ser tab. Vive en
+> **Nota de rutas (Fase 16 Parte 1):** Ajustes dejó de ser tab. Vive en
 > `app/app/ajustes/index.jsx` — la ruta pública sigue siendo `/ajustes` y
 > `/ajustes/notificaciones` sigue colgando de ella. El Perfil se movió a
-> `app/app/(tabs)/perfil.jsx`; `/perfil` no cambió.
+> `app/app/(tabs)/perfil.jsx`; `/perfil` no cambió. La lista de destinos de la
+> barra vive en `app/components/tabsConfig.js`.
 
 Fase 14 cerrada (mascota independiente + perfil de usuario), planificada en
 `docs/fases/FASE14-mascota-perfil.md`.

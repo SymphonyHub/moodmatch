@@ -26,6 +26,10 @@ model User {
   customTheme     Json?
   avatarUrl       String?
   perfilPersonalidad Json?
+  // Memoria del chat de emociones entre sesiones (Fase 15). Shape y garantías
+  // en lib/memoriaChat.js: solo lo que la persona compartió o pidió de forma
+  // explícita — nunca inferencias, nunca contenido de crisis.
+  memoriaChat     Json?
   expoPushToken          String?
   notificationPreferences Json?
   racha           Int          @default(0)

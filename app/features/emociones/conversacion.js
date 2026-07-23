@@ -17,8 +17,10 @@ import { MOOD_INFO } from '../../constants/moods';
 export const MAX_INTERCAMBIOS = 4;
 
 // Máximo de turnos que viajan como historial a /api/chat/respond (el backend
-// también trunca a 8 — CONTRATO-GEMINI.md §1).
-export const MAX_HISTORIAL_IA = 8;
+// también trunca a 40 — CONTRATO-GEMINI.md §1). Subido de 8 en Fase 15: la
+// charla extendida pasa fácil de 20 turnos y con la ventana corta el bot
+// perdía el hilo de lo que la propia persona le había contado antes.
+export const MAX_HISTORIAL_IA = 40;
 
 export function crearConversacion(seed = Math.floor(Math.random() * 997)) {
   const base = {

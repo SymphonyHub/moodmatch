@@ -216,13 +216,22 @@ function pinguino(s, P, gid) {
   cuerpo.push(path(ruta`M${50 - 12},53 Q50,59 ${50 + 12},53`,
     { stroke: P.deep, strokeWidth: 2, fill: 'none', opacity: 0.8, strokeLinecap: 'round' }));
 
-  // penacho: detrás del cuerpo, así solo asoman las puntas de las plumas
+  // Penacho: detrás del cuerpo, así solo asoman las puntas. Cada pluma sube y
+  // barre hacia atrás y abajo, y las tres abren en abanico con largos y alturas
+  // distintos — rectas y paralelas se leían como antenas de insecto.
+  // [x0, y0, control1, control2, punta], con x reflejado por lado.
+  const PLUMAS = [
+    [6, 33, 13, 27, 20, 25, 25, 25.5],
+    [7, 35.4, 15, 31, 22.5, 30, 28, 31.5],
+    [7.5, 37.6, 15, 35.4, 22, 36.4, 26.5, 39.5],
+  ];
+  const largo = [1, 1.05, 1.1][s];
   const apendice = [];
   for (const g of [-1, 1]) {
-    for (let j = 0; j < 3; j += 1) {
+    for (const [x0, y0, c1x, c1y, c2x, c2y, x1, y1] of PLUMAS) {
       apendice.push(path(
-        ruta`M${50 + g * (5 + j * 2.6)},${35 - j * 1.2} Q${50 + g * (13 + j * 3)},${31 - j * 3} ${50 + g * (17 + j * 3.4)},${29 - j * 4.4}`,
-        { stroke: s === 2 ? GOLD : P.deep, strokeWidth: 2.2, fill: 'none', strokeLinecap: 'round' },
+        ruta`M${50 + g * x0},${y0} C${50 + g * c1x * largo},${c1y} ${50 + g * c2x * largo},${c2y} ${50 + g * x1 * largo},${y1}`,
+        { stroke: s === 2 ? GOLD : P.deep, strokeWidth: 2.4, fill: 'none', strokeLinecap: 'round' },
       ));
     }
   }

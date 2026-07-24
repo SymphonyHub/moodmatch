@@ -211,19 +211,21 @@ function pinguino(s, P, gid) {
     ruta`M50,${top} C${50 + wH * 0.86},${top} ${50 + wH},${top + 7} ${50 + wH * 1.04},${top + 14} C${50 + wB * 0.82},${top + 24} ${50 + wB},${top + 30} ${50 + wB},${top + 38} C${50 + wB},${bot - 4} ${50 + wB * 0.66},${bot} 50,${bot} C${50 - wB * 0.66},${bot} ${50 - wB},${bot - 4} ${50 - wB},${top + 38} C${50 - wB},${top + 30} ${50 - wB * 0.82},${top + 24} ${50 - wH * 1.04},${top + 14} C${50 - wH},${top + 7} ${50 - wH * 0.86},${top} 50,${top}Z`,
     { fill: relleno(gid), ...contorno(P) },
   ));
-  cuerpo.push(elip(50, 58, wB * 0.72, 19, P.belly, 0.85));
+  // Panza opaca: a 0.85 el gradiente de abajo la teñía un poco; opaca queda lisa.
+  cuerpo.push(elip(50, 58, wB * 0.72, 19, P.belly, 1));
   cuerpo.push(brillo(50 - wH * 0.5, top + 9, 5.8, 4.2));
   cuerpo.push(path(ruta`M${50 - 12},53 Q50,59 ${50 + 12},53`,
     { stroke: P.deep, strokeWidth: 2, fill: 'none', opacity: 0.8, strokeLinecap: 'round' }));
 
-  // Penacho: detrás del cuerpo, así solo asoman las puntas. Cada pluma sube y
-  // barre hacia atrás y abajo, y las tres abren en abanico con largos y alturas
-  // distintos — rectas y paralelas se leían como antenas de insecto.
+  // Penacho: detrás del cuerpo, así solo asoman las puntas por encima de la
+  // coronilla. Cada pluma nace en la ceja, sube y barre hacia afuera/atrás en un
+  // abanico corto (la externa cae un poco). Naciendo de los flancos a la altura
+  // del ojo leían como bigotes; por eso el origen va arriba y el barrido, alto.
   // [x0, y0, control1, control2, punta], con x reflejado por lado.
   const PLUMAS = [
-    [6, 33, 13, 27, 20, 25, 25, 25.5],
-    [7, 35.4, 15, 31, 22.5, 30, 28, 31.5],
-    [7.5, 37.6, 15, 35.4, 22, 36.4, 26.5, 39.5],
+    [2, 30, 4, 22, 8, 17, 11, 14],
+    [4, 31, 8, 24, 14, 20, 18, 18],
+    [6.5, 32.5, 11, 27, 18, 23, 22, 22],
   ];
   const largo = [1, 1.05, 1.1][s];
   const apendice = [];

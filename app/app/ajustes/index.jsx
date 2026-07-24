@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Switch, View, Text, TextInput, useColorScheme } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,8 +15,6 @@ import {
   MAX_PALETAS,
   NAME_MAX,
   makeCustomTheme,
-  evaluateCustomTheme,
-  customThemePassesAA,
   configDe,
   nuevaPaletaId,
   upsertPalette,
@@ -24,7 +22,7 @@ import {
 } from '../../theme/customTheme';
 import { MOODS } from '../../constants/moods';
 import Tappable from '../../components/Tappable';
-import { HueBar, LumBar } from '../../components/color/HueBar';
+import { HueBar, SatBar, LumBar } from '../../components/color/HueBar';
 import { LARGE_TEXT_SCALE } from '../../theme/persistence';
 import { unregisterPushTokenForLogout } from '../../notifications/pushRegistration';
 
@@ -37,6 +35,11 @@ const THEME_OPTIONS = [
 // La paleta que el contenedor marca como activa (o la primera como red de red).
 const paletaActiva = (container) =>
   container.palettes.find((p) => p.id === container.activeId) ?? container.palettes[0];
+
+// Borde de las muestras de color: hairline translúcido que contrasta con
+// CUALQUIER color en ambos temas. Con el contraste libre, un color casi-blanco
+// o casi-negro puede quedar igual que la tarjeta; el stroke lo delinea igual.
+const swatchStroke = (t) => (t.isDark ? 'rgba(255,255,255,0.32)' : 'rgba(0,0,0,0.22)');
 
 // Mini-mock de la app: dentro de un ThemeScope muestra cómo se vería el tema
 // candidato sin aplicarlo globalmente.
@@ -140,86 +143,124 @@ function SwatchRow({ colors, selected, onSelect, label }) {
   );
 }
 
-// Un color de marca (primario/acento): matiz y luminosidad continuos + atajos.
-function ColorField({ label, value, onChange, swatches, sliderId }) {
+// Lectura/edición del hex exacto. Edita en local mientras se escribe y solo
+// propaga cuando el texto es un hex válido de 6 dígitos; al salir del campo,
+// revierte al último válido si quedó a medias.
+const esHex = (v) => /^#[0-9a-f]{6}$/.test(v);
+function HexInput({ value, onChange, label }) {
+  const styles = useStyles();
+  const [text, setText] = useState(value);
+  useEffect(() => setText(value), [value]);
+  const onText = (t) => {
+    const v = t.trim().toLowerCase();
+    setText(v);
+    if (esHex(v)) onChange(v);
+  };
+  return (
+    <TextInput
+      style={styles.hexInput}
+      value={text}
+      onChangeText={onText}
+      onBlur={() => setText((cur) => (esHex(cur) ? cur : value))}
+      autoCapitalize="none"
+      autoCorrect={false}
+      maxLength={7}
+      keyboardType="ascii-capable"
+      placeholder="#000000"
+      placeholderTextColor={styles.placeholder.color}
+      accessibilityLabel={`Código hex de ${label}`}
+    />
+  );
+}
+
+// Un color libre (primario/acento/fondo): barras continuas + atajos + hex.
+// `fondo` amplía el rango de luminosidad y agrega saturación (sin ella, el
+// matiz de un fondo casi neutro no se notaría).
+function ColorField({ label, value, onChange, swatches, sliderId, fondo = false }) {
   const styles = useStyles();
   return (
     <View style={styles.swatchBlock}>
       <View style={styles.colorHead}>
         <Text style={styles.swatchLabel}>{label}</Text>
-        <View style={[styles.colorPreview, { backgroundColor: value }]} />
+        <View style={styles.hexWrap}>
+          <HexInput value={value} onChange={onChange} label={label} />
+          <View style={[styles.colorPreview, { backgroundColor: value }]} />
+        </View>
       </View>
       <Text style={styles.sliderCap}>Matiz</Text>
-      <HueBar value={value} onChange={onChange} id={sliderId} />
+      <HueBar value={value} onChange={onChange} id={sliderId} label={`Matiz de ${label}`} />
+      {fondo ? (
+        <>
+          <View style={styles.sliderGap} />
+          <Text style={styles.sliderCap}>Saturación</Text>
+          <SatBar value={value} onChange={onChange} id={sliderId} label={`Saturación de ${label}`} />
+        </>
+      ) : null}
       <View style={styles.sliderGap} />
       <Text style={styles.sliderCap}>Luminosidad</Text>
-      <LumBar value={value} onChange={onChange} id={sliderId} />
+      <LumBar
+        value={value}
+        onChange={onChange}
+        id={sliderId}
+        label={`Luminosidad de ${label}`}
+        fondo={fondo}
+      />
       <View style={styles.sliderGap} />
       <SwatchRow colors={swatches} selected={value} onSelect={onChange} label={label} />
     </View>
   );
 }
 
+// Selector de fuente estilo "selector de personaje": una a la vez, con flechas
+// a los lados. La tarjeta central previsualiza en vivo el nombre y una frase de
+// muestra ya renderizados en la fuente elegida.
 function FontPicker({ selected, onSelect }) {
   const styles = useStyles();
+  const { theme } = useTheme();
+  const total = BODY_FONT_IDS.length;
+  const idx = Math.max(0, BODY_FONT_IDS.indexOf(selected));
+  const font = BODY_FONTS[BODY_FONT_IDS[idx]];
+  const go = (delta) => onSelect(BODY_FONT_IDS[(idx + delta + total) % total]);
+
   return (
     <View style={styles.swatchBlock}>
       <Text style={styles.swatchLabel}>Fuente</Text>
-      <View style={styles.fontRow}>
-        {BODY_FONT_IDS.map((id) => {
-          const isSelected = id === selected;
-          return (
-            <Tappable
-              key={id}
-              onPress={() => onSelect(id)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={`Fuente ${BODY_FONTS[id].label}: ${BODY_FONTS[id].tagline}`}
-              style={[styles.fontChip, isSelected && styles.fontChipSelected]}
-            >
-              <Text
-                style={[
-                  styles.fontChipTxt,
-                  { fontFamily: BODY_FONTS[id].bodyFamily },
-                  isSelected && styles.fontChipTxtSelected,
-                ]}
-              >
-                {BODY_FONTS[id].label}
-              </Text>
-            </Tappable>
-          );
-        })}
+      <View style={styles.fontCarousel}>
+        <Tappable
+          style={styles.fontArrow}
+          onPress={() => go(-1)}
+          accessibilityLabel="Fuente anterior"
+        >
+          <Ionicons name="chevron-back" size={22} color={theme.colors.primary} />
+        </Tappable>
+
+        <View
+          style={styles.fontStage}
+          accessible
+          accessibilityLabel={`Fuente ${font.label}: ${font.tagline}. ${idx + 1} de ${total}`}
+        >
+          <Text style={[styles.fontStageName, { fontFamily: font.bodyFamily }]} numberOfLines={1}>
+            {font.label}
+          </Text>
+          <Text style={styles.fontStageTag} numberOfLines={1}>
+            {font.tagline}
+          </Text>
+          <Text style={[styles.fontStageSample, { fontFamily: font.bodyFamily }]} numberOfLines={1}>
+            Hoy me siento en calma
+          </Text>
+          <Text style={styles.fontStageCount}>
+            {idx + 1} / {total}
+          </Text>
+        </View>
+
+        <Tappable
+          style={styles.fontArrow}
+          onPress={() => go(1)}
+          accessibilityLabel="Fuente siguiente"
+        >
+          <Ionicons name="chevron-forward" size={22} color={theme.colors.primary} />
+        </Tappable>
       </View>
-    </View>
-  );
-}
-
-// Aviso WCAG AA: una combinación que no alcance 4.5:1 no se puede aplicar.
-function ContrastNotice({ issues }) {
-  const styles = useStyles();
-
-  if (issues.length === 0) {
-    return (
-      <Text style={styles.contrastOk}>
-        ✓ Esta combinación cumple el contraste recomendado (WCAG AA).
-      </Text>
-    );
-  }
-
-  return (
-    <View style={styles.contrastWarn}>
-      <Text style={styles.contrastWarnTitle}>
-        Esta combinación no alcanza el contraste recomendado (AA) en{' '}
-        {issues.length === 1 ? '1 par' : `${issues.length} pares`}
-      </Text>
-      {issues.slice(0, 3).map(({ pair, ratio }) => (
-        <Text key={pair} style={styles.contrastWarnItem}>
-          • {pair} ({ratio}:1, mínimo 4.5:1)
-        </Text>
-      ))}
-      <Text style={styles.contrastWarnHint}>
-        Ajusta los colores indicados para poder guardar o aplicar esta paleta.
-      </Text>
     </View>
   );
 }
@@ -284,7 +325,6 @@ function CustomThemeEditor({
   draft,
   onChangeConfig,
   onRename,
-  issues,
   palettes,
   activeId,
   applied,
@@ -321,7 +361,7 @@ function CustomThemeEditor({
       </View>
 
       <ColorField
-        label="Color primario"
+        label="Primario"
         value={draft.primary}
         onChange={(primary) => onChangeConfig({ primary })}
         swatches={SWATCHES.primary}
@@ -334,21 +374,18 @@ function CustomThemeEditor({
         swatches={SWATCHES.accent}
         sliderId="accent"
       />
-      <View style={styles.swatchBlock}>
-        <Text style={styles.swatchLabel}>Fondo</Text>
-        <SwatchRow
-          colors={SWATCHES.background}
-          selected={draft.background}
-          onSelect={(background) => onChangeConfig({ background })}
-          label="Fondo"
-        />
-      </View>
+      <ColorField
+        label="Fondo"
+        value={draft.background}
+        onChange={(background) => onChangeConfig({ background })}
+        swatches={SWATCHES.background}
+        sliderId="background"
+        fondo
+      />
       <FontPicker
         selected={draft.bodyFont}
         onSelect={(bodyFont) => onChangeConfig({ bodyFont })}
       />
-
-      <ContrastNotice issues={issues} />
 
       <Tappable
         style={[styles.btnGuardar, !canSave && styles.btnGuardarDisabled]}
@@ -393,8 +430,6 @@ export default function AjustesScreen() {
 
   const isCustomCandidate = candidate === CUSTOM_THEME_ID;
   const draftTheme = useMemo(() => makeCustomTheme(configDe(draft)), [draft]);
-  const contrastIssues = useMemo(() => evaluateCustomTheme(draftTheme), [draftTheme]);
-  const customPassesAA = useMemo(() => customThemePassesAA(draftTheme), [draftTheme]);
 
   const previewTheme = isCustomCandidate
     ? draftTheme
@@ -419,11 +454,10 @@ export default function AjustesScreen() {
       if (restantes.length) setDraft({ ...restantes[0] });
     }
   };
-  // Guardar exige un nombre no vacío; el resto siempre es válido (hex derivado).
+  // Guardar exige solo un nombre no vacío; los colores son libres (el usuario
+  // elige lo que quiera, sin condición de contraste).
   const nameOk = draft.name.trim().length > 0;
-  // Guardar una paleta activa actualiza el tema en runtime, así que también
-  // debe respetar AA para no eludir el bloqueo del botón Aplicar.
-  const canSave = draftDiverge && nameOk && customPassesAA;
+  const canSave = draftDiverge && nameOk;
   const savePaletteDraft = () => savePalette({ ...draft, name: draft.name.trim() });
 
   // isDirty del botón Aplicar: cambió el tema elegido, o (en custom) hay una
@@ -502,7 +536,6 @@ export default function AjustesScreen() {
               draft={draft}
               onChangeConfig={changeConfig}
               onRename={renameDraft}
-              issues={contrastIssues}
               palettes={customConfig.palettes}
               activeId={customConfig.activeId}
               applied={applied}
@@ -515,25 +548,12 @@ export default function AjustesScreen() {
           )}
 
           <Tappable
-            style={[
-              styles.btnAplicar,
-              (!isDirty || isApplying || (isCustomCandidate && !customPassesAA)) &&
-                styles.btnAplicarDisabled,
-            ]}
+            style={[styles.btnAplicar, (!isDirty || isApplying) && styles.btnAplicarDisabled]}
             onPress={handleAplicar}
-            disabled={!isDirty || isApplying || (isCustomCandidate && !customPassesAA)}
-            accessibilityHint={
-              isCustomCandidate && !customPassesAA
-                ? 'Corrige el contraste de la paleta antes de aplicarla'
-                : undefined
-            }
+            disabled={!isDirty || isApplying}
           >
             <Text style={styles.btnAplicarTxt}>
-              {isCustomCandidate && !customPassesAA
-                ? 'Corrige el contraste para aplicar'
-                : isDirty
-                  ? `Aplicar tema ${candidateName}`
-                  : 'Este es tu tema actual'}
+              {isDirty ? `Aplicar tema ${candidateName}` : 'Este es tu tema actual'}
             </Text>
           </Tappable>
         </SectionCard>
@@ -663,7 +683,7 @@ const useStyles = makeThemedStyles((t) => ({
   },
   optionTagline: { fontSize: t.fontSize(12), color: t.colors.textMuted },
   swatches: { flexDirection: 'row', gap: 4, marginLeft: 10 },
-  swatch: { width: 18, height: 18, borderRadius: 9, borderWidth: 1, borderColor: t.colors.border },
+  swatch: { width: 18, height: 18, borderRadius: 9, borderWidth: 1, borderColor: swatchStroke(t) },
   editor: {
     marginBottom: 16,
     borderRadius: t.shape.radiusLg,
@@ -680,12 +700,25 @@ const useStyles = makeThemedStyles((t) => ({
     marginBottom: 8,
   },
   colorHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  hexWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  hexInput: {
+    minWidth: 82,
+    fontSize: t.fontSize(12),
+    color: t.colors.text,
+    backgroundColor: t.colors.surface,
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.border,
+    borderRadius: t.shape.radiusSm,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    textAlign: 'center',
+  },
   colorPreview: {
     width: 26,
     height: 26,
     borderRadius: 13,
     borderWidth: t.shape.borderThin,
-    borderColor: t.colors.border,
+    borderColor: swatchStroke(t),
   },
   sliderCap: {
     fontSize: t.fontSize(11),
@@ -710,7 +743,7 @@ const useStyles = makeThemedStyles((t) => ({
     height: 28,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: t.colors.border,
+    borderColor: swatchStroke(t),
   },
   nameInput: {
     ...t.typography.type.body,
@@ -723,24 +756,39 @@ const useStyles = makeThemedStyles((t) => ({
     paddingVertical: 10,
   },
   placeholder: { color: t.colors.textFaint },
-  fontRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  fontChip: {
-    minHeight: 44,
-    paddingHorizontal: 14,
-    borderRadius: t.shape.radiusMd,
+  fontCarousel: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  fontArrow: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: t.shape.borderThin,
     borderColor: t.colors.border,
     backgroundColor: t.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fontChipSelected: {
-    borderColor: t.colors.primary,
+  fontStage: {
+    flex: 1,
+    minHeight: 104,
+    borderRadius: t.shape.radiusLg,
     borderWidth: t.shape.borderThick,
-    backgroundColor: t.colors.primarySoft,
+    borderColor: t.colors.primary,
+    backgroundColor: t.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    ...t.shadows.card,
   },
-  fontChipTxt: { fontSize: t.fontSize(14), color: t.colors.textMuted },
-  fontChipTxtSelected: { color: t.colors.primary },
+  fontStageName: { fontSize: t.fontSize(22), color: t.colors.text },
+  fontStageTag: { fontSize: t.fontSize(12), color: t.colors.textMuted, marginTop: 3 },
+  fontStageSample: { fontSize: t.fontSize(15), color: t.colors.text, marginTop: 10 },
+  fontStageCount: {
+    fontSize: t.fontSize(11),
+    ...t.typography.fonts.semibold,
+    color: t.colors.primary,
+    marginTop: 10,
+  },
   palRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -751,9 +799,15 @@ const useStyles = makeThemedStyles((t) => ({
     marginBottom: 8,
   },
   palRowSelected: { borderColor: t.colors.primary, borderWidth: t.shape.borderThick },
-  palMain: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: 10 },
-  palSwatches: { flexDirection: 'row', gap: 3, marginRight: 10 },
-  palSwatch: { width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: t.colors.border },
+  palMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  palSwatches: { flexDirection: 'row', gap: 4, marginRight: 10 },
+  palSwatch: { width: 22, height: 22, borderRadius: 11, borderWidth: 1, borderColor: swatchStroke(t) },
   palInfo: { flex: 1, minWidth: 0 },
   palName: {
     fontSize: t.fontSize(14),
@@ -774,21 +828,6 @@ const useStyles = makeThemedStyles((t) => ({
   },
   palNewTxt: { fontSize: t.fontSize(14), ...t.typography.fonts.semibold, color: t.colors.primary },
   palLimit: { fontSize: t.fontSize(12), color: t.colors.textMuted, marginTop: 2 },
-  contrastOk: { ...t.typography.type.caption, color: t.colors.textMuted, marginBottom: 14 },
-  contrastWarn: {
-    backgroundColor: t.colors.dangerSoft,
-    borderRadius: t.shape.radiusMd,
-    padding: 12,
-    marginBottom: 14,
-  },
-  contrastWarnTitle: {
-    fontSize: t.fontSize(13),
-    ...t.typography.fonts.semibold,
-    color: t.colors.danger,
-    marginBottom: 6,
-  },
-  contrastWarnItem: { fontSize: t.fontSize(12), color: t.colors.danger, marginBottom: 2 },
-  contrastWarnHint: { fontSize: t.fontSize(12), color: t.colors.danger, marginTop: 6 },
   btnGuardar: {
     backgroundColor: t.colors.accent,
     borderRadius: t.shape.radiusMd,

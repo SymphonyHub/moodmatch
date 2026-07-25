@@ -33,16 +33,30 @@ const AG = Animated.createAnimatedComponent(G);
 // Rig ÚNICO de animación de la mascota, compartido por las 7 especies (Fase 14,
 // Parte C). No conoce especies: opera sobre la estructura de grupos que expone
 // disenoEtapas.js (cuerpo respira/salta, ojos parpadean, apéndice se balancea).
-// Los 5 estados: idle, reacción al toque, celebración, evolución, necesita
-// atención. Timing y curvas centralizados en movimiento.js (Fase 17): ritmo
-// gentil, anticipación antes de moverse, follow-through del apéndice y parpadeo
-// de intervalo variable (parpadeo.js). Respeta reduce-motion: sin repeticiones,
-// sin parpadeo ni confetti, sprite estático.
+// Todo número y curva viven en movimiento.js; la lógica que se puede testear
+// sale a módulos puros, porque los worklets están mockeados en jest.
 //
-// EXPRESIÓN (Fase 17): `animo` es la cara de fondo que sale del cuidado
-// (animo.js) y `evento` dispara la puntual, que dura unos segundos y se disuelve
-// sola. La expresión no mueve la boca —de las 7 especies varias tienen pico o
-// fauces— sino párpados, rubor y postura, que sí son comunes a todas.
+// Lo que hace, de fondo hacia arriba:
+//   · respira y se mece en loop — lo único que sí es periódico
+//   · parpadea a intervalos sorteados, de a ratos doble          → parpadeo.js
+//   · cada tanto, si nadie la toca, se estira o bosteza          → inactividad.js
+//   · sigue con la mirada el dedo que la toca                    → mirada.js
+//   · se acurruca si le sostienen el dedo encima
+//   · pone cara según cómo la cuidan, y caras puntuales que
+//     duran segundos ante lo que pasa                            → animo.js
+//   · salta al tocarla, festeja al subir de etapa y saluda al
+//     abrirse su pantalla
+//
+// La expresión NO mueve la boca: de las 7 especies, tres tienen pico o fauces y
+// las demás la dibujan distinto. Mueve párpados, rubor y postura, que sí son
+// comunes a todas y salen de la geometría que cada especie ya tenía.
+//
+// Props de estado: `animo` es la cara de fondo que decide animo.js con los datos
+// de cuidado; `evento` ({ tipo, key }) dispara una cara puntual y el confetti;
+// `saludo` es un contador que sube cada vez que se entra a la pantalla.
+//
+// Con reduce-motion no queda nada vivo: ni loops, ni ritmos, ni confetti, ni
+// mirada. El sprite se dibuja quieto en la expresión que le toque.
 export default function MascotaAnimada({
   especie = ESPECIE_POR_DEFECTO,
   etapa = 1,

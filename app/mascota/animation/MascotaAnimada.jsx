@@ -8,6 +8,7 @@ import Animated, {
   withSequence,
   withTiming,
   withSpring,
+  withDelay,
   cancelAnimation,
   useReducedMotion,
 } from 'react-native-reanimated';
@@ -19,9 +20,10 @@ import { renderNodos } from '../MascotaSprite';
 import RecompensaCompletada from '../../components/wellness/RecompensaCompletada';
 import {
   respiracion, balanceo, salto, evolucion, followApendice,
-  expresiones, EXPRESION_BASE, transicionAnimo,
+  expresiones, EXPRESION_BASE, transicionAnimo, mirada,
 } from './movimiento';
 import { planParpadeo, pasosParpadeo } from './parpadeo';
+import { desplazamientoMirada } from './mirada';
 
 const AG = Animated.createAnimatedComponent(G);
 
@@ -76,6 +78,8 @@ export default function MascotaAnimada({
   const ojoAbre = useSharedValue(receta.ojo);
   const ruborSube = useSharedValue(receta.rubor);
   const ladeo = useSharedValue(receta.inclinacionDeg);
+  const miraX = useSharedValue(0);
+  const miraY = useSharedValue(0);
 
   const [fiesta, setFiesta] = useState(false);
   const etapaPrev = useRef(etapa);
@@ -179,6 +183,23 @@ export default function MascotaAnimada({
     return () => clearTimeout(timer);
   }, [eventoKey, eventoTipo, eventoConfetti, reduce]);
 
+  // La mirada busca el punto tocado y se queda ahí mientras el dedo esté apoyado.
+  // Al soltar sostiene un instante más y recién entonces vuelve al centro, que es
+  // lo que hace que se lea como atención y no como un tic.
+  const mirarHacia = (evt) => {
+    if (reduce) return;
+    const { locationX, locationY } = evt?.nativeEvent ?? {};
+    const destino = desplazamientoMirada(locationX, locationY, size);
+    miraX.value = withSpring(destino.x, mirada.spring);
+    miraY.value = withSpring(destino.y, mirada.spring);
+  };
+
+  const soltarMirada = () => {
+    if (reduce) return;
+    miraX.value = withDelay(mirada.vueltaMs, withSpring(0, mirada.vuelta));
+    miraY.value = withDelay(mirada.vueltaMs, withSpring(0, mirada.vuelta));
+  };
+
   const reaccionarAlToque = () => {
     if (!reduce) {
       // Anticipa (squash breve, j<0) → sube → asienta con resorte.
@@ -236,6 +257,15 @@ export default function MascotaAnimada({
     originX: ojoCentro.x,
     originY: ojoCentro.y,
     scaleY: blink.value * ojoAbre.value,
+    x: miraX.value,
+    y: miraY.value,
+  }));
+
+  // Los párpados viajan con la mirada pero NO con el parpadeo: si se escalaran
+  // junto al ojo, el arco de la cara feliz se aplastaría hasta desaparecer.
+  const gestoProps = useAnimatedProps(() => ({
+    x: miraX.value,
+    y: miraY.value,
   }));
 
   // El rubor sube y baja por tamaño, no por opacidad: las chapitas ya vienen a
@@ -264,6 +294,8 @@ export default function MascotaAnimada({
   return (
     <Pressable
       onPress={reaccionarAlToque}
+      onPressIn={mirarHacia}
+      onPressOut={soltarMirada}
       accessibilityRole="image"
       accessibilityLabel={`Mascota ${especie}, etapa ${etapa}${animo === 'adormilada' ? ', te extraña' : ''}`}
       style={{ width: size, height: size }}
@@ -277,7 +309,7 @@ export default function MascotaAnimada({
           <AG animatedProps={ruborProps}>{renderNodos(escena.cara.rubor, 'ru')}</AG>
           {renderNodos(escena.cara.resto, 're')}
           <AG animatedProps={ojosProps}>{renderNodos(escena.cara.ojos, 'oj')}</AG>
-          {renderNodos(escena.cara.gesto, 'ge')}
+          <AG animatedProps={gestoProps}>{renderNodos(escena.cara.gesto, 'ge')}</AG>
           {renderNodos(escena.frente, 'fr')}
         </AG>
       </Svg>

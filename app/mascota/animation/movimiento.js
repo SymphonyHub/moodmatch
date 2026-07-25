@@ -125,6 +125,19 @@ export const expresiones = {
 
 export const EXPRESION_BASE = 'serena';
 
+// La mirada sigue el dedo. Los máximos son chicos a propósito: el ojo mide 3.2
+// de radio en un lienzo de 100, así que más de un punto y pico de corrimiento ya
+// lo saca de la cara y la mascota queda bizca. `vueltaMs` es cuánto sostiene la
+// mirada después de que sueltan, antes de volver despacio al centro — sin esa
+// espera el gesto se lee como un tic en vez de como atención.
+export const mirada = {
+  maxPx: 1.15,
+  maxPy: 0.75,
+  spring: { damping: 14, stiffness: 150, mass: 0.8 },
+  vuelta: { damping: 16, stiffness: 90, mass: 1 },
+  vueltaMs: 420,
+};
+
 // Cuánto tarda el cuerpo en acomodarse a una expresión nueva. Lento a propósito:
 // un cambio de ánimo instantáneo se lee como un parpadeo de sistema, no como un
 // estado. Los párpados sí cambian de golpe (son geometría, no una transición).

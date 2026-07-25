@@ -8,8 +8,10 @@ import { ESPECIE_POR_DEFECTO } from './sprites/especies';
 // un primitivo de react-native-svg. Los atributos ya vienen en camelCase.
 // El nodo `grad` no dibuja: declara el sombreado radial que las masas de la
 // silueta referencian por id (fill="url(#…)"), y debe ir dentro del <Svg>.
+// `rol` tampoco se dibuja: es la etiqueta con la que el rig encuentra el rubor
+// dentro de la cara (geometria.js), y no debe llegar al SVG como atributo.
 export function renderNodo(nodo, key) {
-  const { t, ...attrs } = nodo;
+  const { t, rol, ...attrs } = nodo;
   if (t === 'circle') return <Circle key={key} {...attrs} />;
   if (t === 'ellipse') return <Ellipse key={key} {...attrs} />;
   if (t === 'path') return <Path key={key} {...attrs} />;
@@ -38,10 +40,11 @@ export default function MascotaSprite({
   etapa = 1,
   accesorioCabeza = null,
   accesorioColor = null,
+  parpado = 'ninguno',
   size = 62,
 }) {
   const nodos = escenaPlana({
-    especie, etapa, accesorioCabeza, accesorioColor,
+    especie, etapa, accesorioCabeza, accesorioColor, parpado,
   });
   return (
     <Svg

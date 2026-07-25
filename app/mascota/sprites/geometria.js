@@ -92,10 +92,15 @@ export const ojos = (cx, cy, P, radioCabeza, achatado) => {
   return [...ojo(cx - d, cy, P, achatado), ...ojo(cx + d, cy, P, achatado)];
 };
 
-// Chapitas de rubor: mismo óvalo y misma opacidad en las 7.
+// Chapitas de rubor: mismo óvalo y misma opacidad en las 7. Van marcadas con
+// `rol` para que el rig las encuentre dentro de cara.resto y las suba o baje
+// según la expresión, sin que ninguna especie tenga que hacer nada. El renderer
+// descarta `rol`: es metadato, no un atributo SVG.
+export const ROL_RUBOR = 'rubor';
+
 export const rubor = (cx, cy, dx, rx = 4.8, ry = 3.1) => [
-  elip(cx - dx, cy, rx, ry, CORAL_SOFT, 0.7),
-  elip(cx + dx, cy, rx, ry, CORAL_SOFT, 0.7),
+  { ...elip(cx - dx, cy, rx, ry, CORAL_SOFT, 0.7), rol: ROL_RUBOR },
+  { ...elip(cx + dx, cy, rx, ry, CORAL_SOFT, 0.7), rol: ROL_RUBOR },
 ];
 
 // Boca curva suave.
@@ -110,11 +115,61 @@ export const aleta = (px, py, ancho, alto, P) => path(
   { fill: P.deep, ...contornoFino(P) },
 );
 
-// Centro geométrico de una lista de ojos (para que el rig escale el parpadeo
-// alrededor del punto correcto sin hardcodear coordenadas por especie).
-export const centroOjos = (ojosNodos) => {
-  const cxs = ojosNodos.filter((n) => n.cx != null).map((n) => n.cx);
-  const cys = ojosNodos.filter((n) => n.cy != null).map((n) => n.cy);
+// ── Párpados y cejas (expresión) ────────────────────────────────────────────
+// La expresión NO se hace con la boca: de las 7 especies, tres tienen pico o
+// fauces en vez de boca y las demás la dibujan distinto, así que cambiarla sería
+// siete geometrías nuevas por cada cara. Lo que sí comparten las 7 es el ojo
+// (todas lo arman con `ojo`/`ojos`), y de ahí se saca todo: estos trazos se
+// derivan del globo de cada ojo que la escena ya tiene, así que una especie
+// nueva hereda las expresiones sin escribir una línea.
+//
+// Son TRAZOS por encima del ojo, no parches que lo tapen: un párpado relleno
+// tendría que igualar el sombreado radial del cuerpo y se vería el remiendo.
+// El cierre real lo hace el rig escalando el globo; esto le da la forma.
+
+// Globos de ojo dentro de una lista de nodos de cara (las elipses; los brillos
+// son círculos). De cada uno salen centro y radios.
+const globos = (ojosNodos = []) => ojosNodos.filter((n) => n.t === 'ellipse' && n.rx != null);
+
+// forma: 'ninguno' | 'medio' (adormilada) | 'arco' (ojos felices) | 'ceno' (mohín)
+export const parpados = (ojosNodos, forma = 'ninguno', P) => {
+  if (forma === 'ninguno' || !P) return [];
+  const linea = (d, w) => path(d, {
+    stroke: P.ink, strokeWidth: w, fill: 'none', strokeLinecap: 'round',
+  });
+
+  return globos(ojosNodos).flatMap((o) => {
+    const { cx, cy, rx, ry } = o;
+    const lado = cx < 50 ? -1 : 1;
+
+    if (forma === 'medio') {
+      // Párpado caído: una tapa apenas curva sobre el tercio superior.
+      return [linea(
+        ruta`M${cx - rx * 1.15},${cy - ry * 0.42} Q${cx},${cy - ry * 1.02} ${cx + rx * 1.15},${cy - ry * 0.42}`,
+        1.7,
+      )];
+    }
+    if (forma === 'arco') {
+      // Ojo feliz: el arco abre hacia abajo y el globo casi cerrado lo completa.
+      return [linea(
+        ruta`M${cx - rx * 1.2},${cy + ry * 0.34} Q${cx},${cy - ry * 0.95} ${cx + rx * 1.2},${cy + ry * 0.34}`,
+        2.1,
+      )];
+    }
+    // Ceño del mohín: la punta interna baja. Corto y suave — enfurruñada, no fiera.
+    return [linea(
+      ruta`M${cx - lado * rx * 1.25},${cy - ry * 1.5} L${cx + lado * rx * 1.05},${cy - ry * 1.98}`,
+      2,
+    )];
+  });
+};
+
+// Centro geométrico de un grupo de nodos, para que el rig escale alrededor del
+// punto correcto sin hardcodear coordenadas por especie: el parpadeo alrededor
+// de los ojos, el rubor alrededor de las mejillas.
+export const centroDe = (nodos = []) => {
+  const cxs = nodos.filter((n) => n.cx != null).map((n) => n.cx);
+  const cys = nodos.filter((n) => n.cy != null).map((n) => n.cy);
   if (!cxs.length) return { x: 50, y: 45 };
   return {
     x: (Math.min(...cxs) + Math.max(...cxs)) / 2,

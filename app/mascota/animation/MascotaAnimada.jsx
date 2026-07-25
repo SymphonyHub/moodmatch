@@ -12,13 +12,14 @@ import Animated, {
   useReducedMotion,
 } from 'react-native-reanimated';
 import { escenaMascota } from '../sprites/disenoEtapas';
-import { centroOjos } from '../sprites/geometria';
+import { centroDe } from '../sprites/geometria';
 import { poseDePersonalidad } from '../sprites/personalidad';
 import { ESPECIE_POR_DEFECTO } from '../sprites/especies';
 import { renderNodos } from '../MascotaSprite';
 import RecompensaCompletada from '../../components/wellness/RecompensaCompletada';
 import {
   respiracion, balanceo, salto, evolucion, followApendice,
+  expresiones, EXPRESION_BASE, transicionAnimo,
 } from './movimiento';
 import { planParpadeo, pasosParpadeo } from './parpadeo';
 
@@ -32,24 +33,35 @@ const AG = Animated.createAnimatedComponent(G);
 // gentil, anticipación antes de moverse, follow-through del apéndice y parpadeo
 // de intervalo variable (parpadeo.js). Respeta reduce-motion: sin repeticiones,
 // sin parpadeo ni confetti, sprite estático.
+//
+// EXPRESIÓN (Fase 17): `animo` es la cara de fondo que sale del cuidado
+// (animo.js) y `evento` dispara la puntual, que dura unos segundos y se disuelve
+// sola. La expresión no mueve la boca —de las 7 especies varias tienen pico o
+// fauces— sino párpados, rubor y postura, que sí son comunes a todas.
 export default function MascotaAnimada({
   especie = ESPECIE_POR_DEFECTO,
   etapa = 1,
   personalidad = 'curiosa',
   accesorioCabeza = null,
   accesorioColor = null,
-  necesitaAtencion = false,
-  celebracionKey = 0,
+  animo = EXPRESION_BASE,
+  evento = null,
   size = 132,
   onTocar,
 }) {
   const reduce = useReducedMotion();
   const pose = poseDePersonalidad(personalidad);
+
+  // Expresión puntual: se pisa sobre la de fondo y se va sola.
+  const [puntual, setPuntual] = useState(null);
+  const expresion = expresiones[puntual] ? puntual : (expresiones[animo] ? animo : EXPRESION_BASE);
+  const receta = expresiones[expresion];
+
   const escena = escenaMascota({
-    especie, etapa, accesorioCabeza, accesorioColor,
+    especie, etapa, accesorioCabeza, accesorioColor, parpado: receta.parpado,
   });
-  const ojoCentro = centroOjos(escena.cara.ojos);
-  const amp = necesitaAtencion ? balanceo.ampAtencionDeg : balanceo.ampIdleDeg;
+  const ojoCentro = centroDe(escena.cara.ojos);
+  const ruborCentro = centroDe(escena.cara.rubor);
 
   const breath = useSharedValue(0);
   const blink = useSharedValue(1);
@@ -57,10 +69,17 @@ export default function MascotaAnimada({
   const sway = useSharedValue(0);
   const evo = useSharedValue(1);
   const apendiceKick = useSharedValue(0);
+  // Una sola señal para todo lo que cambia con el ánimo: energía del cuerpo,
+  // tamaño del ojo, intensidad del rubor e inclinación. Se anima con una curva
+  // larga para que el cambio de ánimo se lea como un estado y no como un salto.
+  const energia = useSharedValue(receta.energia);
+  const ojoAbre = useSharedValue(receta.ojo);
+  const ruborSube = useSharedValue(receta.rubor);
+  const ladeo = useSharedValue(receta.inclinacionDeg);
 
   const [fiesta, setFiesta] = useState(false);
   const etapaPrev = useRef(etapa);
-  const celebracionPrev = useRef(celebracionKey);
+  const eventoPrev = useRef(evento?.key ?? 0);
 
   // Idle ambiental: respiración + balanceo del apéndice. Estos SÍ son periódicos
   // a propósito (respirar lo es), así que se quedan en withRepeat.
@@ -128,13 +147,37 @@ export default function MascotaAnimada({
     etapaPrev.current = etapa;
   }, [etapa, reduce, evo]);
 
-  // Celebración: cuidado/reto completado (el contenedor incrementa celebracionKey).
+  // El cuerpo se acomoda a la expresión con una curva larga; los párpados, en
+  // cambio, cambian de golpe porque son geometría y no una transición.
   useEffect(() => {
-    if (celebracionKey !== celebracionPrev.current && celebracionKey > 0 && !reduce) {
-      setFiesta(true);
-    }
-    celebracionPrev.current = celebracionKey;
-  }, [celebracionKey, reduce]);
+    const t = reduce ? { duration: 0 } : transicionAnimo;
+    energia.value = withTiming(receta.energia, t);
+    ojoAbre.value = withTiming(receta.ojo, t);
+    ruborSube.value = withTiming(receta.rubor, t);
+    ladeo.value = withTiming(receta.inclinacionDeg, t);
+  }, [receta, reduce, energia, ojoAbre, ruborSube, ladeo]);
+
+  // Evento del contenedor (cuidado, regalo, reto): dispara la cara puntual y,
+  // si corresponde, el confetti. La cara se disuelve sola pasado su tiempo.
+  // Se depende de los campos y no del objeto: el contenedor arma `evento` en
+  // cada render, y con el objeto como dependencia el efecto correría siempre.
+  const eventoKey = evento?.key ?? 0;
+  const eventoTipo = evento?.tipo;
+  const eventoConfetti = evento?.confetti;
+  useEffect(() => {
+    if (eventoKey === eventoPrev.current || eventoKey <= 0) return undefined;
+    eventoPrev.current = eventoKey;
+    if (reduce) return undefined;
+
+    if (eventoConfetti !== false) setFiesta(true);
+
+    const cara = expresiones[eventoTipo] ? eventoTipo : 'encantada';
+    setPuntual(cara);
+    const ms = expresiones[cara].duracionMs;
+    if (!ms) return undefined;
+    const timer = setTimeout(() => setPuntual(null), ms);
+    return () => clearTimeout(timer);
+  }, [eventoKey, eventoTipo, eventoConfetti, reduce]);
 
   const reaccionarAlToque = () => {
     if (!reduce) {
@@ -157,7 +200,6 @@ export default function MascotaAnimada({
 
   const rebote = pose.rebote;
   const inclinacion = pose.inclinacion;
-  const dim = necesitaAtencion ? 0.85 : 1;
 
   // Primitivos para los worklets (cierran sobre números, no sobre objetos).
   const respX = respiracion.escalaX;
@@ -167,40 +209,63 @@ export default function MascotaAnimada({
   const alturaSalto = salto.alturaPx;
   const factorApendice = balanceo.factorApendice;
   const gradosApendice = followApendice.gradosPorSalto;
+  const ampMin = balanceo.ampMinDeg;
+  const ampMax = balanceo.ampMaxDeg;
 
+  // La energía de la expresión modula el idle entero: cuánto se infla al
+  // respirar y cuánto se mece. Con la mascota adormilada esto la vuelve más
+  // quieta, no más agitada, que era el problema del tratamiento anterior.
   const cuerpoProps = useAnimatedProps(() => {
     const b = breath.value;
     const j = jump.value;
     const e = evo.value;
+    const en = energia.value;
+    const amp = ampMin + (ampMax - ampMin) * en;
+    const respira = rebote * (0.55 + 0.75 * en);
     return {
       originX: 50,
       originY: 88,
-      scaleX: (1 - respX * rebote * b) * (1 - saltoX * j) * e,
-      scaleY: (1 + respY * rebote * b) * (1 + saltoY * j) * e,
+      scaleX: (1 - respX * respira * b) * (1 - saltoX * j) * e,
+      scaleY: (1 + respY * respira * b) * (1 + saltoY * j) * e,
       y: -alturaSalto * j,
-      rotation: inclinacion + (sway.value * 2 - 1) * amp,
-      opacity: dim,
+      rotation: inclinacion + ladeo.value + (sway.value * 2 - 1) * amp,
     };
   });
 
   const ojosProps = useAnimatedProps(() => ({
     originX: ojoCentro.x,
     originY: ojoCentro.y,
-    scaleY: blink.value,
+    scaleY: blink.value * ojoAbre.value,
   }));
 
-  const apendiceProps = useAnimatedProps(() => ({
-    originX: 50,
-    originY: 58,
-    rotation: (sway.value * 2 - 1) * amp * factorApendice
-      + apendiceKick.value * gradosApendice,
-  }));
+  // El rubor sube y baja por tamaño, no por opacidad: las chapitas ya vienen a
+  // 0.7 de la silueta aprobada, así que subir el grupo por encima de 1 no haría
+  // nada. La opacidad solo sirve para apagarlo cuando la mascota dormita.
+  const ruborProps = useAnimatedProps(() => {
+    const r = ruborSube.value;
+    return {
+      originX: ruborCentro.x,
+      originY: ruborCentro.y,
+      opacity: Math.min(1, r),
+      scale: 0.6 + 0.4 * r,
+    };
+  });
+
+  const apendiceProps = useAnimatedProps(() => {
+    const amp = ampMin + (ampMax - ampMin) * energia.value;
+    return {
+      originX: 50,
+      originY: 58,
+      rotation: (sway.value * 2 - 1) * amp * factorApendice
+        + apendiceKick.value * gradosApendice,
+    };
+  });
 
   return (
     <Pressable
       onPress={reaccionarAlToque}
       accessibilityRole="image"
-      accessibilityLabel={`Mascota ${especie}, etapa ${etapa}${necesitaAtencion ? ', te extraña' : ''}`}
+      accessibilityLabel={`Mascota ${especie}, etapa ${etapa}${animo === 'adormilada' ? ', te extraña' : ''}`}
       style={{ width: size, height: size }}
     >
       <Svg width={size} height={size} viewBox="0 0 100 100">
@@ -209,8 +274,10 @@ export default function MascotaAnimada({
         <AG animatedProps={cuerpoProps}>
           <AG animatedProps={apendiceProps}>{renderNodos(escena.apendice, 'ap')}</AG>
           {renderNodos(escena.cuerpo, 'cu')}
+          <AG animatedProps={ruborProps}>{renderNodos(escena.cara.rubor, 'ru')}</AG>
           {renderNodos(escena.cara.resto, 're')}
           <AG animatedProps={ojosProps}>{renderNodos(escena.cara.ojos, 'oj')}</AG>
+          {renderNodos(escena.cara.gesto, 'ge')}
           {renderNodos(escena.frente, 'fr')}
         </AG>
       </Svg>

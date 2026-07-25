@@ -21,11 +21,15 @@ export const respiracion = {
 };
 
 // Balanceo ambiental: el cuerpo se mece un poco; el apéndice, más (factorApendice).
+// La amplitud sale de la energía de la expresión (ver `expresiones`): con poca se
+// mece apenas, como dormitando; con mucha se mece más, nunca agitada. Antes eran
+// dos valores fijos (idle y atención) y la mascota descuidada terminaba
+// moviéndose MÁS que la cuidada, que se leía ansiosa en vez de tranquila.
 export const balanceo = {
   duracionMs: 2600,
   easing: Easing.inOut(Easing.sin),
-  ampIdleDeg: 1.4,
-  ampAtencionDeg: 3.4,
+  ampMinDeg: 0.9,
+  ampMaxDeg: 2.6,
   factorApendice: 1.7,
 };
 
@@ -82,6 +86,49 @@ export const evolucion = {
   pop: { toValue: 1.18, spring: { damping: 9, stiffness: 180 } },
   settle: { toValue: 1, spring: { damping: 12, stiffness: 160 } },
 };
+
+// Expresiones. Cada una es la misma receta: forma del párpado, cuánto sube el
+// rubor, cuánta energía tiene el cuerpo (modula respiración, balanceo y rebote) y
+// cuánto se inclina. `ojo` escala el globo del ojo y se multiplica con el
+// parpadeo. Las cuatro primeras son de FONDO y las decide animo.js a partir del
+// cuidado; las otras son PUNTUALES y las dispara la interacción, con su duración.
+//
+// Ninguna cara de fondo es difícil, a propósito: de radiante se baja a serena y a
+// adormilada. La tristeza y el enojo existen solo como reacción de segundos, para
+// que descuidar a la mascota nunca se lea como un reproche.
+export const expresiones = {
+  adormilada: {
+    parpado: 'medio', ojo: 0.62, rubor: 0.9, energia: 0.34, inclinacionDeg: 2.6,
+  },
+  serena: {
+    parpado: 'ninguno', ojo: 1, rubor: 1, energia: 0.55, inclinacionDeg: 0,
+  },
+  contenta: {
+    parpado: 'ninguno', ojo: 1.04, rubor: 1.16, energia: 0.78, inclinacionDeg: 0,
+  },
+  radiante: {
+    parpado: 'ninguno', ojo: 1.08, rubor: 1.3, energia: 1, inclinacionDeg: 0,
+  },
+  encantada: {
+    parpado: 'arco', ojo: 0.2, rubor: 1.45, energia: 1, inclinacionDeg: 0, duracionMs: 2500,
+  },
+  sorprendida: {
+    parpado: 'ninguno', ojo: 1.18, rubor: 1.1, energia: 0.9, inclinacionDeg: 0, duracionMs: 800,
+  },
+  mimosa: {
+    parpado: 'medio', ojo: 0.5, rubor: 1.4, energia: 0.46, inclinacionDeg: 0, duracionMs: null,
+  },
+  enfurrunada: {
+    parpado: 'ceno', ojo: 0.86, rubor: 1.2, energia: 0.68, inclinacionDeg: -3.2, duracionMs: 1500,
+  },
+};
+
+export const EXPRESION_BASE = 'serena';
+
+// Cuánto tarda el cuerpo en acomodarse a una expresión nueva. Lento a propósito:
+// un cambio de ánimo instantáneo se lee como un parpadeo de sistema, no como un
+// estado. Los párpados sí cambian de golpe (son geometría, no una transición).
+export const transicionAnimo = { duracionMs: 620, easing: Easing.inOut(Easing.sin) };
 
 // Follow-through del apéndice: al reaccionar el cuerpo, el apéndice blando
 // (penacho/orejas/cola/voluta) barre y vuelve con un spring MÁS blando —

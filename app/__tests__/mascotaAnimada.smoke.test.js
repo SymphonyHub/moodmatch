@@ -8,6 +8,7 @@ import { act, create } from 'react-test-renderer';
 import MascotaSprite from '../mascota/MascotaSprite';
 import MascotaAnimada from '../mascota/animation/MascotaAnimada';
 import { ESPECIES } from '../mascota/sprites/especies';
+import { expresiones } from '../mascota/animation/movimiento';
 
 // react-native-reanimated está mockeado globalmente (testing/jest-setup.js): la
 // validación real de las animaciones requiere un build nativo (ver plan Fase 14).
@@ -46,13 +47,69 @@ test('MascotaAnimada (rig único reanimated) monta sin crash', () => {
         especie="huevo"
         etapa={1}
         personalidad="curiosa"
-        necesitaAtencion
+        animo="adormilada"
         size={120}
       />,
     );
   });
   expect(renderer.toJSON()).toBeTruthy();
   act(() => renderer.unmount());
+});
+
+test('el rig monta con cualquier expresión del catálogo, en las 7 especies', () => {
+  for (const especie of ESPECIES) {
+    for (const animo of Object.keys(expresiones)) {
+      let renderer;
+      act(() => {
+        renderer = create(<MascotaAnimada especie={especie} etapa={2} animo={animo} size={100} />);
+      });
+      expect(renderer.toJSON()).toBeTruthy();
+      act(() => renderer.unmount());
+    }
+  }
+});
+
+test('un ánimo desconocido cae en la expresión base en vez de romper', () => {
+  let renderer;
+  act(() => {
+    renderer = create(<MascotaAnimada especie="perro" etapa={1} animo="eufórica" size={100} />);
+  });
+  expect(renderer.toJSON()).toBeTruthy();
+  act(() => renderer.unmount());
+});
+
+test('un evento pone la cara puntual y la suelta sola', () => {
+  const antes = jest.getTimerCount();
+  // Sin confetti: lo que se mide acá es la cara puntual y su temporizador. El
+  // confetti es un componente aparte que necesita ThemeProvider y ya se prueba
+  // montado dentro de la pantalla.
+  const pinta = (key) => (
+    <MascotaAnimada
+      especie="perro"
+      etapa={1}
+      evento={{ tipo: 'encantada', key, confetti: false }}
+      size={100}
+    />
+  );
+
+  let renderer;
+  act(() => { renderer = create(pinta(0)); });
+  // Solo el parpadeo: montar con un evento ya presente no dispara nada, o la
+  // mascota festejaría cada vez que se vuelve a entrar a la pantalla.
+  const enReposo = jest.getTimerCount();
+  expect(enReposo).toBe(antes + 1);
+
+  // El evento llega como cambio de key, que es como lo manda la pantalla.
+  act(() => { renderer.update(pinta(1)); });
+  expect(jest.getTimerCount()).toBe(enReposo + 1);
+
+  // Pasado su tiempo, la cara puntual se suelta y solo queda el parpadeo.
+  act(() => { jest.advanceTimersByTime(expresiones.encantada.duracionMs + 100); });
+  expect(renderer.toJSON()).toBeTruthy();
+  expect(jest.getTimerCount()).toBe(enReposo);
+
+  act(() => renderer.unmount());
+  expect(jest.getTimerCount()).toBeLessThanOrEqual(antes);
 });
 
 test('el parpadeo variable encadena timers y no deja ninguno colgado', () => {

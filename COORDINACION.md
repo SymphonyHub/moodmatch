@@ -41,6 +41,19 @@ necesitas un endpoint que no existe aún, créalo tú mismo dentro de tu propia 
 
 ## Estado actual
 
+> **AVISO (2026-07-24) — `theme/` y los primitivos compartidos tocados de forma
+> aditiva:** Accesibilidad en Ajustes sumó tres controles, así que
+> `theme/persistence.js` y `theme/ThemeContext.jsx` ganan las preferencias de
+> movimiento reducido y vibración, y la escala de texto pasó de un sí/no a tres
+> pasos. Autorizado por el usuario y **aditivo**: el contexto solo agrega claves
+> al value (`reduceMotion`, `hapticsEnabled` y sus setters) sin renombrar ni
+> quitar ninguna de las que ya había. Lo que sí conviene saber si tocas UI:
+> `Tappable` y `Entrance` ahora leen esas preferencias con `useMotionPrefs`, un
+> accesor que fuera del proveedor cae al comportamiento de siempre, y con
+> movimiento reducido no corren ni el pulso al presionar ni las animaciones de
+> entrada. `LARGE_TEXT_SCALE` sigue exportado pero ahora vale 1.3. Va en la rama
+> `feature/ajustes-pulido`, sin mergear.
+
 > **AVISO (Fase 15, 2026-07-22) — `schema.prisma` tocado de forma aditiva:** se
 > agrega a `User` el campo `memoriaChat Json?` (nullable) para la memoria del
 > chat de emociones entre sesiones. Migración `fase15_memoria_chat`, generada

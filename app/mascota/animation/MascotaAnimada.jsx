@@ -10,7 +10,6 @@ import Animated, {
   withSpring,
   cancelAnimation,
   useReducedMotion,
-  Easing,
 } from 'react-native-reanimated';
 import { escenaMascota } from '../sprites/disenoEtapas';
 import { centroOjos } from '../sprites/geometria';
@@ -18,6 +17,9 @@ import { poseDePersonalidad } from '../sprites/personalidad';
 import { ESPECIE_POR_DEFECTO } from '../sprites/especies';
 import { renderNodos } from '../MascotaSprite';
 import RecompensaCompletada from '../../components/wellness/RecompensaCompletada';
+import {
+  respiracion, balanceo, parpadeo, salto, evolucion, followApendice,
+} from './movimiento';
 
 const AG = Animated.createAnimatedComponent(G);
 
@@ -25,8 +27,9 @@ const AG = Animated.createAnimatedComponent(G);
 // Parte C). No conoce especies: opera sobre la estructura de grupos que expone
 // disenoEtapas.js (cuerpo respira/salta, ojos parpadean, apéndice se balancea).
 // Los 5 estados: idle, reacción al toque, celebración, evolución, necesita
-// atención. Springs contenidos, coherentes con el lenguaje de theme/motion.js.
-// Respeta reduce-motion: sin repeticiones ni confetti, sprite estático.
+// atención. Timing y curvas centralizados en movimiento.js (Fase 17): ritmo
+// gentil, anticipación antes de moverse y follow-through del apéndice. Respeta
+// reduce-motion: sin repeticiones ni confetti, sprite estático.
 export default function MascotaAnimada({
   especie = ESPECIE_POR_DEFECTO,
   etapa = 1,
@@ -44,13 +47,14 @@ export default function MascotaAnimada({
     especie, etapa, accesorioCabeza, accesorioColor,
   });
   const ojoCentro = centroOjos(escena.cara.ojos);
-  const amp = necesitaAtencion ? 3.4 : 1.4;
+  const amp = necesitaAtencion ? balanceo.ampAtencionDeg : balanceo.ampIdleDeg;
 
   const breath = useSharedValue(0);
   const blink = useSharedValue(1);
   const jump = useSharedValue(0);
   const sway = useSharedValue(0);
   const evo = useSharedValue(1);
+  const apendiceKick = useSharedValue(0);
 
   const [fiesta, setFiesta] = useState(false);
   const etapaPrev = useRef(etapa);
@@ -60,16 +64,16 @@ export default function MascotaAnimada({
   useEffect(() => {
     if (reduce) return undefined;
     breath.value = withRepeat(
-      withTiming(1, { duration: 1900, easing: Easing.inOut(Easing.quad) }), -1, true,
+      withTiming(1, { duration: respiracion.duracionMs, easing: respiracion.easing }), -1, true,
     );
     sway.value = withRepeat(
-      withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }), -1, true,
+      withTiming(1, { duration: balanceo.duracionMs, easing: balanceo.easing }), -1, true,
     );
     blink.value = withRepeat(
       withSequence(
         withTiming(1, { duration: pose.parpadeoMs }),
-        withTiming(0.12, { duration: 80 }),
-        withTiming(1, { duration: 120 }),
+        withTiming(parpadeo.cerrado, { duration: parpadeo.cierreMs }),
+        withTiming(1, { duration: parpadeo.aperturaMs }),
       ), -1,
     );
     return () => {
@@ -85,8 +89,8 @@ export default function MascotaAnimada({
     if (etapa > etapaPrev.current) {
       if (!reduce) {
         evo.value = withSequence(
-          withSpring(1.18, { damping: 9, stiffness: 180 }),
-          withSpring(1, { damping: 12, stiffness: 160 }),
+          withSpring(evolucion.pop.toValue, evolucion.pop.spring),
+          withSpring(evolucion.settle.toValue, evolucion.settle.spring),
         );
         setFiesta(true);
       }
@@ -104,9 +108,18 @@ export default function MascotaAnimada({
 
   const reaccionarAlToque = () => {
     if (!reduce) {
+      // Anticipa (squash breve, j<0) → sube → asienta con resorte.
       jump.value = withSequence(
-        withTiming(1, { duration: 130, easing: Easing.out(Easing.quad) }),
-        withSpring(0, { damping: 10, stiffness: 220, mass: 0.7 }),
+        withTiming(salto.anticipacionMag, { duration: salto.anticipacionMs }),
+        withTiming(1, { duration: salto.subidaMs, easing: salto.subidaEasing }),
+        withSpring(0, salto.asentamiento),
+      );
+      // Follow-through: el apéndice arranca un beat después del cuerpo y arrastra
+      // al volver, con un resorte más blando (sobrepasa en vez de seguir rígido).
+      apendiceKick.value = withSequence(
+        withTiming(0, { duration: salto.anticipacionMs + salto.subidaMs * 0.5 }),
+        withSpring(1, followApendice.spring),
+        withSpring(0, followApendice.spring),
       );
     }
     onTocar?.();
@@ -116,6 +129,15 @@ export default function MascotaAnimada({
   const inclinacion = pose.inclinacion;
   const dim = necesitaAtencion ? 0.85 : 1;
 
+  // Primitivos para los worklets (cierran sobre números, no sobre objetos).
+  const respX = respiracion.escalaX;
+  const respY = respiracion.escalaY;
+  const saltoX = salto.escalaX;
+  const saltoY = salto.escalaY;
+  const alturaSalto = salto.alturaPx;
+  const factorApendice = balanceo.factorApendice;
+  const gradosApendice = followApendice.gradosPorSalto;
+
   const cuerpoProps = useAnimatedProps(() => {
     const b = breath.value;
     const j = jump.value;
@@ -123,9 +145,9 @@ export default function MascotaAnimada({
     return {
       originX: 50,
       originY: 88,
-      scaleX: (1 - 0.015 * rebote * b) * (1 - 0.06 * j) * e,
-      scaleY: (1 + 0.025 * rebote * b) * (1 + 0.1 * j) * e,
-      y: -9 * j,
+      scaleX: (1 - respX * rebote * b) * (1 - saltoX * j) * e,
+      scaleY: (1 + respY * rebote * b) * (1 + saltoY * j) * e,
+      y: -alturaSalto * j,
       rotation: inclinacion + (sway.value * 2 - 1) * amp,
       opacity: dim,
     };
@@ -140,7 +162,8 @@ export default function MascotaAnimada({
   const apendiceProps = useAnimatedProps(() => ({
     originX: 50,
     originY: 58,
-    rotation: (sway.value * 2 - 1) * amp * 1.7,
+    rotation: (sway.value * 2 - 1) * amp * factorApendice
+      + apendiceKick.value * gradosApendice,
   }));
 
   return (

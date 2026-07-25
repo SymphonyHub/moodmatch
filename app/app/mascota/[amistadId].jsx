@@ -104,6 +104,7 @@ export default function MascotaDetalleScreen() {
   const [editarNombre, setEditarNombre] = useState(false);
   const [nombre, setNombre] = useState('');
   const [celebracion, setCelebracion] = useState(0);
+  const [saludo, setSaludo] = useState(0);
   const [confirmarPausa, setConfirmarPausa] = useState(false);
 
   const cargar = useCallback(async () => {
@@ -121,7 +122,13 @@ export default function MascotaDetalleScreen() {
     }
   }, [amistadId]);
 
-  useFocusEffect(useCallback(() => { cargar(); }, [cargar]));
+  // Cada vez que se entra a la pantalla la mascota saluda. El contador sube
+  // antes de que la mascota termine de cargar la primera vez, y está bien: el
+  // rig dispara el saludo también al montar.
+  useFocusEffect(useCallback(() => {
+    cargar();
+    setSaludo((s) => s + 1);
+  }, [cargar]));
 
   const ejecutar = async (tipo, request, exito) => {
     setAccion(tipo);
@@ -275,6 +282,7 @@ export default function MascotaDetalleScreen() {
             accesorioColor={mascota.accesorios?.color ?? null}
             animo={animoDeMascota(mascota)}
             evento={{ tipo: 'encantada', key: celebracion }}
+            saludo={saludo}
             size={132}
           />
         </View>

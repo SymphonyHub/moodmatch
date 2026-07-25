@@ -21,7 +21,7 @@ import RecompensaCompletada from '../../components/wellness/RecompensaCompletada
 import {
   respiracion, balanceo, salto, evolucion, followApendice,
   expresiones, EXPRESION_BASE, transicionAnimo, mirada, caricia, inactividad,
-  parpadeo, mohin,
+  parpadeo, mohin, saludo as tokenSaludo,
 } from './movimiento';
 import { planParpadeo, pasosParpadeo } from './parpadeo';
 import { desplazamientoMirada } from './mirada';
@@ -51,6 +51,7 @@ export default function MascotaAnimada({
   accesorioColor = null,
   animo = EXPRESION_BASE,
   evento = null,
+  saludo = 0,
   size = 132,
   onTocar,
 }) {
@@ -93,6 +94,10 @@ export default function MascotaAnimada({
   const [toqueKey, setToqueKey] = useState(0);
   const etapaPrev = useRef(etapa);
   const eventoPrev = useRef(evento?.key ?? 0);
+  // Arranca en 0 y no en la prop, justamente para que el saludo sí dispare al
+  // montar. El evento hace lo contrario: si no, la mascota festejaría cada vez
+  // que se vuelve a entrar a la pantalla.
+  const saludoPrev = useRef(0);
   // Si hizo un gesto de los suyos desde el último toque, está distraída: el
   // próximo toque la agarra desprevenida y por eso se sorprende.
   const distraida = useRef(false);
@@ -101,11 +106,14 @@ export default function MascotaAnimada({
 
   // Una sola puerta para las caras puntuales: la del evento del contenedor y las
   // que nacen del toque comparten temporizador, así nunca hay dos compitiendo.
+  // Solo entran las que tienen duración: una cara de fondo puesta por acá se
+  // quedaría pegada tapando al ánimo real.
   const mostrarPuntual = (cara) => {
+    const ms = expresiones[cara]?.duracionMs;
+    if (!ms) return;
     clearTimeout(puntualTimer.current);
     setPuntual(cara);
-    const ms = expresiones[cara]?.duracionMs;
-    if (ms) puntualTimer.current = setTimeout(() => setPuntual(null), ms);
+    puntualTimer.current = setTimeout(() => setPuntual(null), ms);
   };
   useEffect(() => () => clearTimeout(puntualTimer.current), []);
 
@@ -226,6 +234,22 @@ export default function MascotaAnimada({
     mostrarPuntual(expresiones[eventoTipo] ? eventoTipo : 'encantada');
     return undefined;
   }, [eventoKey, eventoTipo, eventoConfetti, reduce]);
+
+  // Saludo al entrar a la pantalla: levanta la vista y da un saltito corto.
+  // A diferencia del evento, este SÍ dispara al montar — el caso normal es
+  // justamente que la pantalla se abra por primera vez y la mascota salude.
+  useEffect(() => {
+    if (saludo === saludoPrev.current || saludo <= 0 || reduce) return;
+    saludoPrev.current = saludo;
+    jump.value = withSequence(
+      withTiming(salto.anticipacionMag * tokenSaludo.escala, { duration: salto.anticipacionMs }),
+      withTiming(tokenSaludo.escala, {
+        duration: salto.subidaMs, easing: salto.subidaEasing,
+      }),
+      withSpring(0, salto.asentamiento),
+    );
+    mostrarPuntual('saludando');
+  }, [saludo, reduce]);
 
   // La mirada busca el punto tocado y se queda ahí mientras el dedo esté apoyado.
   // Al soltar sostiene un instante más y recién entonces vuelve al centro, que es

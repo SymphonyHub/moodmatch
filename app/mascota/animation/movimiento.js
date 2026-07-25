@@ -121,7 +121,15 @@ export const expresiones = {
   enfurrunada: {
     parpado: 'ceno', ojo: 0.86, rubor: 1.2, energia: 0.68, inclinacionDeg: -3.2, duracionMs: 1500,
   },
+  saludando: {
+    parpado: 'ninguno', ojo: 1.12, rubor: 1.25, energia: 0.95, inclinacionDeg: 0, duracionMs: 1600,
+  },
 };
+
+// Saludo al entrar a la pantalla: el mismo salto del toque, más chico. Que use
+// la misma curva y no una propia es lo que hace que se lea como la misma
+// criatura y no como una animación de entrada pegada encima.
+export const saludo = { escala: 0.55 };
 
 export const EXPRESION_BASE = 'serena';
 

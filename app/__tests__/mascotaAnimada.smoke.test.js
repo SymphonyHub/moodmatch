@@ -130,6 +130,60 @@ test('el parpadeo variable encadena timers y no deja ninguno colgado', () => {
   expect(jest.getTimerCount()).toBeLessThanOrEqual(antes);
 });
 
+test('el saludo sí dispara al montar, al revés que el evento', () => {
+  // Entrar a la pantalla es justamente el caso normal: la mascota tiene que
+  // saludar la primera vez, no solo al volver.
+  const antes = jest.getTimerCount();
+  let renderer;
+  act(() => {
+    renderer = create(<MascotaAnimada especie="perro" etapa={1} saludo={1} size={100} />);
+  });
+  // Los ritmos de fondo más el temporizador de la cara del saludo.
+  const conSaludo = jest.getTimerCount();
+  expect(conSaludo).toBeGreaterThan(antes + 1);
+
+  act(() => { jest.advanceTimersByTime(expresiones.saludando.duracionMs + 100); });
+  expect(jest.getTimerCount()).toBe(conSaludo - 1);
+
+  act(() => renderer.unmount());
+  expect(jest.getTimerCount()).toBeLessThanOrEqual(antes);
+});
+
+test('una cara de fondo no puede quedarse pegada como puntual', () => {
+  // serena no tiene duración: si entrara por la puerta de las puntuales, taparía
+  // al ánimo real para siempre.
+  const antes = jest.getTimerCount();
+  let renderer;
+  act(() => {
+    renderer = create(
+      <MascotaAnimada
+        especie="perro"
+        etapa={1}
+        animo="radiante"
+        evento={{ tipo: 'serena', key: 0, confetti: false }}
+        size={100}
+      />,
+    );
+  });
+  act(() => {
+    renderer.update(
+      <MascotaAnimada
+        especie="perro"
+        etapa={1}
+        animo="radiante"
+        evento={{ tipo: 'serena', key: 1, confetti: false }}
+        size={100}
+      />,
+    );
+  });
+  // Sin temporizador de más: la cara de fondo se descartó.
+  expect(jest.getTimerCount()).toBeGreaterThan(antes);
+  act(() => { jest.advanceTimersByTime(50); });
+  expect(renderer.toJSON()).toBeTruthy();
+
+  act(() => renderer.unmount());
+});
+
 test('la caricia pausa el parpadeo y lo devuelve al soltar', () => {
   // Con el ojo entrecerrado por la caricia, un parpadeo encima pelearía por la
   // misma escala. Es lo único de la caricia observable sin worklets.

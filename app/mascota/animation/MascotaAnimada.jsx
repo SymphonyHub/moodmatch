@@ -18,8 +18,9 @@ import { ESPECIE_POR_DEFECTO } from '../sprites/especies';
 import { renderNodos } from '../MascotaSprite';
 import RecompensaCompletada from '../../components/wellness/RecompensaCompletada';
 import {
-  respiracion, balanceo, parpadeo, salto, evolucion, followApendice,
+  respiracion, balanceo, salto, evolucion, followApendice,
 } from './movimiento';
+import { planParpadeo, pasosParpadeo } from './parpadeo';
 
 const AG = Animated.createAnimatedComponent(G);
 
@@ -28,8 +29,9 @@ const AG = Animated.createAnimatedComponent(G);
 // disenoEtapas.js (cuerpo respira/salta, ojos parpadean, apéndice se balancea).
 // Los 5 estados: idle, reacción al toque, celebración, evolución, necesita
 // atención. Timing y curvas centralizados en movimiento.js (Fase 17): ritmo
-// gentil, anticipación antes de moverse y follow-through del apéndice. Respeta
-// reduce-motion: sin repeticiones ni confetti, sprite estático.
+// gentil, anticipación antes de moverse, follow-through del apéndice y parpadeo
+// de intervalo variable (parpadeo.js). Respeta reduce-motion: sin repeticiones,
+// sin parpadeo ni confetti, sprite estático.
 export default function MascotaAnimada({
   especie = ESPECIE_POR_DEFECTO,
   etapa = 1,
@@ -60,7 +62,8 @@ export default function MascotaAnimada({
   const etapaPrev = useRef(etapa);
   const celebracionPrev = useRef(celebracionKey);
 
-  // Idle: respiración + parpadeo + balanceo del apéndice. Solo si hay movimiento.
+  // Idle ambiental: respiración + balanceo del apéndice. Estos SÍ son periódicos
+  // a propósito (respirar lo es), así que se quedan en withRepeat.
   useEffect(() => {
     if (reduce) return undefined;
     breath.value = withRepeat(
@@ -69,19 +72,46 @@ export default function MascotaAnimada({
     sway.value = withRepeat(
       withTiming(1, { duration: balanceo.duracionMs, easing: balanceo.easing }), -1, true,
     );
-    blink.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: pose.parpadeoMs }),
-        withTiming(parpadeo.cerrado, { duration: parpadeo.cierreMs }),
-        withTiming(1, { duration: parpadeo.aperturaMs }),
-      ), -1,
-    );
     return () => {
       cancelAnimation(breath);
       cancelAnimation(sway);
-      cancelAnimation(blink);
     };
-  }, [reduce, pose.parpadeoMs, breath, sway, blink]);
+  }, [reduce, breath, sway]);
+
+  // Parpadeo: fuera del loop ambiental porque no debe ser periódico. Cada
+  // parpadeo se programa de cero con su propia espera sorteada (parpadeo.js), y
+  // de a ratos sale doble. El timer vive en JS —y no como una cadena de worklets—
+  // porque una secuencia con withRepeat volvería a ser periódica (solo que con un
+  // período más largo), y porque re-armarse desde el callback de withTiming
+  // recursaría infinito en jest, donde el mock invoca el callback en el acto.
+  // Que el hilo de JS llegue tarde acá no es un problema: lo hace más orgánico.
+  useEffect(() => {
+    if (reduce) {
+      blink.value = 1;
+      return undefined;
+    }
+    let timer = null;
+    let vivo = true;
+    const programar = () => {
+      const { esperaMs, doble } = planParpadeo(pose.parpadeoMs);
+      timer = setTimeout(() => {
+        if (!vivo) return;
+        blink.value = withSequence(
+          ...pasosParpadeo(doble).map(
+            (paso) => withTiming(paso.a, { duration: paso.ms, easing: paso.curva }),
+          ),
+        );
+        programar();
+      }, esperaMs);
+    };
+    programar();
+    return () => {
+      vivo = false;
+      clearTimeout(timer);
+      cancelAnimation(blink);
+      blink.value = 1;
+    };
+  }, [reduce, pose.parpadeoMs, blink]);
 
   // Evolución: al subir de etapa, pop del sprite + confetti (reutiliza el sistema
   // de Fase 12). La transición dedicada es el salto de escala con resorte.

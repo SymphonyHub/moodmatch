@@ -30,11 +30,38 @@ export const balanceo = {
 };
 
 // Parpadeo: escala Y del ojo al cerrar + tiempos de cierre/apertura. El INTERVALO
-// entre parpadeos lo aporta personalidad.js (media); su variación es del paso 3.
+// entre parpadeos NO es fijo — un parpadeo perfectamente periódico se lee como un
+// tic mecánico. personalidad.js aporta la MEDIA y estos tokens la variación:
+// cuánto se aparta de esa media (jitter) y cada cuánto sale un parpadeo doble.
+// El ritmo en sí lo arma parpadeo.js, que no conoce otros números que estos.
 export const parpadeo = {
   cerrado: 0.12,
   cierreMs: 80,
   aperturaMs: 120,
+  // El párpado acelera al cerrarse y frena al abrirse. Antes quedaba en el easing
+  // por defecto de reanimated; explícito acá, como el resto del rig.
+  cierreEasing: Easing.in(Easing.quad),
+  aperturaEasing: Easing.out(Easing.quad),
+
+  // Espera hasta el próximo parpadeo = media de personalidad × un factor sorteado
+  // en este rango. Con la media 3800 ms de 'curiosa' da ~1,7 s a 6,6 s.
+  jitterMin: 0.45,
+  jitterMax: 1.75,
+  // Exponente que sesga el sorteo hacia las esperas cortas y deja las largas como
+  // pausas ocasionales (una cara real parpadea en tandas, no repartido parejo).
+  // Con 1.5 el promedio cae en ~0.97 de la media, así que la identidad de cada
+  // personalidad se conserva: la "más tranquila" sigue parpadeando menos seguido.
+  sesgo: 1.5,
+  // Piso duro: pase lo que pase, nunca dos parpadeos encimados.
+  esperaMinMs: 700,
+
+  // Cada tanto un doble parpadeo. El segundo golpe es más rápido y no cierra del
+  // todo — así se ve en una cara de verdad, y es lo que evita que el doble se
+  // lea como un tartamudeo.
+  probDoble: 0.22,
+  pausaDobleMs: 90,
+  dobleFactor: 0.8,
+  dobleCerrado: 0.25,
 };
 
 // Reacción al toque: ANTICIPA (squash breve, j<0) → sube → asienta con spring.

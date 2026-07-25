@@ -37,6 +37,12 @@ jest.mock('react-native-keyboard-controller', () => {
 jest.mock('../notifications/pushRegistration', () => ({
   unregisterPushTokenForLogout: jest.fn(),
 }));
+// jest-expo deja expoConfig vacío, así que la versión se fija acá para poder
+// verificar que la fila "Acerca de" la muestra de verdad.
+jest.mock('expo-constants', () => ({
+  __esModule: true,
+  default: { expoConfig: { name: 'MoodMatch', version: '9.9.9' } },
+}));
 jest.mock('../services/api', () => ({
   apiGetMe: jest.fn().mockResolvedValue({ user: { nombre: 'Ada', avatarUrl: null } }),
   apiUpdateMe: jest.fn().mockResolvedValue({ user: {} }),
@@ -44,8 +50,10 @@ jest.mock('../services/api', () => ({
 }));
 
 import React from 'react';
+import { Alert } from 'react-native';
 import { act, create } from 'react-test-renderer';
 import { router } from 'expo-router';
+import Constants from 'expo-constants';
 import AjustesScreen from '../app/ajustes/index';
 import { ThemeProvider } from '../theme/ThemeContext';
 
@@ -72,6 +80,56 @@ test('renderiza la pantalla completa de Ajustes', async () => {
   });
 
   act(() => renderer.unmount());
+});
+
+// Sin la versión a la vista no hay forma de saber qué build corre el dispositivo
+// cuando un cambio "no se ve aplicado".
+test('Cuenta muestra la versión de la app', async () => {
+  let renderer;
+  await act(async () => {
+    renderer = renderAjustes();
+    await Promise.resolve();
+  });
+
+  expect(renderer.root.findByProps({ children: 'Acerca de' })).toBeTruthy();
+  const copys = renderer.root
+    .findAll((n) => typeof n.props.children === 'string')
+    .map((n) => n.props.children);
+  expect(copys.some((t) => t.includes(Constants.expoConfig.version))).toBe(true);
+
+  act(() => renderer.unmount());
+});
+
+test('cerrar sesión pide confirmación antes de salir', async () => {
+  const alerta = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  let renderer;
+  await act(async () => {
+    renderer = renderAjustes();
+    await Promise.resolve();
+  });
+
+  const salir = renderer.root.findAll(
+    (n) =>
+      n.props &&
+      n.props.accessibilityLabel === 'Cerrar sesión' &&
+      typeof n.props.onPress === 'function',
+  )[0];
+
+  act(() => salir.props.onPress());
+  expect(alerta).toHaveBeenCalled();
+  // Preguntar no cierra la sesión todavía.
+  expect(router.replace).not.toHaveBeenCalledWith('/login');
+
+  // Confirmar sí.
+  const [, , acciones] = alerta.mock.calls.at(-1);
+  await act(async () => {
+    acciones.find((a) => a.style === 'destructive').onPress();
+    await Promise.resolve();
+  });
+  expect(router.replace).toHaveBeenCalledWith('/login');
+
+  act(() => renderer.unmount());
+  alerta.mockRestore();
 });
 
 // Ajustes se abre como push desde el Perfil, así que trae su propio botón atrás.

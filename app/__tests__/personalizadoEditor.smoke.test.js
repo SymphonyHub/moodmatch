@@ -31,6 +31,7 @@ jest.mock('../services/api', () => ({
 }));
 
 import React from 'react';
+import { Alert } from 'react-native';
 import { act, create } from 'react-test-renderer';
 import AjustesScreen from '../app/ajustes/index';
 import { ThemeProvider } from '../theme/ThemeContext';
@@ -60,18 +61,99 @@ const textos = (renderer) =>
     .findAll((n) => typeof n.props.children === 'string')
     .map((n) => n.props.children);
 
-test('el editor de Personalizado se despliega sin aviso ni bloqueo de contraste', async () => {
+// Campo hex de un color del editor (Primario / Acento / Fondo). Se queda con el
+// nodo más externo que sí trae el callback: la etiqueta accesible aparece en
+// varios niveles del árbol, y los de adentro no siempre lo llevan.
+const campoHex = (renderer, color) =>
+  renderer.root.findAll(
+    (n) =>
+      n.props &&
+      n.props.accessibilityLabel === `Código hex de ${color}` &&
+      typeof n.props.onChangeText === 'function',
+  )[0];
+
+// Botón por su etiqueta accesible, con el mismo criterio.
+const boton = (renderer, label) =>
+  renderer.root.findAll(
+    (n) =>
+      n.props && n.props.accessibilityLabel === label && typeof n.props.onPress === 'function',
+  )[0];
+
+test('el editor de Personalizado se despliega sin bloqueo de contraste', async () => {
   const renderer = await renderEditorPersonalizado();
 
   // El editor está montado (bloque de fuente presente).
   expect(renderer.root.findByProps({ children: 'Fuente' })).toBeTruthy();
 
-  // No queda rastro del guardrail WCAG: ni copys del aviso ni del botón Aplicar.
+  // La paleta por defecto no dispara ningún aviso, y no queda rastro del
+  // guardrail que bloqueaba: nada pide corregir nada.
   const copys = textos(renderer);
-  expect(copys.some((t) => t.includes('contraste'))).toBe(false);
+  expect(copys.some((t) => t.includes('costar de leer'))).toBe(false);
   expect(copys.some((t) => t.includes('Corrige'))).toBe(false);
 
   act(() => renderer.unmount());
+});
+
+test('el aviso de contraste avisa pero no bloquea guardar ni aplicar', async () => {
+  const renderer = await renderEditorPersonalizado();
+
+  // Primario casi blanco sobre las tarjetas claras: contraste malísimo a propósito.
+  act(() => campoHex(renderer, 'Primario').props.onChangeText('fffffe'));
+
+  // Avisa... (el copy usa singular o plural según cuántas combinaciones haya)
+  expect(textos(renderer).some((t) => t.includes('costar de leer'))).toBe(true);
+  // ...y aun así deja guardar y aplicar (los colores son libres).
+  expect(boton(renderer, 'Guardar paleta').props.disabled).toBe(false);
+  const aplicar = renderer.root.findByProps({ children: 'Aplicar tema Personalizado' });
+  expect(aplicar).toBeTruthy();
+
+  act(() => renderer.unmount());
+});
+
+test('el campo hex acepta el valor sin # y expande la forma corta al salir', async () => {
+  const renderer = await renderEditorPersonalizado();
+  const campo = campoHex(renderer, 'Acento');
+
+  // Sin "#": se toma igual.
+  act(() => campo.props.onChangeText('ff0000'));
+  expect(campoHex(renderer, 'Acento').props.value).toBe('#ff0000');
+
+  // Forma corta de 3 dígitos: se expande recién al salir del campo.
+  act(() => campoHex(renderer, 'Acento').props.onChangeText('00f'));
+  act(() => campoHex(renderer, 'Acento').props.onBlur());
+  expect(campoHex(renderer, 'Acento').props.value).toBe('#0000ff');
+
+  act(() => renderer.unmount());
+});
+
+test('borrar una paleta pide confirmación antes de destruirla', async () => {
+  const alerta = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  const renderer = await renderEditorPersonalizado();
+
+  // Hace falta una segunda paleta para que aparezca "Borrar".
+  act(() => boton(renderer, 'Crear paleta nueva').props.onPress());
+  await act(async () => {
+    boton(renderer, 'Guardar paleta').props.onPress();
+    await Promise.resolve();
+  });
+
+  const borrar = renderer.root.findAll(
+    (n) =>
+      n.props &&
+      String(n.props.accessibilityLabel ?? '').startsWith('Borrar paleta') &&
+      typeof n.props.onPress === 'function',
+  );
+  expect(borrar.length).toBeGreaterThan(0);
+
+  // El toque solo abre la confirmación: todavía no borra nada.
+  act(() => borrar[0].props.onPress());
+  expect(alerta).toHaveBeenCalled();
+  const [, , acciones] = alerta.mock.calls.at(-1);
+  expect(acciones.map((a) => a.style)).toContain('cancel');
+  expect(acciones.some((a) => a.style === 'destructive')).toBe(true);
+
+  act(() => renderer.unmount());
+  alerta.mockRestore();
 });
 
 test('la fuente es un carrusel: las flechas cambian la fuente activa', async () => {

@@ -94,10 +94,10 @@ test('un evento pone la cara puntual y la suelta sola', () => {
 
   let renderer;
   act(() => { renderer = create(pinta(0)); });
-  // Solo el parpadeo: montar con un evento ya presente no dispara nada, o la
-  // mascota festejaría cada vez que se vuelve a entrar a la pantalla.
+  // Solo los ritmos de fondo: montar con un evento ya presente no dispara nada,
+  // o la mascota festejaría cada vez que se vuelve a entrar a la pantalla.
   const enReposo = jest.getTimerCount();
-  expect(enReposo).toBe(antes + 1);
+  expect(enReposo).toBeGreaterThan(antes);
 
   // El evento llega como cambio de key, que es como lo manda la pantalla.
   act(() => { renderer.update(pinta(1)); });
@@ -137,13 +137,15 @@ test('la caricia pausa el parpadeo y lo devuelve al soltar', () => {
   let renderer;
   act(() => { renderer = create(<MascotaAnimada especie="perro" etapa={1} size={100} />); });
   const sprite = renderer.root.findByProps({ accessibilityRole: 'image' });
-  expect(jest.getTimerCount()).toBe(antes + 1);
+  const enReposo = jest.getTimerCount();
+  expect(enReposo).toBeGreaterThan(antes);
 
+  // La caricia detiene los ritmos de fondo, parpadeo incluido.
   act(() => sprite.props.onLongPress());
   expect(jest.getTimerCount()).toBe(antes);
 
   act(() => sprite.props.onPressOut());
-  expect(jest.getTimerCount()).toBe(antes + 1);
+  expect(jest.getTimerCount()).toBe(enReposo);
 
   act(() => renderer.unmount());
   expect(jest.getTimerCount()).toBeLessThanOrEqual(antes);

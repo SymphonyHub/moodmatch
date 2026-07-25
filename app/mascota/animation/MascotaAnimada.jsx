@@ -20,10 +20,13 @@ import { renderNodos } from '../MascotaSprite';
 import RecompensaCompletada from '../../components/wellness/RecompensaCompletada';
 import {
   respiracion, balanceo, salto, evolucion, followApendice,
-  expresiones, EXPRESION_BASE, transicionAnimo, mirada, caricia,
+  expresiones, EXPRESION_BASE, transicionAnimo, mirada, caricia, inactividad,
+  parpadeo, mohin,
 } from './movimiento';
 import { planParpadeo, pasosParpadeo } from './parpadeo';
 import { desplazamientoMirada } from './mirada';
+import { planInactividad } from './inactividad';
+import { useRitmo } from './useRitmo';
 
 const AG = Animated.createAnimatedComponent(G);
 
@@ -87,8 +90,24 @@ export default function MascotaAnimada({
   const mimo = useSharedValue(0);
 
   const [fiesta, setFiesta] = useState(false);
+  const [toqueKey, setToqueKey] = useState(0);
   const etapaPrev = useRef(etapa);
   const eventoPrev = useRef(evento?.key ?? 0);
+  // Si hizo un gesto de los suyos desde el último toque, está distraída: el
+  // próximo toque la agarra desprevenida y por eso se sorprende.
+  const distraida = useRef(false);
+  const toques = useRef([]);
+  const puntualTimer = useRef(null);
+
+  // Una sola puerta para las caras puntuales: la del evento del contenedor y las
+  // que nacen del toque comparten temporizador, así nunca hay dos compitiendo.
+  const mostrarPuntual = (cara) => {
+    clearTimeout(puntualTimer.current);
+    setPuntual(cara);
+    const ms = expresiones[cara]?.duracionMs;
+    if (ms) puntualTimer.current = setTimeout(() => setPuntual(null), ms);
+  };
+  useEffect(() => () => clearTimeout(puntualTimer.current), []);
 
   // Idle ambiental: respiración + balanceo del apéndice. Estos SÍ son periódicos
   // a propósito (respirar lo es), así que se quedan en withRepeat.
@@ -107,41 +126,64 @@ export default function MascotaAnimada({
   }, [reduce, breath, sway]);
 
   // Parpadeo: fuera del loop ambiental porque no debe ser periódico. Cada
-  // parpadeo se programa de cero con su propia espera sorteada (parpadeo.js), y
-  // de a ratos sale doble. El timer vive en JS —y no como una cadena de worklets—
-  // porque una secuencia con withRepeat volvería a ser periódica (solo que con un
-  // período más largo), y porque re-armarse desde el callback de withTiming
-  // recursaría infinito en jest, donde el mock invoca el callback en el acto.
-  // Que el hilo de JS llegue tarde acá no es un problema: lo hace más orgánico.
-  useEffect(() => {
-    // Durante la caricia el ojo queda entrecerrado por la expresión: si además
-    // siguiera parpadeando, los dos cierres pelearían por la misma escala.
-    if (reduce || acariciando) {
-      blink.value = 1;
-      return undefined;
-    }
-    let timer = null;
-    let vivo = true;
-    const programar = () => {
-      const { esperaMs, doble } = planParpadeo(pose.parpadeoMs);
-      timer = setTimeout(() => {
-        if (!vivo) return;
-        blink.value = withSequence(
-          ...pasosParpadeo(doble).map(
-            (paso) => withTiming(paso.a, { duration: paso.ms, easing: paso.curva }),
-          ),
-        );
-        programar();
-      }, esperaMs);
-    };
-    programar();
-    return () => {
-      vivo = false;
-      clearTimeout(timer);
+  // parpadeo se programa de cero con su propia espera sorteada (parpadeo.js) y
+  // de a ratos sale doble. Durante la caricia se apaga: con el ojo ya
+  // entrecerrado por la expresión, los dos cierres pelearían por la misma escala.
+  const animando = !reduce && !acariciando;
+  useRitmo({
+    activo: animando,
+    planear: () => planParpadeo(pose.parpadeoMs),
+    hacer: ({ doble }) => {
+      blink.value = withSequence(
+        ...pasosParpadeo(doble).map(
+          (paso) => withTiming(paso.a, { duration: paso.ms, easing: paso.curva }),
+        ),
+      );
+    },
+    alParar: () => {
       cancelAnimation(blink);
       blink.value = 1;
-    };
-  }, [reduce, acariciando, pose.parpadeoMs, blink]);
+    },
+  });
+
+  // Gesto cada tanto si nadie la toca, con esperas que crecen para que no
+  // insista. El contador vuelve a cero con cada toque: la mascota "se distrae"
+  // recién cuando de verdad la dejaron sola.
+  useRitmo({
+    activo: animando,
+    reinicio: toqueKey,
+    planear: (vuelta) => planInactividad(vuelta),
+    hacer: ({ gesto }) => {
+      distraida.current = true;
+      if (gesto === 'bostezar') {
+        blink.value = withSequence(
+          withTiming(inactividad.bostezo.cerrado, {
+            duration: inactividad.bostezo.cierreMs, easing: parpadeo.cierreEasing,
+          }),
+          withTiming(1, {
+            duration: inactividad.bostezo.aperturaMs, easing: parpadeo.aperturaEasing,
+          }),
+        );
+        return;
+      }
+      if (gesto === 'vistazo') {
+        const lado = Math.random() < 0.5 ? -1 : 1;
+        miraX.value = withSequence(
+          withSpring(lado * mirada.maxPx, mirada.spring),
+          withDelay(inactividad.vistazo.sostenerMs, withSpring(0, mirada.vuelta)),
+        );
+        return;
+      }
+      // Estirarse: se alarga despacio y vuelve. Es el salto del toque, pero
+      // lento y sin despegar del suelo.
+      jump.value = withSequence(
+        withTiming(inactividad.estiron.magnitud, {
+          duration: inactividad.estiron.subidaMs, easing: respiracion.easing,
+        }),
+        withTiming(0, { duration: inactividad.estiron.vueltaMs, easing: respiracion.easing }),
+      );
+    },
+  });
 
   // Evolución: al subir de etapa, pop del sprite + confetti (reutiliza el sistema
   // de Fase 12). La transición dedicada es el salto de escala con resorte.
@@ -181,13 +223,8 @@ export default function MascotaAnimada({
     if (reduce) return undefined;
 
     if (eventoConfetti !== false) setFiesta(true);
-
-    const cara = expresiones[eventoTipo] ? eventoTipo : 'encantada';
-    setPuntual(cara);
-    const ms = expresiones[cara].duracionMs;
-    if (!ms) return undefined;
-    const timer = setTimeout(() => setPuntual(null), ms);
-    return () => clearTimeout(timer);
+    mostrarPuntual(expresiones[eventoTipo] ? eventoTipo : 'encantada');
+    return undefined;
   }, [eventoKey, eventoTipo, eventoConfetti, reduce]);
 
   // La mirada busca el punto tocado y se queda ahí mientras el dedo esté apoyado.
@@ -226,6 +263,21 @@ export default function MascotaAnimada({
 
   const reaccionarAlToque = () => {
     if (!reduce) {
+      // Reinicia el reloj de la inactividad: la acaban de atender.
+      setToqueKey((k) => k + 1);
+
+      // Si venía distraída, este toque la agarra desprevenida. Si en cambio la
+      // están zarandeando —varios toques en poco rato— se enfurruña un momento.
+      const ahora = Date.now();
+      toques.current = [...toques.current, ahora].filter((t) => ahora - t <= mohin.ventanaMs);
+      if (toques.current.length >= mohin.toques) {
+        toques.current = [];
+        mostrarPuntual('enfurrunada');
+      } else if (distraida.current) {
+        mostrarPuntual('sorprendida');
+      }
+      distraida.current = false;
+
       // Anticipa (squash breve, j<0) → sube → asienta con resorte.
       jump.value = withSequence(
         withTiming(salto.anticipacionMag, { duration: salto.anticipacionMs }),

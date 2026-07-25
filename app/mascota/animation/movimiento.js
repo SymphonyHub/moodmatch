@@ -149,6 +149,25 @@ export const caricia = {
   sacudida: 0.6,
 };
 
+// Gesto cada tanto si nadie la toca. Las esperas CRECEN (crecimiento) y tienen
+// techo: la mascota hace algo al rato, un poco menos seguido después, y termina
+// espaciándose mucho. Es a propósito — el gesto es para que se sienta viva, no
+// para reclamar atención, y algo que insiste cada quince segundos reclama.
+// El primer toque después de un gesto la agarra distraída: ahí va la sorpresa.
+export const inactividad = {
+  primeraMs: 16000,
+  crecimiento: 1.55,
+  maxMs: 78000,
+  jitter: 0.18,
+  estiron: { magnitud: -0.28, subidaMs: 620, vueltaMs: 520 },
+  bostezo: { cerrado: 0.14, cierreMs: 420, aperturaMs: 560 },
+  vistazo: { sostenerMs: 900 },
+};
+
+// Varios toques seguidos en poco rato: se enfurruña un momento, jugando. No es
+// un castigo por insistir, es que reacciona a que la estén zarandeando.
+export const mohin = { toques: 4, ventanaMs: 2600 };
+
 // Cuánto tarda el cuerpo en acomodarse a una expresión nueva. Lento a propósito:
 // un cambio de ánimo instantáneo se lee como un parpadeo de sistema, no como un
 // estado. Los párpados sí cambian de golpe (son geometría, no una transición).

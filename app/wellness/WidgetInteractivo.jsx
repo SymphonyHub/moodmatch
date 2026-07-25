@@ -17,7 +17,7 @@
  * @param {string} [moodType] - ánimo del último registro (una de MOOD_KEYS).
  */
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Text, View } from 'react-native';
+import { Animated, Easing, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme, makeThemedStyles } from '../theme/ThemeContext';
 import { durations } from '../theme/motion';
@@ -28,12 +28,13 @@ import { FASES, ESCALA_MIN, ESCALA_MAX, introDe } from '../features/wellness/res
 const EASING_RESPIRO = Easing.inOut(Easing.quad);
 
 export default function WidgetInteractivo({ moodType }) {
-  const { theme } = useTheme();
+  // El movimiento reducido ahora sale del tema: combina el ajuste del sistema con
+  // el interruptor de Ajustes, así que este widget ya no lo consulta por su cuenta.
+  const { theme, reduceMotion } = useTheme();
   const styles = useStyles();
 
   const [activo, setActivo] = useState(false);
   const [faseIdx, setFaseIdx] = useState(0);
-  const [reduceMotion, setReduceMotion] = useState(false);
   const escala = useRef(new Animated.Value(ESCALA_MIN)).current;
 
   // Acento del ánimo (theme.colors.moods[mood] = { soft, color }); si no vino
@@ -42,20 +43,9 @@ export default function WidgetInteractivo({ moodType }) {
   const acento = tinte?.color ?? theme.colors.primary;
   const acentoSoft = tinte?.soft ?? theme.colors.primarySoft;
 
-  // Respeta la preferencia del sistema de "reducir movimiento": sin escala,
-  // solo la guía por texto (que igual es útil para respirar).
-  useEffect(() => {
-    let vivo = true;
-    AccessibilityInfo.isReduceMotionEnabled().then((val) => {
-      if (vivo) setReduceMotion(val);
-    });
-    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
-    return () => {
-      vivo = false;
-      sub?.remove?.();
-    };
-  }, []);
-
+  // Con movimiento reducido no hay escala: queda solo la guía por texto, que
+  // igual es útil para respirar.
+  //
   // Un solo scheduler mueve la etiqueta Y el círculo, así van siempre en fase.
   // Cada fase fija su etiqueta, anima la escala hacia su destino (en sostener el
   // valor ya está en destino → sin salto) y agenda la siguiente.

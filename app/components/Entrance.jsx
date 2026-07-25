@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Animated } from 'react-native';
 import { durations, easings, STAGGER_MS } from '../theme/motion';
+import { useMotionPrefs } from '../theme/ThemeContext';
 
 // Entrada estándar de contenido: fade + deslizamiento corto.
 // `index` escalona ítems de una lista; `distance` 0 = solo fade.
@@ -12,10 +13,21 @@ export default function Entrance({
   distance = 16,
   duration = durations.base,
 }) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(distance)).current;
+  const { reduceMotion } = useMotionPrefs();
+  const opacity = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;
+  const translateY = useRef(new Animated.Value(reduceMotion ? 0 : distance)).current;
+
+  // Si el ajuste se enciende con algo ya montado, el contenido se planta en su
+  // posición final en vez de quedarse a medio camino de una animación que no va
+  // a correr.
+  useEffect(() => {
+    if (!reduceMotion) return;
+    opacity.setValue(1);
+    translateY.setValue(0);
+  }, [reduceMotion, opacity, translateY]);
 
   useEffect(() => {
+    if (reduceMotion) return;
     const delay = index * STAGGER_MS;
     Animated.parallel([
       Animated.timing(opacity, {

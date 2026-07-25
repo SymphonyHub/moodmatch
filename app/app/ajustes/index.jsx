@@ -24,10 +24,19 @@ import {
 } from '../../theme/customTheme';
 import { MOODS } from '../../constants/moods';
 import Tappable from '../../components/Tappable';
+import SegmentedTabs from '../../components/SegmentedTabs';
 import FilaSwitch from '../../components/ajustes/FilaSwitch';
 import { HueBar, SatBar, LumBar } from '../../components/color/HueBar';
-import { LARGE_TEXT_SCALE } from '../../theme/persistence';
+import { TEXT_SCALE_STEPS } from '../../theme/persistence';
 import { unregisterPushTokenForLogout } from '../../notifications/pushRegistration';
+
+// Pasos de lectura, derivados de la lista de persistence para que no se
+// desincronicen. SegmentedTabs trabaja con ids de texto.
+const TEXT_SCALE_LABELS = ['Normal', 'Grande', 'Más grande'];
+const TEXT_SCALE_TABS = TEXT_SCALE_STEPS.map((paso, i) => ({
+  id: String(paso),
+  label: TEXT_SCALE_LABELS[i] ?? `${Math.round(paso * 100)}%`,
+}));
 
 const THEME_OPTIONS = [
   { id: AUTO_THEME_ID, name: 'Automático', tagline: 'Sigue el modo del sistema' },
@@ -486,6 +495,10 @@ export default function AjustesScreen() {
     deletePalette,
     textScale,
     setTextScale,
+    reduceMotion,
+    setReduceMotion,
+    hapticsEnabled,
+    setHaptics,
   } = useTheme();
   const styles = useStyles();
   const systemScheme = useColorScheme();
@@ -644,14 +657,32 @@ export default function AjustesScreen() {
           </Tappable>
         </SectionCard>
 
-        <SectionCard title="Accesibilidad" hint="Ajusta la lectura sin cambiar tu tema ni tu fuente.">
+        <SectionCard
+          title="Accesibilidad"
+          hint="Ajusta la lectura y el movimiento sin cambiar tu tema ni tu fuente."
+        >
+          <Text style={styles.a11yLabel}>Tamaño del texto</Text>
+          <SegmentedTabs
+            tabs={TEXT_SCALE_TABS}
+            activeId={String(textScale)}
+            onChange={(id) => setTextScale(Number(id))}
+          />
+          <View style={styles.a11yGap} />
           <FilaSwitch
-            title="Texto grande"
-            hint="Aumenta los textos de toda la app."
-            value={textScale === LARGE_TEXT_SCALE}
-            onValueChange={(enabled) => setTextScale(enabled ? LARGE_TEXT_SCALE : 1)}
-            accessibilityLabel="Texto grande"
-            accessibilityHint="Aumenta el tamaño de los textos de la aplicación"
+            title="Reducir movimiento"
+            hint="Quita las animaciones de entrada y las transiciones de tema."
+            value={reduceMotion}
+            onValueChange={setReduceMotion}
+            divider
+            accessibilityLabel="Reducir movimiento"
+            accessibilityHint="Desactiva las animaciones de la aplicación"
+          />
+          <FilaSwitch
+            title="Vibración al tocar"
+            hint="La respuesta táctil de botones y controles."
+            value={hapticsEnabled}
+            onValueChange={setHaptics}
+            accessibilityLabel="Vibración al tocar"
           />
         </SectionCard>
 
@@ -951,6 +982,13 @@ const useStyles = makeThemedStyles((t) => ({
     fontSize: t.fontSize(15),
     ...t.typography.fonts.bold,
   },
+  a11yLabel: {
+    fontSize: t.fontSize(13),
+    ...t.typography.fonts.semibold,
+    color: t.colors.text,
+    marginBottom: 8,
+  },
+  a11yGap: { height: 6 },
   contrastHint: { ...t.typography.type.caption, color: t.colors.textMuted, marginBottom: 14 },
   aboutRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   aboutLabel: { ...t.typography.type.body, color: t.colors.text },

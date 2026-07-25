@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { Animated, TouchableOpacity } from 'react-native';
 import { springs, PRESS_SCALE } from '../theme/motion';
+import { useMotionPrefs } from '../theme/ThemeContext';
 
 // El APK de desarrollo anterior no trae el módulo nativo de expo-haptics;
 // sin él la app debe seguir funcionando (solo sin vibración).
@@ -24,12 +25,17 @@ export default function Tappable({
   ...rest
 }) {
   const scale = useRef(new Animated.Value(1)).current;
+  const { reduceMotion, hapticsEnabled } = useMotionPrefs();
 
-  const animateTo = (toValue) =>
+  // Con movimiento reducido el pulso al presionar no corre; el valor se queda en
+  // 1, así que el botón sigue respondiendo por opacidad.
+  const animateTo = (toValue) => {
+    if (reduceMotion) return;
     Animated.spring(scale, { toValue, useNativeDriver: true, ...springs.press }).start();
+  };
 
   const handlePress = (e) => {
-    if (haptic && Haptics) Haptics.selectionAsync().catch(() => {});
+    if (haptic && hapticsEnabled && Haptics) Haptics.selectionAsync().catch(() => {});
     onPress?.(e);
   };
 

@@ -72,7 +72,14 @@ test('renderiza la pantalla completa de Ajustes', async () => {
     await Promise.resolve();
   });
 
-  expect(renderer.root.findByProps({ accessibilityLabel: 'Texto grande' })).toBeTruthy();
+  // El tamaño de texto pasó de un sí/no a tres pasos, y Accesibilidad sumó
+  // movimiento reducido y vibración.
+  expect(renderer.root.findByProps({ children: 'Tamaño del texto' })).toBeTruthy();
+  ['Normal', 'Grande', 'Más grande'].forEach((paso) => {
+    expect(renderer.root.findAllByProps({ children: paso }).length).toBeGreaterThan(0);
+  });
+  expect(renderer.root.findByProps({ accessibilityLabel: 'Reducir movimiento' })).toBeTruthy();
+  expect(renderer.root.findByProps({ accessibilityLabel: 'Vibración al tocar' })).toBeTruthy();
   expect(renderer.root.findByProps({ children: 'Cerrar sesión' })).toBeTruthy();
   // Bloques que Ajustes conserva tras dejar de ser tab.
   ['Apariencia', 'Accesibilidad', 'Notificaciones', 'Cuenta'].forEach((titulo) => {

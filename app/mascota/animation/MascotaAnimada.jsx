@@ -20,7 +20,7 @@ import { renderNodos } from '../MascotaSprite';
 import RecompensaCompletada from '../../components/wellness/RecompensaCompletada';
 import {
   respiracion, balanceo, salto, evolucion, followApendice,
-  expresiones, EXPRESION_BASE, transicionAnimo, mirada,
+  expresiones, EXPRESION_BASE, transicionAnimo, mirada, caricia,
 } from './movimiento';
 import { planParpadeo, pasosParpadeo } from './parpadeo';
 import { desplazamientoMirada } from './mirada';
@@ -54,9 +54,13 @@ export default function MascotaAnimada({
   const reduce = useReducedMotion();
   const pose = poseDePersonalidad(personalidad);
 
-  // Expresión puntual: se pisa sobre la de fondo y se va sola.
+  // Expresión puntual: se pisa sobre la de fondo y se va sola. La caricia gana
+  // sobre las dos mientras el dedo siga apoyado — es lo que está pasando ahora.
   const [puntual, setPuntual] = useState(null);
-  const expresion = expresiones[puntual] ? puntual : (expresiones[animo] ? animo : EXPRESION_BASE);
+  const [acariciando, setAcariciando] = useState(false);
+  const expresion = acariciando
+    ? 'mimosa'
+    : (expresiones[puntual] ? puntual : (expresiones[animo] ? animo : EXPRESION_BASE));
   const receta = expresiones[expresion];
 
   const escena = escenaMascota({
@@ -80,6 +84,7 @@ export default function MascotaAnimada({
   const ladeo = useSharedValue(receta.inclinacionDeg);
   const miraX = useSharedValue(0);
   const miraY = useSharedValue(0);
+  const mimo = useSharedValue(0);
 
   const [fiesta, setFiesta] = useState(false);
   const etapaPrev = useRef(etapa);
@@ -109,7 +114,9 @@ export default function MascotaAnimada({
   // recursaría infinito en jest, donde el mock invoca el callback en el acto.
   // Que el hilo de JS llegue tarde acá no es un problema: lo hace más orgánico.
   useEffect(() => {
-    if (reduce) {
+    // Durante la caricia el ojo queda entrecerrado por la expresión: si además
+    // siguiera parpadeando, los dos cierres pelearían por la misma escala.
+    if (reduce || acariciando) {
       blink.value = 1;
       return undefined;
     }
@@ -134,7 +141,7 @@ export default function MascotaAnimada({
       cancelAnimation(blink);
       blink.value = 1;
     };
-  }, [reduce, pose.parpadeoMs, blink]);
+  }, [reduce, acariciando, pose.parpadeoMs, blink]);
 
   // Evolución: al subir de etapa, pop del sprite + confetti (reutiliza el sistema
   // de Fase 12). La transición dedicada es el salto de escala con resorte.
@@ -194,10 +201,27 @@ export default function MascotaAnimada({
     miraY.value = withSpring(destino.y, mirada.spring);
   };
 
-  const soltarMirada = () => {
+  // Sostener el dedo es una caricia: se inclina hacia la mano y entrecierra los
+  // ojos. RN garantiza que si dispara onLongPress ya no dispara onPress, así que
+  // la caricia y el toque no se pisan.
+  const empezarCaricia = () => {
+    if (reduce) return;
+    setAcariciando(true);
+    mimo.value = withSpring(1, caricia.entrada);
+  };
+
+  const soltar = () => {
     if (reduce) return;
     miraX.value = withDelay(mirada.vueltaMs, withSpring(0, mirada.vuelta));
     miraY.value = withDelay(mirada.vueltaMs, withSpring(0, mirada.vuelta));
+    if (!acariciando) return;
+    setAcariciando(false);
+    mimo.value = withSpring(0, caricia.entrada);
+    // Una sacudida corta del apéndice al soltar: se sacude de gusto.
+    apendiceKick.value = withSequence(
+      withSpring(caricia.sacudida, followApendice.spring),
+      withSpring(0, followApendice.spring),
+    );
   };
 
   const reaccionarAlToque = () => {
@@ -232,6 +256,7 @@ export default function MascotaAnimada({
   const gradosApendice = followApendice.gradosPorSalto;
   const ampMin = balanceo.ampMinDeg;
   const ampMax = balanceo.ampMaxDeg;
+  const gradosCaricia = caricia.gradosPorPunto;
 
   // La energía de la expresión modula el idle entero: cuánto se infla al
   // respirar y cuánto se mece. Con la mascota adormilada esto la vuelve más
@@ -249,7 +274,8 @@ export default function MascotaAnimada({
       scaleX: (1 - respX * respira * b) * (1 - saltoX * j) * e,
       scaleY: (1 + respY * respira * b) * (1 + saltoY * j) * e,
       y: -alturaSalto * j,
-      rotation: inclinacion + ladeo.value + (sway.value * 2 - 1) * amp,
+      rotation: inclinacion + ladeo.value + (sway.value * 2 - 1) * amp
+        + mimo.value * miraX.value * gradosCaricia,
     };
   });
 
@@ -295,7 +321,9 @@ export default function MascotaAnimada({
     <Pressable
       onPress={reaccionarAlToque}
       onPressIn={mirarHacia}
-      onPressOut={soltarMirada}
+      onPressOut={soltar}
+      onLongPress={empezarCaricia}
+      delayLongPress={caricia.esperaMs}
       accessibilityRole="image"
       accessibilityLabel={`Mascota ${especie}, etapa ${etapa}${animo === 'adormilada' ? ', te extraña' : ''}`}
       style={{ width: size, height: size }}

@@ -130,6 +130,39 @@ test('el parpadeo variable encadena timers y no deja ninguno colgado', () => {
   expect(jest.getTimerCount()).toBeLessThanOrEqual(antes);
 });
 
+test('la caricia pausa el parpadeo y lo devuelve al soltar', () => {
+  // Con el ojo entrecerrado por la caricia, un parpadeo encima pelearía por la
+  // misma escala. Es lo único de la caricia observable sin worklets.
+  const antes = jest.getTimerCount();
+  let renderer;
+  act(() => { renderer = create(<MascotaAnimada especie="perro" etapa={1} size={100} />); });
+  const sprite = renderer.root.findByProps({ accessibilityRole: 'image' });
+  expect(jest.getTimerCount()).toBe(antes + 1);
+
+  act(() => sprite.props.onLongPress());
+  expect(jest.getTimerCount()).toBe(antes);
+
+  act(() => sprite.props.onPressOut());
+  expect(jest.getTimerCount()).toBe(antes + 1);
+
+  act(() => renderer.unmount());
+  expect(jest.getTimerCount()).toBeLessThanOrEqual(antes);
+});
+
+test('soltar sin haber acariciado no rompe nada', () => {
+  let renderer;
+  act(() => { renderer = create(<MascotaAnimada especie="perro" etapa={1} size={100} />); });
+  const sprite = renderer.root.findByProps({ accessibilityRole: 'image' });
+
+  // Un toque normal: entra, sale y reacciona, sin pasar por la caricia.
+  act(() => { sprite.props.onPressIn({ nativeEvent: { locationX: 20, locationY: 30 } }); });
+  act(() => sprite.props.onPressOut());
+  act(() => sprite.props.onPress());
+  expect(renderer.toJSON()).toBeTruthy();
+
+  act(() => renderer.unmount());
+});
+
 test('con reduce-motion no programa ningún parpadeo', () => {
   const Reanimated = require('react-native-reanimated');
   const spy = jest.spyOn(Reanimated, 'useReducedMotion').mockReturnValue(true);

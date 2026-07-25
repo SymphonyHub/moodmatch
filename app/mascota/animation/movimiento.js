@@ -138,6 +138,17 @@ export const mirada = {
   vueltaMs: 420,
 };
 
+// Caricia: sostener el dedo encima. Se inclina hacia donde está la mano y pone
+// cara de mimosa; al soltar, el apéndice blando da una sacudida corta de gusto.
+// `esperaMs` separa el toque de la caricia — por debajo de eso sigue siendo un
+// toque, y RN garantiza que si dispara onLongPress ya no dispara onPress.
+export const caricia = {
+  esperaMs: 260,
+  gradosPorPunto: 2.2,
+  entrada: { damping: 15, stiffness: 110, mass: 1 },
+  sacudida: 0.6,
+};
+
 // Cuánto tarda el cuerpo en acomodarse a una expresión nueva. Lento a propósito:
 // un cambio de ánimo instantáneo se lee como un parpadeo de sistema, no como un
 // estado. Los párpados sí cambian de golpe (son geometría, no una transición).

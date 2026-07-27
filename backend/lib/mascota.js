@@ -15,6 +15,11 @@ const {
 } = require('./interaccionesSociales');
 const { derivarEspecie } = require('./especies');
 const { derivarDesbloqueados } = require('./accesorios');
+const {
+  ENERGIA_INICIAL,
+  presentarEnergia,
+  ultimoCuidadoMs,
+} = require('./energiaMascota');
 
 const NOMBRE_MASCOTA = 'Lumi';
 const CARINO_POR_PAR_DE_MENSAJES = 2;
@@ -46,6 +51,7 @@ const datosMascota = (amistadId, nivelCarino = 0) => ({
   amistadId,
   nombre: NOMBRE_MASCOTA,
   nivelCarino,
+  energia: ENERGIA_INICIAL,
 });
 
 const asegurarMascota = (db, amistadId) =>
@@ -107,16 +113,6 @@ function etapaVisual(nivelCarino = 0) {
   const actual = [...UMBRALES_EVOLUCION].reverse().find(({ desde }) => nivel >= desde)
     ?? UMBRALES_EVOLUCION[0];
   return { numero: actual.etapa, nombre: actual.nombre };
-}
-
-// Última señal de cuidado: el momento más reciente entre la creación de la
-// mascota y ambos cuidados. Espeja latestPetCare de dueNotifications para que
-// el badge de "necesita atención" coincida con cuándo se dispara la push.
-function ultimoCuidadoMs(mascota) {
-  const marcas = [mascota.createdAt, mascota.ultimoCuidadoUsuario1, mascota.ultimoCuidadoUsuario2]
-    .map((valor) => (valor ? new Date(valor).getTime() : null))
-    .filter((ms) => ms !== null && Number.isFinite(ms));
-  return marcas.length ? Math.max(...marcas) : null;
 }
 
 function necesitaAtencion(mascota, ahora = new Date()) {
@@ -182,12 +178,14 @@ function presentarMascota(mascota, amistad, userId, personalidad, extra = {}) {
   const proximoCuidadoEn = ultimoCuidado
     ? new Date(new Date(ultimoCuidado).getTime() + COOLDOWN_CUIDADO_MS).toISOString()
     : null;
+  const puedeCuidar = !ultimoCuidado || new Date(proximoCuidadoEn).getTime() <= Date.now();
 
   return {
     id: mascota.id,
     amistadId: mascota.amistadId,
     nombre: mascota.nombre,
     nivelCarino: mascota.nivelCarino,
+    ...presentarEnergia(mascota),
     personalidad,
     // Fuente de verdad: la especie negociada por ambos (Agente A), persistida en
     // MascotaAmistad.especie. derivarEspecie es solo fallback para las mascotas
@@ -205,7 +203,9 @@ function presentarMascota(mascota, amistad, userId, personalidad, extra = {}) {
     invitacionMia: mascota.invitadaPor != null && mascota.invitadaPor === userId,
     activa: mascota.activa !== false,
     necesitaAtencion: necesitaAtencion(mascota),
-    puedeCuidar: !ultimoCuidado || new Date(proximoCuidadoEn).getTime() <= Date.now(),
+    puedeCuidar,
+    puedeAlimentar: puedeCuidar,
+    puedeJugar: puedeCuidar,
     proximoCuidadoEn,
     reto: reto ? {
       tipo: reto.tipo,

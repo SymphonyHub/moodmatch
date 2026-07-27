@@ -10,7 +10,6 @@ import Animated, {
   withSpring,
   withDelay,
   cancelAnimation,
-  useReducedMotion,
 } from 'react-native-reanimated';
 import { escenaMascota } from '../sprites/disenoEtapas';
 import { centroDe } from '../sprites/geometria';
@@ -18,6 +17,7 @@ import { poseDePersonalidad } from '../sprites/personalidad';
 import { ESPECIE_POR_DEFECTO } from '../sprites/especies';
 import { renderNodos } from '../MascotaSprite';
 import RecompensaCompletada from '../../components/wellness/RecompensaCompletada';
+import { useMotionPrefs } from '../../theme/ThemeContext';
 import {
   respiracion, balanceo, salto, evolucion, followApendice,
   expresiones, EXPRESION_BASE, transicionAnimo, mirada, caricia, inactividad,
@@ -69,7 +69,7 @@ export default function MascotaAnimada({
   size = 132,
   onTocar,
 }) {
-  const reduce = useReducedMotion();
+  const { reduceMotion: reduce } = useMotionPrefs();
   const pose = poseDePersonalidad(personalidad);
 
   // Expresión puntual: se pisa sobre la de fondo y se va sola. La caricia gana

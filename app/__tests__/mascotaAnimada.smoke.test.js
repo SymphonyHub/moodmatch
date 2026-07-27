@@ -220,8 +220,11 @@ test('soltar sin haber acariciado no rompe nada', () => {
 });
 
 test('con reduce-motion no programa ningún parpadeo', () => {
-  const Reanimated = require('react-native-reanimated');
-  const spy = jest.spyOn(Reanimated, 'useReducedMotion').mockReturnValue(true);
+  const ThemeContext = require('../theme/ThemeContext');
+  const spy = jest.spyOn(ThemeContext, 'useMotionPrefs').mockReturnValue({
+    reduceMotion: true,
+    hapticsEnabled: true,
+  });
   const antes = jest.getTimerCount();
   let renderer;
   act(() => {

@@ -10,8 +10,14 @@ import {
   saveCustomThemeConfig,
   DEFAULT_TEXT_SCALE,
   LARGE_TEXT_SCALE,
+  TEXT_SCALE_STEPS,
   loadTextScale,
   saveTextScale,
+  DEFAULT_HAPTICS,
+  loadReduceMotion,
+  saveReduceMotion,
+  loadHaptics,
+  saveHaptics,
 } from '../theme/persistence';
 import { DEFAULT_THEME_ID } from '../theme/themes';
 import { DEFAULT_CUSTOM_CONFIG, DEFAULT_CUSTOM_THEME } from '../theme/customTheme';
@@ -119,5 +125,51 @@ describe('load/saveTextScale', () => {
   test('no lanza si no se puede guardar', async () => {
     AsyncStorage.setItem.mockRejectedValueOnce(new Error('storage roto'));
     await expect(saveTextScale(LARGE_TEXT_SCALE)).resolves.toBeUndefined();
+  });
+
+  test('acepta los tres pasos y rechaza cualquier otro valor', async () => {
+    expect(TEXT_SCALE_STEPS).toHaveLength(3);
+    for (const paso of TEXT_SCALE_STEPS) {
+      await saveTextScale(paso);
+      expect(await loadTextScale()).toBe(paso);
+    }
+    // Un valor intermedio no se "acerca" al paso vecino: vuelve al normal.
+    await AsyncStorage.setItem(TEXT_SCALE_KEY, '1.22');
+    expect(await loadTextScale()).toBe(DEFAULT_TEXT_SCALE);
+  });
+
+  test('traduce el 1.2 del ajuste binario anterior al paso más parecido', async () => {
+    await AsyncStorage.setItem(TEXT_SCALE_KEY, '1.2');
+    expect(await loadTextScale()).toBe(1.15);
+  });
+});
+
+describe('load/saveReduceMotion', () => {
+  test('sin preferencia propia devuelve null para poder seguir al sistema', async () => {
+    expect(await loadReduceMotion()).toBeNull();
+  });
+
+  test('distingue apagado explícito de "nunca lo tocó"', async () => {
+    await saveReduceMotion(false);
+    expect(await loadReduceMotion()).toBe(false);
+    await saveReduceMotion(true);
+    expect(await loadReduceMotion()).toBe(true);
+  });
+
+  test('cae a null si el almacenamiento falla', async () => {
+    AsyncStorage.getItem.mockRejectedValueOnce(new Error('storage roto'));
+    expect(await loadReduceMotion()).toBeNull();
+  });
+});
+
+describe('load/saveHaptics', () => {
+  test('viene activada por defecto', async () => {
+    expect(await loadHaptics()).toBe(DEFAULT_HAPTICS);
+    expect(DEFAULT_HAPTICS).toBe(true);
+  });
+
+  test('persiste el apagado', async () => {
+    await saveHaptics(false);
+    expect(await loadHaptics()).toBe(false);
   });
 });

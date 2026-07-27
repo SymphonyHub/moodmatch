@@ -2,17 +2,18 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
-  ScrollView,
-  Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../../components/Tappable';
+import SegmentedTabs from '../../components/SegmentedTabs';
+import FilaSwitch from '../../components/ajustes/FilaSwitch';
 import {
   apiGetNotificationPreferences,
   apiUpdateNotificationPreferences,
@@ -109,7 +110,10 @@ export default function NotificationSettingsScreen() {
     setSaving(false);
   };
 
+  // SegmentedTabs no tiene estado deshabilitado, así que el guardado en curso se
+  // corta acá (antes lo cubría el `disabled` de cada chip).
   const selectMode = async (nextMode) => {
+    if (saving) return;
     const quietHours = quietHoursFor(nextMode, from, until);
     if (quietHours === undefined) return;
     const previousMode = mode;
@@ -153,7 +157,11 @@ export default function NotificationSettingsScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        bottomOffset={24}
+      >
         <View style={[styles.permissionCard, permissionReady && styles.permissionCardReady]}>
           <View style={styles.permissionIcon}>
             <Ionicons
@@ -188,23 +196,16 @@ export default function NotificationSettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Qué quieres recibir</Text>
           {NOTIFICATION_OPTIONS.map((option, index) => (
-            <View
+            <FilaSwitch
               key={option.key}
-              style={[styles.toggleRow, index < NOTIFICATION_OPTIONS.length - 1 && styles.rowDivider]}
-            >
-              <View style={styles.toggleCopy}>
-                <Text style={styles.toggleLabel}>{option.label}</Text>
-                <Text style={styles.toggleHint}>{option.hint}</Text>
-              </View>
-              <Switch
-                value={preferences[option.key]}
-                onValueChange={(value) => persist({ [option.key]: value })}
-                disabled={saving}
-                trackColor={{ false: theme.colors.border, true: theme.colors.primarySoftBorder }}
-                thumbColor={preferences[option.key] ? theme.colors.primary : theme.colors.textFaint}
-                accessibilityLabel={`Notificaciones de ${option.label}`}
-              />
-            </View>
+              title={option.label}
+              hint={option.hint}
+              value={preferences[option.key]}
+              onValueChange={(value) => persist({ [option.key]: value })}
+              disabled={saving}
+              divider={index < NOTIFICATION_OPTIONS.length - 1}
+              accessibilityLabel={`Notificaciones de ${option.label}`}
+            />
           ))}
         </View>
 
@@ -214,21 +215,7 @@ export default function NotificationSettingsScreen() {
             Durante este periodo el backend no enviará ningún tipo de aviso.
           </Text>
           <View style={styles.modeRow}>
-            {MODES.map((option) => (
-              <Tappable
-                key={option.id}
-                style={[styles.modeChip, mode === option.id && styles.modeChipActive]}
-                wrapperStyle={styles.modeWrapper}
-                onPress={() => selectMode(option.id)}
-                disabled={saving}
-                haptic={false}
-                accessibilityState={{ selected: mode === option.id }}
-              >
-                <Text style={[styles.modeText, mode === option.id && styles.modeTextActive]}>
-                  {option.label}
-                </Text>
-              </Tappable>
-            ))}
+            <SegmentedTabs tabs={MODES} activeId={mode} onChange={selectMode} />
           </View>
 
           {mode === 'schedule' ? (
@@ -267,7 +254,7 @@ export default function NotificationSettingsScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {saving ? <Text style={styles.saving}>Guardando cambios…</Text> : null}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
@@ -286,7 +273,15 @@ const useStyles = makeThemedStyles((t) => ({
   headerCopy: { marginLeft: 6 },
   title: { ...t.typography.type.title, color: t.colors.onHeader },
   subtitle: { ...t.typography.type.caption, color: t.colors.onHeader, opacity: 0.78, marginTop: 1 },
-  content: { padding: 18, paddingBottom: 42 },
+  // Mismo contenedor que Ajustes: ancho máximo legible y centrado (antes esta
+  // pantalla se estiraba de borde a borde en tablet mientras la otra no).
+  content: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
+    padding: 20,
+    paddingBottom: 40,
+  },
   permissionCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -295,6 +290,7 @@ const useStyles = makeThemedStyles((t) => ({
     borderWidth: t.shape.borderThin,
     borderColor: t.colors.border,
     padding: 14,
+    marginBottom: 20,
     ...t.shadows.card,
   },
   permissionCardReady: { borderColor: t.colors.primarySoftBorder },
@@ -320,34 +316,20 @@ const useStyles = makeThemedStyles((t) => ({
   compactButtonText: { color: t.colors.onPrimary, ...t.typography.fonts.bold, fontSize: t.fontSize(12) },
   systemSettings: { paddingVertical: 12, alignItems: 'center' },
   systemSettingsText: { color: t.colors.primary, ...t.typography.fonts.semibold, fontSize: t.fontSize(13) },
+  // La tarjeta de sección ahora lleva sombra, como las de Ajustes: sin ella esta
+  // pantalla se veía plana al lado de la otra.
   section: {
     backgroundColor: t.colors.surface,
     borderRadius: t.shape.radiusLg,
     borderWidth: t.shape.borderThin,
     borderColor: t.colors.border,
     padding: 16,
-    marginTop: 18,
+    marginBottom: 20,
+    ...t.shadows.card,
   },
   sectionTitle: { ...t.typography.type.section, color: t.colors.text },
   sectionHint: { ...t.typography.type.caption, color: t.colors.textMuted, marginTop: 5, marginBottom: 14 },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13 },
-  rowDivider: { borderBottomWidth: t.shape.borderThin, borderBottomColor: t.colors.border },
-  toggleCopy: { flex: 1, paddingRight: 14 },
-  toggleLabel: { fontSize: t.fontSize(15), ...t.typography.fonts.semibold, color: t.colors.text },
-  toggleHint: { fontSize: t.fontSize(12), lineHeight: t.fontSize(17), color: t.colors.textMuted, marginTop: 3 },
-  modeRow: { flexDirection: 'row', gap: 7, marginTop: 14 },
-  modeWrapper: { flex: 1 },
-  modeChip: {
-    borderRadius: t.shape.radiusMd,
-    borderWidth: t.shape.borderThin,
-    borderColor: t.colors.border,
-    backgroundColor: t.colors.background,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  modeChipActive: { borderColor: t.colors.primary, backgroundColor: t.colors.primarySoft },
-  modeText: { fontSize: t.fontSize(12), color: t.colors.textMuted, ...t.typography.fonts.semibold },
-  modeTextActive: { color: t.colors.primary },
+  modeRow: { marginTop: 14 },
   scheduleBox: {
     flexDirection: 'row',
     alignItems: 'flex-end',

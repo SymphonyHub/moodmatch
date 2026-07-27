@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Switch, View, Text, TextInput, useColorScheme } from 'react-native';
+import { Alert, View, Text, TextInput, useColorScheme } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { THEMES, AUTO_THEME_ID, CUSTOM_THEME_ID, resolveThemeId } from '../../theme/themes';
@@ -15,6 +16,7 @@ import {
   MAX_PALETAS,
   NAME_MAX,
   makeCustomTheme,
+  evaluateCustomTheme,
   configDe,
   nuevaPaletaId,
   upsertPalette,
@@ -22,9 +24,19 @@ import {
 } from '../../theme/customTheme';
 import { MOODS } from '../../constants/moods';
 import Tappable from '../../components/Tappable';
+import SegmentedTabs from '../../components/SegmentedTabs';
+import FilaSwitch from '../../components/ajustes/FilaSwitch';
 import { HueBar, SatBar, LumBar } from '../../components/color/HueBar';
-import { LARGE_TEXT_SCALE } from '../../theme/persistence';
+import { TEXT_SCALE_STEPS } from '../../theme/persistence';
 import { unregisterPushTokenForLogout } from '../../notifications/pushRegistration';
+
+// Pasos de lectura, derivados de la lista de persistence para que no se
+// desincronicen. SegmentedTabs trabaja con ids de texto.
+const TEXT_SCALE_LABELS = ['Normal', 'Grande', 'Más grande'];
+const TEXT_SCALE_TABS = TEXT_SCALE_STEPS.map((paso, i) => ({
+  id: String(paso),
+  label: TEXT_SCALE_LABELS[i] ?? `${Math.round(paso * 100)}%`,
+}));
 
 const THEME_OPTIONS = [
   { id: AUTO_THEME_ID, name: 'Automático', tagline: 'Sigue el modo del sistema' },
@@ -40,6 +52,20 @@ const paletaActiva = (container) =>
 // CUALQUIER color en ambos temas. Con el contraste libre, un color casi-blanco
 // o casi-negro puede quedar igual que la tarjeta; el stroke lo delinea igual.
 const swatchStroke = (t) => (t.isDark ? 'rgba(255,255,255,0.32)' : 'rgba(0,0,0,0.22)');
+
+// Nombre y versión del build, de app.json vía expo-constants. En un solo string
+// para que sea legible de una sola lectura (y verificable en test).
+const APP_BUILD = [Constants.expoConfig?.name ?? 'MoodMatch', Constants.expoConfig?.version]
+  .filter(Boolean)
+  .join(' ');
+
+// Confirmación para las acciones que no se pueden deshacer (borrar una paleta,
+// cerrar sesión). Un solo helper para que las dos pregunten igual.
+const confirmarAccion = ({ titulo, mensaje, accion, onConfirm }) =>
+  Alert.alert(titulo, mensaje, [
+    { text: 'Cancelar', style: 'cancel' },
+    { text: accion, style: 'destructive', onPress: onConfirm },
+  ]);
 
 // Mini-mock de la app: dentro de un ThemeScope muestra cómo se vería el tema
 // candidato sin aplicarlo globalmente.
@@ -92,7 +118,13 @@ function ThemeOptionRow({ option, selected, onPress, customDraft }) {
           swatchTheme.colors.background,
           swatchTheme.colors.moods.CALMADO.color,
         ]
-      : [THEMES.sereno.colors.background, THEMES.nocturno.colors.background];
+      : // Automático muestra tres muestras como el resto de las filas (claro,
+        // primario y oscuro) para que la columna de la derecha no quede despareja.
+        [
+          THEMES.sereno.colors.background,
+          THEMES.sereno.colors.primary,
+          THEMES.nocturno.colors.background,
+        ];
 
   return (
     <Tappable
@@ -143,25 +175,48 @@ function SwatchRow({ colors, selected, onSelect, label }) {
   );
 }
 
-// Lectura/edición del hex exacto. Edita en local mientras se escribe y solo
-// propaga cuando el texto es un hex válido de 6 dígitos; al salir del campo,
-// revierte al último válido si quedó a medias.
-const esHex = (v) => /^#[0-9a-f]{6}$/.test(v);
+// Lectura/edición del hex exacto. El `#` es opcional: "ff0000" vale igual que
+// "#ff0000". La forma corta de 3 dígitos ("f00") se expande recién al salir del
+// campo — si se expandiera mientras se escribe, el texto saltaría a "#ff0000" y
+// con maxLength ya no se podría seguir tecleando un hex de 6 dígitos.
+const hexLargo = (v) => {
+  const m = /^#?([0-9a-f]{6})$/.exec(v.trim().toLowerCase());
+  return m ? `#${m[1]}` : null;
+};
+const hexCorto = (v) => {
+  const m = /^#?([0-9a-f]{3})$/.exec(v.trim().toLowerCase());
+  return m ? `#${m[1].replace(/./g, (c) => c + c)}` : null;
+};
+
 function HexInput({ value, onChange, label }) {
   const styles = useStyles();
   const [text, setText] = useState(value);
   useEffect(() => setText(value), [value]);
+
   const onText = (t) => {
-    const v = t.trim().toLowerCase();
-    setText(v);
-    if (esHex(v)) onChange(v);
+    setText(t.toLowerCase());
+    const hex = hexLargo(t);
+    if (hex) onChange(hex);
   };
+
+  // Al salir: deja el canónico a la vista (expandiendo la forma corta) o
+  // revierte al último color válido si quedó a medias.
+  const onBlur = () => {
+    const hex = hexLargo(text) ?? hexCorto(text);
+    if (!hex) {
+      setText(value);
+      return;
+    }
+    setText(hex);
+    if (hex !== value) onChange(hex);
+  };
+
   return (
     <TextInput
       style={styles.hexInput}
       value={text}
       onChangeText={onText}
-      onBlur={() => setText((cur) => (esHex(cur) ? cur : value))}
+      onBlur={onBlur}
       autoCapitalize="none"
       autoCorrect={false}
       maxLength={7}
@@ -321,6 +376,22 @@ function PaletteList({ palettes, draftId, activeId, applied, onSelect, onDelete,
   );
 }
 
+// Aviso de contraste: informa y nada más. Los colores siguen siendo libres — no
+// condiciona guardar ni aplicar — pero deja dicho cuándo una combinación va a
+// costar de leer, que es la regla de la casa ("avisa, no bloquea"). Reusa
+// evaluateCustomTheme, la misma evaluación que verifica contrast.test.js.
+function ContrastHint({ issues }) {
+  const styles = useStyles();
+  if (issues.length === 0) return null;
+
+  const aviso =
+    issues.length === 1
+      ? 'Hay una combinación de colores que puede costar de leer.'
+      : `Hay ${issues.length} combinaciones de colores que pueden costar de leer.`;
+
+  return <Text style={styles.contrastHint}>{`${aviso} Puedes usar la paleta igual.`}</Text>;
+}
+
 function CustomThemeEditor({
   draft,
   onChangeConfig,
@@ -333,6 +404,7 @@ function CustomThemeEditor({
   onNewPalette,
   onSavePalette,
   canSave,
+  contrastIssues,
 }) {
   const styles = useStyles();
   return (
@@ -387,6 +459,8 @@ function CustomThemeEditor({
         onSelect={(bodyFont) => onChangeConfig({ bodyFont })}
       />
 
+      <ContrastHint issues={contrastIssues} />
+
       <Tappable
         style={[styles.btnGuardar, !canSave && styles.btnGuardarDisabled]}
         onPress={onSavePalette}
@@ -421,6 +495,10 @@ export default function AjustesScreen() {
     deletePalette,
     textScale,
     setTextScale,
+    reduceMotion,
+    setReduceMotion,
+    hapticsEnabled,
+    setHaptics,
   } = useTheme();
   const styles = useStyles();
   const systemScheme = useColorScheme();
@@ -430,6 +508,7 @@ export default function AjustesScreen() {
 
   const isCustomCandidate = candidate === CUSTOM_THEME_ID;
   const draftTheme = useMemo(() => makeCustomTheme(configDe(draft)), [draft]);
+  const contrastIssues = useMemo(() => evaluateCustomTheme(draftTheme), [draftTheme]);
 
   const previewTheme = isCustomCandidate
     ? draftTheme
@@ -453,6 +532,16 @@ export default function AjustesScreen() {
       const restantes = customConfig.palettes.filter((p) => p.id !== id);
       if (restantes.length) setDraft({ ...restantes[0] });
     }
+  };
+  // Borrar una paleta no se puede deshacer, así que pregunta antes.
+  const confirmDeletePalette = (id) => {
+    const paleta = customConfig.palettes.find((p) => p.id === id);
+    confirmarAccion({
+      titulo: `¿Borrar "${paleta?.name ?? 'esta paleta'}"?`,
+      mensaje: 'Se pierde esta combinación de colores y fuente. No se puede deshacer.',
+      accion: 'Borrar',
+      onConfirm: () => removePaletteById(id),
+    });
   };
   // Guardar exige solo un nombre no vacío; los colores son libres (el usuario
   // elige lo que quiera, sin condición de contraste).
@@ -484,11 +573,19 @@ export default function AjustesScreen() {
     else router.replace('/perfil');
   };
 
-  const handleCerrarSesion = async () => {
+  const cerrarSesion = async () => {
     await unregisterPushTokenForLogout();
     await AsyncStorage.removeItem('token');
     router.replace('/login');
   };
+
+  const handleCerrarSesion = () =>
+    confirmarAccion({
+      titulo: '¿Cerrar sesión?',
+      mensaje: 'Tendrás que volver a entrar con tu cuenta. Tus datos quedan guardados.',
+      accion: 'Cerrar sesión',
+      onConfirm: cerrarSesion,
+    });
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
@@ -503,6 +600,7 @@ export default function AjustesScreen() {
         </Tappable>
         <View style={styles.headerCopy}>
           <Text style={styles.headerTitle}>Ajustes</Text>
+          <Text style={styles.headerSubtitle}>Tu app, a tu manera</Text>
         </View>
       </View>
 
@@ -540,10 +638,11 @@ export default function AjustesScreen() {
               activeId={customConfig.activeId}
               applied={applied}
               onSelectPalette={selectPalette}
-              onDeletePalette={removePaletteById}
+              onDeletePalette={confirmDeletePalette}
               onNewPalette={newPalette}
               onSavePalette={savePaletteDraft}
               canSave={canSave}
+              contrastIssues={contrastIssues}
             />
           )}
 
@@ -558,21 +657,33 @@ export default function AjustesScreen() {
           </Tappable>
         </SectionCard>
 
-        <SectionCard title="Accesibilidad" hint="Ajusta la lectura sin cambiar tu tema ni tu fuente.">
-          <View style={styles.accessibilityRow}>
-            <View style={styles.accessibilityCopy}>
-              <Text style={styles.accessibilityTitle}>Texto grande</Text>
-              <Text style={styles.accessibilityHint}>Aumenta los textos de toda la app.</Text>
-            </View>
-            <Switch
-              value={textScale === LARGE_TEXT_SCALE}
-              onValueChange={(enabled) => setTextScale(enabled ? LARGE_TEXT_SCALE : 1)}
-              trackColor={{ false: theme.colors.border, true: theme.colors.primarySoftBorder }}
-              thumbColor={textScale === LARGE_TEXT_SCALE ? theme.colors.primary : theme.colors.surface}
-              accessibilityLabel="Texto grande"
-              accessibilityHint="Aumenta el tamaño de los textos de la aplicación"
-            />
-          </View>
+        <SectionCard
+          title="Accesibilidad"
+          hint="Ajusta la lectura y el movimiento sin cambiar tu tema ni tu fuente."
+        >
+          <Text style={styles.a11yLabel}>Tamaño del texto</Text>
+          <SegmentedTabs
+            tabs={TEXT_SCALE_TABS}
+            activeId={String(textScale)}
+            onChange={(id) => setTextScale(Number(id))}
+          />
+          <View style={styles.a11yGap} />
+          <FilaSwitch
+            title="Reducir movimiento"
+            hint="Quita las animaciones de entrada y las transiciones de tema."
+            value={reduceMotion}
+            onValueChange={setReduceMotion}
+            divider
+            accessibilityLabel="Reducir movimiento"
+            accessibilityHint="Desactiva las animaciones de la aplicación"
+          />
+          <FilaSwitch
+            title="Vibración al tocar"
+            hint="La respuesta táctil de botones y controles."
+            value={hapticsEnabled}
+            onValueChange={setHaptics}
+            accessibilityLabel="Vibración al tocar"
+          />
         </SectionCard>
 
         <SectionCard
@@ -605,7 +716,19 @@ export default function AjustesScreen() {
             <Text style={styles.settingsLinkArrow}>›</Text>
           </Tappable>
           <View style={styles.accountDivider} />
-          <Tappable style={styles.btnSalir} onPress={handleCerrarSesion} haptic={false}>
+          {/* Versión a la vista: sin esto no hay forma de saber qué build corre el
+              teléfono cuando algo "no se ve aplicado". */}
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>Acerca de</Text>
+            <Text style={styles.aboutValue}>{APP_BUILD}</Text>
+          </View>
+          <View style={styles.accountDivider} />
+          <Tappable
+            style={styles.btnSalir}
+            onPress={handleCerrarSesion}
+            haptic={false}
+            accessibilityLabel="Cerrar sesión"
+          >
             <Text style={styles.btnSalirTxt}>Cerrar sesión</Text>
           </Tappable>
         </SectionCard>
@@ -628,6 +751,12 @@ const useStyles = makeThemedStyles((t) => ({
   back: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { marginLeft: 6 },
   headerTitle: { ...t.typography.type.title, color: t.colors.onHeader },
+  headerSubtitle: {
+    ...t.typography.type.caption,
+    color: t.colors.onHeader,
+    opacity: 0.78,
+    marginTop: 1,
+  },
   container: {
     width: '100%',
     maxWidth: 680,
@@ -853,10 +982,17 @@ const useStyles = makeThemedStyles((t) => ({
     fontSize: t.fontSize(15),
     ...t.typography.fonts.bold,
   },
-  accessibilityRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  accessibilityCopy: { flex: 1 },
-  accessibilityTitle: { ...t.typography.type.body, ...t.typography.fonts.semibold, color: t.colors.text },
-  accessibilityHint: { ...t.typography.type.caption, color: t.colors.textMuted, marginTop: 2 },
+  a11yLabel: {
+    fontSize: t.fontSize(13),
+    ...t.typography.fonts.semibold,
+    color: t.colors.text,
+    marginBottom: 8,
+  },
+  a11yGap: { height: 6 },
+  contrastHint: { ...t.typography.type.caption, color: t.colors.textMuted, marginBottom: 14 },
+  aboutRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  aboutLabel: { ...t.typography.type.body, color: t.colors.text },
+  aboutValue: { ...t.typography.type.caption, color: t.colors.textMuted },
   btnSalir: {
     borderWidth: t.shape.borderMedium,
     borderColor: t.colors.border,

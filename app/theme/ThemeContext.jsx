@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { Animated, StyleSheet, useColorScheme } from 'react-native';
+import { AccessibilityInfo, Animated, StyleSheet, useColorScheme } from 'react-native';
 import { THEMES, DEFAULT_THEME_ID, CUSTOM_THEME_ID, resolveThemeId } from './themes';
 import {
   loadThemeChoice,
@@ -7,9 +7,14 @@ import {
   loadCustomThemeConfig,
   saveCustomThemeConfig,
   DEFAULT_TEXT_SCALE,
-  LARGE_TEXT_SCALE,
+  TEXT_SCALE_STEPS,
   loadTextScale,
   saveTextScale,
+  DEFAULT_HAPTICS,
+  loadReduceMotion,
+  saveReduceMotion,
+  loadHaptics,
+  saveHaptics,
 } from './persistence';
 import {
   makeCustomTheme,
@@ -54,26 +59,55 @@ export function ThemeProvider({ children }) {
   // configurado → DEFAULT_CUSTOM_THEME).
   const [customConfig, setCustomConfigState] = useState(null);
   const [textScale, setTextScaleState] = useState(DEFAULT_TEXT_SCALE);
+  // Preferencia de movimiento reducido elegida en la app: null = seguir al
+  // sistema. Se guarda aparte del valor del sistema para poder distinguir
+  // "nunca lo tocó" de "lo apagó a propósito".
+  const [reduceMotionPref, setReduceMotionPref] = useState(null);
+  const [systemReduceMotion, setSystemReduceMotion] = useState(false);
+  const [haptics, setHapticsState] = useState(DEFAULT_HAPTICS);
   // Velo de transición al aplicar un tema: { color, opacity } mientras anima.
   const [veil, setVeil] = useState(null);
   const systemScheme = useColorScheme();
 
   useEffect(() => {
     let alive = true;
-    Promise.all([loadThemeChoice(), loadCustomThemeConfig(), loadTextScale()]).then(([
-      stored,
-      storedCustom,
-      storedTextScale,
-    ]) => {
+    Promise.all([
+      loadThemeChoice(),
+      loadCustomThemeConfig(),
+      loadTextScale(),
+      loadReduceMotion(),
+      loadHaptics(),
+    ]).then(([stored, storedCustom, storedTextScale, storedReduceMotion, storedHaptics]) => {
       if (!alive) return;
       setCustomConfigState(storedCustom);
       setTextScaleState(storedTextScale);
+      setReduceMotionPref(storedReduceMotion);
+      setHapticsState(storedHaptics);
       setChoice(stored);
     });
     return () => {
       alive = false;
     };
   }, []);
+
+  // El ajuste de movimiento reducido del sistema se sigue en vivo: es la base
+  // cuando no hay preferencia propia, y antes lo leía cada componente por su
+  // cuenta (solo lo hacía uno).
+  useEffect(() => {
+    let alive = true;
+    AccessibilityInfo.isReduceMotionEnabled?.().then((value) => {
+      if (alive) setSystemReduceMotion(Boolean(value));
+    });
+    const sub = AccessibilityInfo.addEventListener?.('reduceMotionChanged', (value) =>
+      setSystemReduceMotion(Boolean(value)),
+    );
+    return () => {
+      alive = false;
+      sub?.remove?.();
+    };
+  }, []);
+
+  const reduceMotion = reduceMotionPref ?? systemReduceMotion;
 
   // sync: false cuando el valor VIENE del servidor (adopción al login),
   // para no reenviarle su propio dato. El PATCH es best-effort: si falla
@@ -93,9 +127,21 @@ export function ThemeProvider({ children }) {
   }, []);
 
   const setTextScale = useCallback((next) => {
-    const scale = next === LARGE_TEXT_SCALE ? LARGE_TEXT_SCALE : DEFAULT_TEXT_SCALE;
+    const scale = TEXT_SCALE_STEPS.includes(next) ? next : DEFAULT_TEXT_SCALE;
     setTextScaleState(scale);
     saveTextScale(scale);
+  }, []);
+
+  const setReduceMotion = useCallback((next) => {
+    const value = Boolean(next);
+    setReduceMotionPref(value);
+    saveReduceMotion(value);
+  }, []);
+
+  const setHaptics = useCallback((next) => {
+    const value = Boolean(next);
+    setHapticsState(value);
+    saveHaptics(value);
   }, []);
 
   // Gestión de paletas: parten del contenedor actual (o el default) y aplican
@@ -132,6 +178,15 @@ export function ThemeProvider({ children }) {
         next === CUSTOM_THEME_ID
           ? makeCustomTheme(activePalette(container) ?? DEFAULT_CUSTOM_CONFIG)
           : THEMES[resolveThemeId(next, systemScheme)];
+
+      // Con movimiento reducido el tema conmuta de una, sin el velo que sube y
+      // baja: es el efecto más grande de la app y no aporta nada funcional.
+      if (reduceMotion) {
+        if (custom) setCustomContainer(custom);
+        setThemeChoice(next);
+        return;
+      }
+
       const opacity = new Animated.Value(0);
       setVeil({ color: target.colors.background, opacity });
       Animated.timing(opacity, { toValue: 1, duration: 160, useNativeDriver: true }).start(() => {
@@ -145,7 +200,7 @@ export function ThemeProvider({ children }) {
         }).start(() => setVeil(null));
       });
     },
-    [systemScheme, setThemeChoice, setCustomContainer, customConfig],
+    [systemScheme, setThemeChoice, setCustomContainer, customConfig, reduceMotion],
   );
 
   const hydrated = choice !== null;
@@ -171,6 +226,10 @@ export function ThemeProvider({ children }) {
       setActivePalette,
       textScale,
       setTextScale,
+      reduceMotion,
+      setReduceMotion,
+      hapticsEnabled: haptics,
+      setHaptics,
       isApplying: veil !== null,
       veil,
     }),
@@ -188,6 +247,10 @@ export function ThemeProvider({ children }) {
       setActivePalette,
       textScale,
       setTextScale,
+      reduceMotion,
+      setReduceMotion,
+      haptics,
+      setHaptics,
       veil,
     ],
   );
@@ -228,6 +291,18 @@ export function useTheme() {
   const ctx = useContext(ThemeContext);
   if (!ctx) throw new Error('useTheme debe usarse dentro de <ThemeProvider>');
   return ctx;
+}
+
+// Accesor tolerante de las preferencias de movimiento y vibración, para los
+// primitivos de más abajo (Tappable, Entrance): los renderiza media app y varios
+// tests los montan sueltos, sin provider. Ahí un throw sería una molestia sin
+// ninguna ganancia, así que caen al comportamiento de siempre.
+export function useMotionPrefs() {
+  const ctx = useContext(ThemeContext);
+  return {
+    reduceMotion: ctx?.reduceMotion ?? false,
+    hapticsEnabled: ctx?.hapticsEnabled ?? true,
+  };
 }
 
 // Crea un hook de estilos tematizados: const useStyles = makeThemedStyles((t) => ({ ... }));

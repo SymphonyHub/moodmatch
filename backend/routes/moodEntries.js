@@ -1,9 +1,28 @@
 const router = require('express').Router();
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
+const { mascotaAceptada } = require('../lib/mascota');
+const {
+  prepararActualizacionExperiencia,
+  reclamarRecompensaDiaria,
+  respuestaProgresion,
+} = require('../lib/mascotaProgresion');
 
 const VALID_MOODS = ['FELIZ', 'TRISTE', 'ANSIOSO', 'CALMADO', 'ENOJADO', 'NEUTRO'];
 const CLIENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_REINTENTOS_TRANSACCION = 3;
+
+async function transaccionSerializable(operacion) {
+  let intento = 0;
+  while (true) {
+    try {
+      return await prisma.$transaction(operacion, { isolationLevel: 'Serializable' });
+    } catch (error) {
+      intento += 1;
+      if (error?.code !== 'P2034' || intento >= MAX_REINTENTOS_TRANSACCION) throw error;
+    }
+  }
+}
 
 async function nextSuggestion(db, moodType, moodEntryId) {
   const moodActivities = await db.moodActivity.findMany({
@@ -39,6 +58,50 @@ const mismoRegistro = (entry, userId, moodType, nota, capturedAt) => (
   && (entry.nota ?? null) === nota
   && (!capturedAt || new Date(entry.createdAt).toISOString() === capturedAt.toISOString())
 );
+
+// Un registro nuevo recompensa cada mascota activa del usuario. El dia del
+// limite sale del servidor, no de capturedAt, para que importar datos antiguos
+// no permita repetir recompensas de dias pasados.
+async function recompensarMascotasPorAnimo(db, userId, ahora) {
+  const friendships = await db.friendship.findMany({
+    where: { OR: [{ userId }, { friendId: userId }] },
+    include: { mascota: true },
+  });
+  const vistas = new Set();
+  const resultados = [];
+
+  for (const amistad of friendships) {
+    const mascota = amistad.mascota;
+    const clave = mascota?.id ?? `amistad:${amistad.id}`;
+    if (!mascotaAceptada(mascota) || vistas.has(clave)) continue;
+    vistas.add(clave);
+
+    const recompensa = await reclamarRecompensaDiaria(db, {
+      amistad,
+      userId,
+      tipo: 'ANIMO',
+      ahora,
+    });
+    const avance = prepararActualizacionExperiencia(
+      mascota,
+      recompensa.experienciaOtorgada,
+      ahora,
+    );
+    if (recompensa.experienciaOtorgada > 0) {
+      await db.mascotaAmistad.update({
+        where: { amistadId: amistad.id },
+        data: avance.data,
+      });
+    }
+    resultados.push({
+      amistadId: amistad.id,
+      ...respuestaProgresion(avance.progresion),
+      experienciaOtorgada: recompensa.experienciaOtorgada,
+      limiteDiarioAlcanzado: recompensa.limiteDiarioAlcanzado,
+    });
+  }
+  return resultados;
+}
 
 // GET /api/mood-entries?days=30 — registros del usuario dentro de la ventana
 // de días pedida (para la vista de historial). Sin suggestions: aquí solo
@@ -106,10 +169,11 @@ router.post('/', requireAuth, async (req, res) => {
   const userId = req.user.userId;
   const clientId = clientIdRaw ?? null;
   const notaNormalizada = nota || null;
+  const ahora = new Date();
   let resultado;
 
   try {
-    resultado = await prisma.$transaction(async (tx) => {
+    resultado = await transaccionSerializable(async (tx) => {
       if (clientId) {
         const existente = await tx.moodEntry.findUnique({
           where: { clientId },
@@ -128,7 +192,13 @@ router.post('/', requireAuth, async (req, res) => {
         },
       });
       const actividadSugerida = await nextSuggestion(tx, moodType, moodEntry.id);
-      return { moodEntry, actividadSugerida, creada: true };
+      const progresionMascotas = await recompensarMascotasPorAnimo(tx, userId, ahora);
+      return {
+        moodEntry,
+        actividadSugerida,
+        creada: true,
+        ...(progresionMascotas.length > 0 && { progresionMascotas }),
+      };
     });
   } catch (error) {
     // Dos sincronizaciones concurrentes pueden intentar insertar el mismo UUID.

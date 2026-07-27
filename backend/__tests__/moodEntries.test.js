@@ -5,6 +5,9 @@ jest.mock('../lib/prisma', () => {
     },
     moodActivity: { findMany: jest.fn() },
     suggestion: { create: jest.fn() },
+    friendship: { findMany: jest.fn() },
+    mascotaAmistad: { update: jest.fn() },
+    cheer: { count: jest.fn(), create: jest.fn() },
   };
   db.$transaction = jest.fn((callback) => callback(db));
   return db;
@@ -25,6 +28,8 @@ app.use('/api/mood-entries', moodEntriesRouter);
 beforeEach(() => {
   jest.clearAllMocks();
   prisma.moodEntry.findUnique.mockResolvedValue(null);
+  prisma.friendship.findMany.mockResolvedValue([]);
+  prisma.cheer.count.mockResolvedValue(0);
 });
 
 const VALID_MOODS = ['FELIZ', 'TRISTE', 'ANSIOSO', 'CALMADO', 'ENOJADO', 'NEUTRO'];
@@ -176,6 +181,57 @@ describe('POST /api/mood-entries — idempotencia offline', () => {
     expect(res.status).toBe(200);
     expect(res.body.moodEntry.id).toBe(entry.id);
     expect(res.body.actividadSugerida).toEqual(actividad);
+  });
+});
+
+describe('POST /api/mood-entries — experiencia de mascota', () => {
+  const mascota = {
+    id: 'pet-1', amistadId: 7, experiencia: 0, historialHitos: [],
+    invitacionEstado: 'aceptada', activa: true,
+  };
+  const amistad = { id: 7, userId: 1, friendId: 2, mascota };
+
+  beforeEach(() => {
+    prisma.moodEntry.create.mockResolvedValue({
+      id: 50, userId: 1, clientId: null, moodType: 'FELIZ', nota: null, createdAt: new Date(),
+    });
+    prisma.moodActivity.findMany.mockResolvedValue([]);
+    prisma.friendship.findMany.mockResolvedValue([amistad]);
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, experiencia: 50 });
+  });
+
+  test('el primer animo del dia otorga 50 EXP a cada mascota activa', async () => {
+    const res = await request(app)
+      .post('/api/mood-entries')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ moodType: 'FELIZ' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.progresionMascotas[0]).toEqual(expect.objectContaining({
+      amistadId: 7,
+      experiencia: 50,
+      nivel: 2,
+      experienciaOtorgada: 50,
+      limiteDiarioAlcanzado: false,
+    }));
+    expect(prisma.mascotaAmistad.update).toHaveBeenCalledWith({
+      where: { amistadId: 7 },
+      data: expect.objectContaining({ experiencia: { increment: 50 } }),
+    });
+  });
+
+  test('otro animo el mismo dia se guarda pero otorga 0 EXP', async () => {
+    prisma.cheer.count.mockResolvedValue(1);
+
+    const res = await request(app)
+      .post('/api/mood-entries')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ moodType: 'FELIZ' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.progresionMascotas[0].experienciaOtorgada).toBe(0);
+    expect(res.body.progresionMascotas[0].limiteDiarioAlcanzado).toBe(true);
+    expect(prisma.mascotaAmistad.update).not.toHaveBeenCalled();
   });
 });
 

@@ -30,7 +30,7 @@ const token = jwt.sign({ userId: MY_USER_ID }, 'moodmatch-dev-secret');
 // amistad.userId = FRIEND_ID (usuario1), amistad.friendId = MY_USER_ID (usuario2)
 const amistad = { id: AMISTAD_ID, userId: FRIEND_ID, friendId: MY_USER_ID };
 const mascota = {
-  id: 'pet-1', amistadId: AMISTAD_ID, nombre: 'Lumi', nivelCarino: 0,
+  id: 'pet-1', amistadId: AMISTAD_ID, nombre: 'Lumi', nivelCarino: 0, experiencia: 0,
   invitacionEstado: 'aceptada', activa: true, invitadaPor: FRIEND_ID,
 };
 
@@ -187,7 +187,10 @@ describe('catálogo de retos en el cuidado', () => {
         progresoUsuario1: false, progresoUsuario2: false, completado: false,
       },
     });
-    prisma.cheer.count.mockResolvedValueOnce(4).mockResolvedValueOnce(1); // pares = 1
+    prisma.cheer.count
+      .mockResolvedValueOnce(0) // recompensa diaria de cuidado
+      .mockResolvedValueOnce(4)
+      .mockResolvedValueOnce(1); // pares = 1
     prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, nivelCarino: 6 });
 
     const res = await request(app)

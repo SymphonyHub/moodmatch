@@ -113,7 +113,7 @@ describe('GET /api/messages/:friendId', () => {
     });
     expect(prisma.cheer.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
-        NOT: { message: { startsWith: '__MASCOTA_ACTIVIDAD__:' } },
+        NOT: { message: { startsWith: '__MASCOTA_' } },
       }),
     }));
   });
@@ -168,6 +168,17 @@ describe('POST /api/messages/:friendId', () => {
       .send({ message: 'a'.repeat(501) });
 
     expect(res.status).toBe(400);
+    expect(prisma.cheer.create).not.toHaveBeenCalled();
+  });
+
+  test('400 si intenta usar un prefijo interno de mascota', async () => {
+    const res = await request(app)
+      .post(`/api/messages/${FRIEND_ID}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ message: '__MASCOTA_EXP__:marcador-falso' });
+
+    expect(res.status).toBe(400);
+    expect(prisma.friendship.findFirst).not.toHaveBeenCalled();
     expect(prisma.cheer.create).not.toHaveBeenCalled();
   });
 
@@ -311,7 +322,7 @@ describe('PUT /api/messages/:friendId/:messageId/reaction', () => {
     expect(prisma.cheer.findFirst).toHaveBeenCalledWith({
       where: expect.objectContaining({
         id: 99,
-        NOT: { message: { startsWith: '__MASCOTA_ACTIVIDAD__:' } },
+        NOT: { message: { startsWith: '__MASCOTA_' } },
       }),
     });
     expect(prisma.cheer.update).not.toHaveBeenCalled();

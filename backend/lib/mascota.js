@@ -20,6 +20,13 @@ const {
   presentarEnergia,
   ultimoCuidadoMs,
 } = require('./energiaMascota');
+const {
+  EXPERIENCIA_INICIAL,
+  PREFIJO_INTERNO_MASCOTA,
+  calcularProgresion,
+  etapaVisual,
+  respuestaProgresion,
+} = require('./mascotaProgresion');
 
 const NOMBRE_MASCOTA = 'Lumi';
 const CARINO_POR_PAR_DE_MENSAJES = 2;
@@ -34,17 +41,8 @@ const UMBRALES_ETAPA = [4, 10, 20, 40];
 // crea al agregar un amigo, solo cuando alguien invita explícitamente.
 const ESTADOS_INVITACION = ['pendiente', 'aceptada', 'rechazada'];
 
-// Etapas de evolución estilo Pokémon (Parte B). Aquí solo se deriva el nombre
-// visible desde el nivel de cariño; el sprite y la animación de transición son
-// del Agente C. Umbrales 16/36 según FASE14 sección 4.
-const UMBRALES_EVOLUCION = [
-  { etapa: 1, desde: 0, nombre: 'Cachorro' },
-  { etapa: 2, desde: 16, nombre: 'Joven' },
-  { etapa: 3, desde: 36, nombre: 'Adulta' },
-];
-
 const filtroMensajesVisibles = {
-  NOT: { message: { startsWith: PREFIJO_ACTIVIDAD } },
+  NOT: { message: { startsWith: PREFIJO_INTERNO_MASCOTA } },
 };
 
 const datosMascota = (amistadId, nivelCarino = 0) => ({
@@ -52,6 +50,7 @@ const datosMascota = (amistadId, nivelCarino = 0) => ({
   nombre: NOMBRE_MASCOTA,
   nivelCarino,
   energia: ENERGIA_INICIAL,
+  experiencia: EXPERIENCIA_INICIAL,
 });
 
 const asegurarMascota = (db, amistadId) =>
@@ -108,13 +107,6 @@ const bonusReto = (nivelCarino) => Math.max(0, siguienteUmbral(nivelCarino) - ni
 const claveUsuarioReto = (amistad, userId) =>
   amistad.userId === userId ? 'progresoUsuario1' : 'progresoUsuario2';
 
-function etapaVisual(nivelCarino = 0) {
-  const nivel = Math.max(0, Number.isFinite(nivelCarino) ? nivelCarino : 0);
-  const actual = [...UMBRALES_EVOLUCION].reverse().find(({ desde }) => nivel >= desde)
-    ?? UMBRALES_EVOLUCION[0];
-  return { numero: actual.etapa, nombre: actual.nombre };
-}
-
 function necesitaAtencion(mascota, ahora = new Date()) {
   const ultimo = ultimoCuidadoMs(mascota);
   if (ultimo === null) return true;
@@ -168,6 +160,9 @@ const guardarPropuesta = (nombre, propuestoPor) => JSON.stringify({ nombre, prop
 function presentarMascota(mascota, amistad, userId, personalidad, extra = {}) {
   const reto = mascota.retoCooperativo;
   const propuesta = leerPropuesta(mascota.nombrePropuesto);
+  const progresion = extra.progresion
+    ? respuestaProgresion(extra.progresion)
+    : calcularProgresion(mascota.experiencia);
   const clavePropia = claveUsuarioReto(amistad, userId);
   const claveCompanero = clavePropia === 'progresoUsuario1'
     ? 'progresoUsuario2'
@@ -185,13 +180,16 @@ function presentarMascota(mascota, amistad, userId, personalidad, extra = {}) {
     amistadId: mascota.amistadId,
     nombre: mascota.nombre,
     nivelCarino: mascota.nivelCarino,
+    experiencia: progresion.experiencia,
+    nivel: progresion.nivel,
+    progresion,
     ...presentarEnergia(mascota),
     personalidad,
     // Fuente de verdad: la especie negociada por ambos (Agente A), persistida en
     // MascotaAmistad.especie. derivarEspecie es solo fallback para las mascotas
     // previas a Fase 14 (especie null tras el backfill de Fase 0).
     especie: mascota.especie ?? derivarEspecie(mascota.amistadId),
-    etapa: etapaVisual(mascota.nivelCarino),
+    etapa: etapaVisual(mascota.experiencia),
     especiePropuestaPor: mascota.especiePropuestaPor ?? null,
     propuestaMia: mascota.especiePropuestaPor != null && mascota.especiePropuestaPor === userId,
     accesorios: {

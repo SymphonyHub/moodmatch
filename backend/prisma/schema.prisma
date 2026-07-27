@@ -117,6 +117,7 @@ model MascotaAmistad {
   nombre      String
   nivelCarino Int        @default(0)
   energia     Int        @default(50)
+  experiencia Int        @default(0)
   ultimoCuidadoUsuario1 DateTime?
   ultimoCuidadoUsuario2 DateTime?
   retoCooperativo       Json?

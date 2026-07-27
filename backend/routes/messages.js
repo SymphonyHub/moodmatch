@@ -2,6 +2,7 @@ const router = require('express').Router();
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { filtroMensajesVisibles, registrarMensajeReciproco } = require('../lib/mascota');
+const { PREFIJO_INTERNO_MASCOTA } = require('../lib/mascotaProgresion');
 const {
   dispatchNotification,
   notifyNewMessage,
@@ -169,6 +170,9 @@ router.post('/:friendId', requireAuth, async (req, res) => {
   }
   if (message.length > MAX_LENGTH) {
     return res.status(400).json({ error: `El mensaje no puede superar los ${MAX_LENGTH} caracteres` });
+  }
+  if (message.startsWith(PREFIJO_INTERNO_MASCOTA)) {
+    return res.status(400).json({ error: 'El mensaje usa un prefijo interno reservado' });
   }
 
   const friendship = await findFriendshipBetween(me, friendId);

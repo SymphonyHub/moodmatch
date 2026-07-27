@@ -18,6 +18,7 @@ import {
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../../components/Tappable';
 import MascotaAnimada from '../../mascota/animation/MascotaAnimada';
+import BarraProgresoCarino from '../../mascota/animation/BarraProgresoCarino';
 import { animoDeMascota } from '../../mascota/animation/animo';
 import { CATALOGO_ACCESORIOS } from '../../mascota/sprites/accesorios';
 import { estadoMascota } from '../../mascota/estadoMascota';
@@ -103,7 +104,9 @@ export default function MascotaDetalleScreen() {
   const [aviso, setAviso] = useState('');
   const [editarNombre, setEditarNombre] = useState(false);
   const [nombre, setNombre] = useState('');
-  const [celebracion, setCelebracion] = useState(0);
+  const [celebracion, setCelebracion] = useState({
+    tipo: 'encantada', key: 0, cantidad: 0,
+  });
   const [saludo, setSaludo] = useState(0);
   const [confirmarPausa, setConfirmarPausa] = useState(false);
 
@@ -140,8 +143,15 @@ export default function MascotaDetalleScreen() {
       // Cuando el cariño sube (cuidado/reto/regalo) la mascota pone cara de
       // encantada y salta el confetti. `key` es lo que el rig usa para saber que
       // es un evento nuevo y no un re-render.
-      if (mascota && data.mascota.nivelCarino > mascota.nivelCarino) {
-        setCelebracion((c) => c + 1);
+      const antes = Number(mascota?.nivelCarino);
+      const despues = Number(data.mascota.nivelCarino);
+      const ganancia = Number.isFinite(antes) && Number.isFinite(despues)
+        ? Math.max(0, despues - antes)
+        : 0;
+      if (ganancia > 0) {
+        setCelebracion((evento) => ({
+          ...evento, key: evento.key + 1, cantidad: ganancia,
+        }));
       }
       setMascota(data.mascota);
       setAviso(exito);
@@ -281,7 +291,7 @@ export default function MascotaDetalleScreen() {
             accesorioCabeza={mascota.accesorios?.cabeza ?? null}
             accesorioColor={mascota.accesorios?.color ?? null}
             animo={animoDeMascota(mascota)}
-            evento={{ tipo: 'encantada', key: celebracion }}
+            evento={celebracion}
             saludo={saludo}
             size={132}
           />
@@ -292,12 +302,9 @@ export default function MascotaDetalleScreen() {
         </Text>
       </View>
 
-      {/* Barra de progreso hacia la próxima evolución. El Agente C puede
-          sustituirla por un anillo alrededor del sprite. */}
+      {/* Barra de progreso hacia la próxima evolución. */}
       <View style={styles.progresoWrap}>
-        <View style={styles.progresoBarra}>
-          <View style={[styles.progresoFill, { width: `${Math.round(progreso * 100)}%` }]} />
-        </View>
+        <BarraProgresoCarino progreso={progreso} nivelCarino={mascota.nivelCarino} />
         <Text style={styles.progresoTxt}>
           {mascota.nivelCarino} de cariño · {mascota.personalidad ?? 'curiosa'}
         </Text>
@@ -359,6 +366,7 @@ export default function MascotaDetalleScreen() {
         mascota={mascota}
         onRegalar={regalar}
         regalando={accion === 'regalo'}
+        bloqueado={accion !== null}
       />
 
       {/* Historial de hitos */}
@@ -517,13 +525,6 @@ const useStyles = makeThemedStyles((t) => ({
   nombreHero: { ...t.typography.type.title, color: t.colors.text, marginBottom: 2 },
   etapaHero: { fontSize: t.fontSize(14), color: t.colors.textMuted },
   progresoWrap: { marginBottom: 20 },
-  progresoBarra: {
-    height: 10,
-    borderRadius: 6,
-    backgroundColor: t.colors.primarySoft,
-    overflow: 'hidden',
-  },
-  progresoFill: { height: '100%', borderRadius: 6, backgroundColor: t.colors.accent },
   progresoTxt: { fontSize: t.fontSize(12), color: t.colors.textFaint, marginTop: 6, textAlign: 'center' },
   aviso: {
     color: t.colors.textMuted,

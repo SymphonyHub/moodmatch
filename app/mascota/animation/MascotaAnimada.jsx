@@ -27,6 +27,8 @@ import { planParpadeo, pasosParpadeo } from './parpadeo';
 import { desplazamientoMirada } from './mirada';
 import { planInactividad } from './inactividad';
 import { useRitmo } from './useRitmo';
+import FeedbackCarino from './FeedbackCarino';
+import ParticulasCaricia from './ParticulasCaricia';
 
 const AG = Animated.createAnimatedComponent(G);
 
@@ -52,8 +54,8 @@ const AG = Animated.createAnimatedComponent(G);
 // comunes a todas y salen de la geometría que cada especie ya tenía.
 //
 // Props de estado: `animo` es la cara de fondo que decide animo.js con los datos
-// de cuidado; `evento` ({ tipo, key }) dispara una cara puntual y el confetti;
-// `saludo` es un contador que sube cada vez que se entra a la pantalla.
+// de cuidado; `evento` ({ tipo, key, cantidad }) dispara una cara puntual, el
+// confetti y la ganancia flotante; `saludo` sube al entrar a la pantalla.
 //
 // Con reduce-motion no queda nada vivo: ni loops, ni ritmos, ni confetti, ni
 // mirada. El sprite se dibuja quieto en la expresión que le toque.
@@ -106,6 +108,7 @@ export default function MascotaAnimada({
 
   const [fiesta, setFiesta] = useState(false);
   const [toqueKey, setToqueKey] = useState(0);
+  const [particulas, setParticulas] = useState({ key: 0, x: size / 2, y: size / 2 });
   const etapaPrev = useRef(etapa);
   const eventoPrev = useRef(evento?.key ?? 0);
   // Arranca en 0 y no en la prop, justamente para que el saludo sí dispare al
@@ -117,6 +120,7 @@ export default function MascotaAnimada({
   const distraida = useRef(false);
   const toques = useRef([]);
   const puntualTimer = useRef(null);
+  const puntoToque = useRef({ x: size / 2, y: size / 2 });
 
   // Una sola puerta para las caras puntuales: la del evento del contenedor y las
   // que nacen del toque comparten temporizador, así nunca hay dos compitiendo.
@@ -130,6 +134,17 @@ export default function MascotaAnimada({
     puntualTimer.current = setTimeout(() => setPuntual(null), ms);
   };
   useEffect(() => () => clearTimeout(puntualTimer.current), []);
+
+  // Si la preferencia cambia mientras la están acariciando, desmonta el burst y
+  // devuelve la pose a reposo. Así al reactivar movimiento no queda mimosa ni
+  // con una animación anterior todavía corriendo.
+  useEffect(() => {
+    if (!reduce) return;
+    setAcariciando(false);
+    setParticulas((actual) => (actual.key === 0 ? actual : { ...actual, key: 0 }));
+    cancelAnimation(mimo);
+    mimo.value = 0;
+  }, [reduce, mimo]);
 
   // Idle ambiental: respiración + balanceo del apéndice. Estos SÍ son periódicos
   // a propósito (respirar lo es), así que se quedan en withRepeat.
@@ -269,8 +284,11 @@ export default function MascotaAnimada({
   // Al soltar sostiene un instante más y recién entonces vuelve al centro, que es
   // lo que hace que se lea como atención y no como un tic.
   const mirarHacia = (evt) => {
-    if (reduce) return;
     const { locationX, locationY } = evt?.nativeEvent ?? {};
+    if (Number.isFinite(locationX) && Number.isFinite(locationY)) {
+      puntoToque.current = { x: locationX, y: locationY };
+    }
+    if (reduce) return;
     const destino = desplazamientoMirada(locationX, locationY, size);
     miraX.value = withSpring(destino.x, mirada.spring);
     miraY.value = withSpring(destino.y, mirada.spring);
@@ -279,14 +297,23 @@ export default function MascotaAnimada({
   // Sostener el dedo es una caricia: se inclina hacia la mano y entrecierra los
   // ojos. RN garantiza que si dispara onLongPress ya no dispara onPress, así que
   // la caricia y el toque no se pisan.
-  const empezarCaricia = () => {
+  const empezarCaricia = (evt) => {
     if (reduce) return;
+    const { locationX, locationY } = evt?.nativeEvent ?? {};
+    const origen = Number.isFinite(locationX) && Number.isFinite(locationY)
+      ? { x: locationX, y: locationY }
+      : puntoToque.current;
+    setParticulas((actual) => ({ key: actual.key + 1, ...origen }));
     setAcariciando(true);
     mimo.value = withSpring(1, caricia.entrada);
   };
 
   const soltar = () => {
-    if (reduce) return;
+    if (reduce) {
+      setAcariciando(false);
+      mimo.value = 0;
+      return;
+    }
     miraX.value = withDelay(mirada.vueltaMs, withSpring(0, mirada.vuelta));
     miraY.value = withDelay(mirada.vueltaMs, withSpring(0, mirada.vuelta));
     if (!acariciando) return;
@@ -416,7 +443,7 @@ export default function MascotaAnimada({
       delayLongPress={caricia.esperaMs}
       accessibilityRole="image"
       accessibilityLabel={`Mascota ${especie}, etapa ${etapa}${animo === 'adormilada' ? ', te extraña' : ''}`}
-      style={{ width: size, height: size }}
+      style={{ width: size, height: size, position: 'relative', overflow: 'visible' }}
     >
       <Svg width={size} height={size} viewBox="0 0 100 100">
         {renderNodos(escena.defs, 'df')}
@@ -432,6 +459,16 @@ export default function MascotaAnimada({
           {renderNodos(escena.frente, 'fr')}
         </AG>
       </Svg>
+      {!reduce && particulas.key > 0 && (
+        <ParticulasCaricia
+          key={particulas.key}
+          origen={{ x: particulas.x, y: particulas.y }}
+          size={size}
+        />
+      )}
+      {Number(evento?.cantidad) > 0 && (
+        <FeedbackCarino eventoKey={eventoKey} cantidad={evento.cantidad} />
+      )}
       {fiesta && (
         <Pressable
           pointerEvents="none"

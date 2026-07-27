@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
-import { Switch, View, Text, TextInput, useColorScheme } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, View, Text, TextInput, useColorScheme } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { THEMES, AUTO_THEME_ID, CUSTOM_THEME_ID, resolveThemeId } from '../../theme/themes';
@@ -16,7 +17,6 @@ import {
   NAME_MAX,
   makeCustomTheme,
   evaluateCustomTheme,
-  customThemePassesAA,
   configDe,
   nuevaPaletaId,
   upsertPalette,
@@ -24,9 +24,19 @@ import {
 } from '../../theme/customTheme';
 import { MOODS } from '../../constants/moods';
 import Tappable from '../../components/Tappable';
-import { HueBar, LumBar } from '../../components/color/HueBar';
-import { LARGE_TEXT_SCALE } from '../../theme/persistence';
+import SegmentedTabs from '../../components/SegmentedTabs';
+import FilaSwitch from '../../components/ajustes/FilaSwitch';
+import { HueBar, SatBar, LumBar } from '../../components/color/HueBar';
+import { TEXT_SCALE_STEPS } from '../../theme/persistence';
 import { unregisterPushTokenForLogout } from '../../notifications/pushRegistration';
+
+// Pasos de lectura, derivados de la lista de persistence para que no se
+// desincronicen. SegmentedTabs trabaja con ids de texto.
+const TEXT_SCALE_LABELS = ['Normal', 'Grande', 'Más grande'];
+const TEXT_SCALE_TABS = TEXT_SCALE_STEPS.map((paso, i) => ({
+  id: String(paso),
+  label: TEXT_SCALE_LABELS[i] ?? `${Math.round(paso * 100)}%`,
+}));
 
 const THEME_OPTIONS = [
   { id: AUTO_THEME_ID, name: 'Automático', tagline: 'Sigue el modo del sistema' },
@@ -37,6 +47,25 @@ const THEME_OPTIONS = [
 // La paleta que el contenedor marca como activa (o la primera como red de red).
 const paletaActiva = (container) =>
   container.palettes.find((p) => p.id === container.activeId) ?? container.palettes[0];
+
+// Borde de las muestras de color: hairline translúcido que contrasta con
+// CUALQUIER color en ambos temas. Con el contraste libre, un color casi-blanco
+// o casi-negro puede quedar igual que la tarjeta; el stroke lo delinea igual.
+const swatchStroke = (t) => (t.isDark ? 'rgba(255,255,255,0.32)' : 'rgba(0,0,0,0.22)');
+
+// Nombre y versión del build, de app.json vía expo-constants. En un solo string
+// para que sea legible de una sola lectura (y verificable en test).
+const APP_BUILD = [Constants.expoConfig?.name ?? 'MoodMatch', Constants.expoConfig?.version]
+  .filter(Boolean)
+  .join(' ');
+
+// Confirmación para las acciones que no se pueden deshacer (borrar una paleta,
+// cerrar sesión). Un solo helper para que las dos pregunten igual.
+const confirmarAccion = ({ titulo, mensaje, accion, onConfirm }) =>
+  Alert.alert(titulo, mensaje, [
+    { text: 'Cancelar', style: 'cancel' },
+    { text: accion, style: 'destructive', onPress: onConfirm },
+  ]);
 
 // Mini-mock de la app: dentro de un ThemeScope muestra cómo se vería el tema
 // candidato sin aplicarlo globalmente.
@@ -89,7 +118,13 @@ function ThemeOptionRow({ option, selected, onPress, customDraft }) {
           swatchTheme.colors.background,
           swatchTheme.colors.moods.CALMADO.color,
         ]
-      : [THEMES.sereno.colors.background, THEMES.nocturno.colors.background];
+      : // Automático muestra tres muestras como el resto de las filas (claro,
+        // primario y oscuro) para que la columna de la derecha no quede despareja.
+        [
+          THEMES.sereno.colors.background,
+          THEMES.sereno.colors.primary,
+          THEMES.nocturno.colors.background,
+        ];
 
   return (
     <Tappable
@@ -140,86 +175,147 @@ function SwatchRow({ colors, selected, onSelect, label }) {
   );
 }
 
-// Un color de marca (primario/acento): matiz y luminosidad continuos + atajos.
-function ColorField({ label, value, onChange, swatches, sliderId }) {
+// Lectura/edición del hex exacto. El `#` es opcional: "ff0000" vale igual que
+// "#ff0000". La forma corta de 3 dígitos ("f00") se expande recién al salir del
+// campo — si se expandiera mientras se escribe, el texto saltaría a "#ff0000" y
+// con maxLength ya no se podría seguir tecleando un hex de 6 dígitos.
+const hexLargo = (v) => {
+  const m = /^#?([0-9a-f]{6})$/.exec(v.trim().toLowerCase());
+  return m ? `#${m[1]}` : null;
+};
+const hexCorto = (v) => {
+  const m = /^#?([0-9a-f]{3})$/.exec(v.trim().toLowerCase());
+  return m ? `#${m[1].replace(/./g, (c) => c + c)}` : null;
+};
+
+function HexInput({ value, onChange, label }) {
+  const styles = useStyles();
+  const [text, setText] = useState(value);
+  useEffect(() => setText(value), [value]);
+
+  const onText = (t) => {
+    setText(t.toLowerCase());
+    const hex = hexLargo(t);
+    if (hex) onChange(hex);
+  };
+
+  // Al salir: deja el canónico a la vista (expandiendo la forma corta) o
+  // revierte al último color válido si quedó a medias.
+  const onBlur = () => {
+    const hex = hexLargo(text) ?? hexCorto(text);
+    if (!hex) {
+      setText(value);
+      return;
+    }
+    setText(hex);
+    if (hex !== value) onChange(hex);
+  };
+
+  return (
+    <TextInput
+      style={styles.hexInput}
+      value={text}
+      onChangeText={onText}
+      onBlur={onBlur}
+      autoCapitalize="none"
+      autoCorrect={false}
+      maxLength={7}
+      keyboardType="ascii-capable"
+      placeholder="#000000"
+      placeholderTextColor={styles.placeholder.color}
+      accessibilityLabel={`Código hex de ${label}`}
+    />
+  );
+}
+
+// Un color libre (primario/acento/fondo): barras continuas + atajos + hex.
+// `fondo` amplía el rango de luminosidad y agrega saturación (sin ella, el
+// matiz de un fondo casi neutro no se notaría).
+function ColorField({ label, value, onChange, swatches, sliderId, fondo = false }) {
   const styles = useStyles();
   return (
     <View style={styles.swatchBlock}>
       <View style={styles.colorHead}>
         <Text style={styles.swatchLabel}>{label}</Text>
-        <View style={[styles.colorPreview, { backgroundColor: value }]} />
+        <View style={styles.hexWrap}>
+          <HexInput value={value} onChange={onChange} label={label} />
+          <View style={[styles.colorPreview, { backgroundColor: value }]} />
+        </View>
       </View>
       <Text style={styles.sliderCap}>Matiz</Text>
-      <HueBar value={value} onChange={onChange} id={sliderId} />
+      <HueBar value={value} onChange={onChange} id={sliderId} label={`Matiz de ${label}`} />
+      {fondo ? (
+        <>
+          <View style={styles.sliderGap} />
+          <Text style={styles.sliderCap}>Saturación</Text>
+          <SatBar value={value} onChange={onChange} id={sliderId} label={`Saturación de ${label}`} />
+        </>
+      ) : null}
       <View style={styles.sliderGap} />
       <Text style={styles.sliderCap}>Luminosidad</Text>
-      <LumBar value={value} onChange={onChange} id={sliderId} />
+      <LumBar
+        value={value}
+        onChange={onChange}
+        id={sliderId}
+        label={`Luminosidad de ${label}`}
+        fondo={fondo}
+      />
       <View style={styles.sliderGap} />
       <SwatchRow colors={swatches} selected={value} onSelect={onChange} label={label} />
     </View>
   );
 }
 
+// Selector de fuente estilo "selector de personaje": una a la vez, con flechas
+// a los lados. La tarjeta central previsualiza en vivo el nombre y una frase de
+// muestra ya renderizados en la fuente elegida.
 function FontPicker({ selected, onSelect }) {
   const styles = useStyles();
+  const { theme } = useTheme();
+  const total = BODY_FONT_IDS.length;
+  const idx = Math.max(0, BODY_FONT_IDS.indexOf(selected));
+  const font = BODY_FONTS[BODY_FONT_IDS[idx]];
+  const go = (delta) => onSelect(BODY_FONT_IDS[(idx + delta + total) % total]);
+
   return (
     <View style={styles.swatchBlock}>
       <Text style={styles.swatchLabel}>Fuente</Text>
-      <View style={styles.fontRow}>
-        {BODY_FONT_IDS.map((id) => {
-          const isSelected = id === selected;
-          return (
-            <Tappable
-              key={id}
-              onPress={() => onSelect(id)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={`Fuente ${BODY_FONTS[id].label}: ${BODY_FONTS[id].tagline}`}
-              style={[styles.fontChip, isSelected && styles.fontChipSelected]}
-            >
-              <Text
-                style={[
-                  styles.fontChipTxt,
-                  { fontFamily: BODY_FONTS[id].bodyFamily },
-                  isSelected && styles.fontChipTxtSelected,
-                ]}
-              >
-                {BODY_FONTS[id].label}
-              </Text>
-            </Tappable>
-          );
-        })}
+      <View style={styles.fontCarousel}>
+        <Tappable
+          style={styles.fontArrow}
+          onPress={() => go(-1)}
+          accessibilityLabel="Fuente anterior"
+        >
+          <Ionicons name="chevron-back" size={22} color={theme.colors.primary} />
+        </Tappable>
+
+        <View
+          style={styles.fontStage}
+          accessible
+          accessibilityLabel={`Fuente ${font.label}: ${font.tagline}. ${idx + 1} de ${total}`}
+        >
+          <Text style={[styles.fontStageName, { fontFamily: font.bodyFamily }]} numberOfLines={1}>
+            {font.label}
+          </Text>
+          <Text style={styles.fontStageTag} numberOfLines={1}>
+            {font.tagline}
+          </Text>
+          <Text style={[styles.fontStageSample, { fontFamily: font.bodyFamily }]} numberOfLines={1}>
+            Hoy me siento en calma
+          </Text>
+          <Text style={styles.fontStageCount}>
+            {idx + 1} / {total}
+          </Text>
+        </View>
+
+        <Tappable
+          style={styles.fontArrow}
+          onPress={() => go(1)}
+          accessibilityLabel="Fuente siguiente"
+        >
+          <Ionicons name="chevron-forward" size={22} color={theme.colors.primary} />
+        </Tappable>
       </View>
-    </View>
-  );
-}
-
-// Aviso WCAG AA: una combinación que no alcance 4.5:1 no se puede aplicar.
-function ContrastNotice({ issues }) {
-  const styles = useStyles();
-
-  if (issues.length === 0) {
-    return (
-      <Text style={styles.contrastOk}>
-        ✓ Esta combinación cumple el contraste recomendado (WCAG AA).
-      </Text>
-    );
-  }
-
-  return (
-    <View style={styles.contrastWarn}>
-      <Text style={styles.contrastWarnTitle}>
-        Esta combinación no alcanza el contraste recomendado (AA) en{' '}
-        {issues.length === 1 ? '1 par' : `${issues.length} pares`}
-      </Text>
-      {issues.slice(0, 3).map(({ pair, ratio }) => (
-        <Text key={pair} style={styles.contrastWarnItem}>
-          • {pair} ({ratio}:1, mínimo 4.5:1)
-        </Text>
-      ))}
-      <Text style={styles.contrastWarnHint}>
-        Ajusta los colores indicados para poder guardar o aplicar esta paleta.
-      </Text>
     </View>
   );
 }
@@ -280,11 +376,26 @@ function PaletteList({ palettes, draftId, activeId, applied, onSelect, onDelete,
   );
 }
 
+// Aviso de contraste: informa y nada más. Los colores siguen siendo libres — no
+// condiciona guardar ni aplicar — pero deja dicho cuándo una combinación va a
+// costar de leer, que es la regla de la casa ("avisa, no bloquea"). Reusa
+// evaluateCustomTheme, la misma evaluación que verifica contrast.test.js.
+function ContrastHint({ issues }) {
+  const styles = useStyles();
+  if (issues.length === 0) return null;
+
+  const aviso =
+    issues.length === 1
+      ? 'Hay una combinación de colores que puede costar de leer.'
+      : `Hay ${issues.length} combinaciones de colores que pueden costar de leer.`;
+
+  return <Text style={styles.contrastHint}>{`${aviso} Puedes usar la paleta igual.`}</Text>;
+}
+
 function CustomThemeEditor({
   draft,
   onChangeConfig,
   onRename,
-  issues,
   palettes,
   activeId,
   applied,
@@ -293,6 +404,7 @@ function CustomThemeEditor({
   onNewPalette,
   onSavePalette,
   canSave,
+  contrastIssues,
 }) {
   const styles = useStyles();
   return (
@@ -321,7 +433,7 @@ function CustomThemeEditor({
       </View>
 
       <ColorField
-        label="Color primario"
+        label="Primario"
         value={draft.primary}
         onChange={(primary) => onChangeConfig({ primary })}
         swatches={SWATCHES.primary}
@@ -334,21 +446,20 @@ function CustomThemeEditor({
         swatches={SWATCHES.accent}
         sliderId="accent"
       />
-      <View style={styles.swatchBlock}>
-        <Text style={styles.swatchLabel}>Fondo</Text>
-        <SwatchRow
-          colors={SWATCHES.background}
-          selected={draft.background}
-          onSelect={(background) => onChangeConfig({ background })}
-          label="Fondo"
-        />
-      </View>
+      <ColorField
+        label="Fondo"
+        value={draft.background}
+        onChange={(background) => onChangeConfig({ background })}
+        swatches={SWATCHES.background}
+        sliderId="background"
+        fondo
+      />
       <FontPicker
         selected={draft.bodyFont}
         onSelect={(bodyFont) => onChangeConfig({ bodyFont })}
       />
 
-      <ContrastNotice issues={issues} />
+      <ContrastHint issues={contrastIssues} />
 
       <Tappable
         style={[styles.btnGuardar, !canSave && styles.btnGuardarDisabled]}
@@ -384,6 +495,10 @@ export default function AjustesScreen() {
     deletePalette,
     textScale,
     setTextScale,
+    reduceMotion,
+    setReduceMotion,
+    hapticsEnabled,
+    setHaptics,
   } = useTheme();
   const styles = useStyles();
   const systemScheme = useColorScheme();
@@ -394,7 +509,6 @@ export default function AjustesScreen() {
   const isCustomCandidate = candidate === CUSTOM_THEME_ID;
   const draftTheme = useMemo(() => makeCustomTheme(configDe(draft)), [draft]);
   const contrastIssues = useMemo(() => evaluateCustomTheme(draftTheme), [draftTheme]);
-  const customPassesAA = useMemo(() => customThemePassesAA(draftTheme), [draftTheme]);
 
   const previewTheme = isCustomCandidate
     ? draftTheme
@@ -419,11 +533,20 @@ export default function AjustesScreen() {
       if (restantes.length) setDraft({ ...restantes[0] });
     }
   };
-  // Guardar exige un nombre no vacío; el resto siempre es válido (hex derivado).
+  // Borrar una paleta no se puede deshacer, así que pregunta antes.
+  const confirmDeletePalette = (id) => {
+    const paleta = customConfig.palettes.find((p) => p.id === id);
+    confirmarAccion({
+      titulo: `¿Borrar "${paleta?.name ?? 'esta paleta'}"?`,
+      mensaje: 'Se pierde esta combinación de colores y fuente. No se puede deshacer.',
+      accion: 'Borrar',
+      onConfirm: () => removePaletteById(id),
+    });
+  };
+  // Guardar exige solo un nombre no vacío; los colores son libres (el usuario
+  // elige lo que quiera, sin condición de contraste).
   const nameOk = draft.name.trim().length > 0;
-  // Guardar una paleta activa actualiza el tema en runtime, así que también
-  // debe respetar AA para no eludir el bloqueo del botón Aplicar.
-  const canSave = draftDiverge && nameOk && customPassesAA;
+  const canSave = draftDiverge && nameOk;
   const savePaletteDraft = () => savePalette({ ...draft, name: draft.name.trim() });
 
   // isDirty del botón Aplicar: cambió el tema elegido, o (en custom) hay una
@@ -450,11 +573,19 @@ export default function AjustesScreen() {
     else router.replace('/perfil');
   };
 
-  const handleCerrarSesion = async () => {
+  const cerrarSesion = async () => {
     await unregisterPushTokenForLogout();
     await AsyncStorage.removeItem('token');
     router.replace('/login');
   };
+
+  const handleCerrarSesion = () =>
+    confirmarAccion({
+      titulo: '¿Cerrar sesión?',
+      mensaje: 'Tendrás que volver a entrar con tu cuenta. Tus datos quedan guardados.',
+      accion: 'Cerrar sesión',
+      onConfirm: cerrarSesion,
+    });
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
@@ -469,6 +600,7 @@ export default function AjustesScreen() {
         </Tappable>
         <View style={styles.headerCopy}>
           <Text style={styles.headerTitle}>Ajustes</Text>
+          <Text style={styles.headerSubtitle}>Tu app, a tu manera</Text>
         </View>
       </View>
 
@@ -502,57 +634,56 @@ export default function AjustesScreen() {
               draft={draft}
               onChangeConfig={changeConfig}
               onRename={renameDraft}
-              issues={contrastIssues}
               palettes={customConfig.palettes}
               activeId={customConfig.activeId}
               applied={applied}
               onSelectPalette={selectPalette}
-              onDeletePalette={removePaletteById}
+              onDeletePalette={confirmDeletePalette}
               onNewPalette={newPalette}
               onSavePalette={savePaletteDraft}
               canSave={canSave}
+              contrastIssues={contrastIssues}
             />
           )}
 
           <Tappable
-            style={[
-              styles.btnAplicar,
-              (!isDirty || isApplying || (isCustomCandidate && !customPassesAA)) &&
-                styles.btnAplicarDisabled,
-            ]}
+            style={[styles.btnAplicar, (!isDirty || isApplying) && styles.btnAplicarDisabled]}
             onPress={handleAplicar}
-            disabled={!isDirty || isApplying || (isCustomCandidate && !customPassesAA)}
-            accessibilityHint={
-              isCustomCandidate && !customPassesAA
-                ? 'Corrige el contraste de la paleta antes de aplicarla'
-                : undefined
-            }
+            disabled={!isDirty || isApplying}
           >
             <Text style={styles.btnAplicarTxt}>
-              {isCustomCandidate && !customPassesAA
-                ? 'Corrige el contraste para aplicar'
-                : isDirty
-                  ? `Aplicar tema ${candidateName}`
-                  : 'Este es tu tema actual'}
+              {isDirty ? `Aplicar tema ${candidateName}` : 'Este es tu tema actual'}
             </Text>
           </Tappable>
         </SectionCard>
 
-        <SectionCard title="Accesibilidad" hint="Ajusta la lectura sin cambiar tu tema ni tu fuente.">
-          <View style={styles.accessibilityRow}>
-            <View style={styles.accessibilityCopy}>
-              <Text style={styles.accessibilityTitle}>Texto grande</Text>
-              <Text style={styles.accessibilityHint}>Aumenta los textos de toda la app.</Text>
-            </View>
-            <Switch
-              value={textScale === LARGE_TEXT_SCALE}
-              onValueChange={(enabled) => setTextScale(enabled ? LARGE_TEXT_SCALE : 1)}
-              trackColor={{ false: theme.colors.border, true: theme.colors.primarySoftBorder }}
-              thumbColor={textScale === LARGE_TEXT_SCALE ? theme.colors.primary : theme.colors.surface}
-              accessibilityLabel="Texto grande"
-              accessibilityHint="Aumenta el tamaño de los textos de la aplicación"
-            />
-          </View>
+        <SectionCard
+          title="Accesibilidad"
+          hint="Ajusta la lectura y el movimiento sin cambiar tu tema ni tu fuente."
+        >
+          <Text style={styles.a11yLabel}>Tamaño del texto</Text>
+          <SegmentedTabs
+            tabs={TEXT_SCALE_TABS}
+            activeId={String(textScale)}
+            onChange={(id) => setTextScale(Number(id))}
+          />
+          <View style={styles.a11yGap} />
+          <FilaSwitch
+            title="Reducir movimiento"
+            hint="Quita las animaciones de entrada y las transiciones de tema."
+            value={reduceMotion}
+            onValueChange={setReduceMotion}
+            divider
+            accessibilityLabel="Reducir movimiento"
+            accessibilityHint="Desactiva las animaciones de la aplicación"
+          />
+          <FilaSwitch
+            title="Vibración al tocar"
+            hint="La respuesta táctil de botones y controles."
+            value={hapticsEnabled}
+            onValueChange={setHaptics}
+            accessibilityLabel="Vibración al tocar"
+          />
         </SectionCard>
 
         <SectionCard
@@ -585,7 +716,19 @@ export default function AjustesScreen() {
             <Text style={styles.settingsLinkArrow}>›</Text>
           </Tappable>
           <View style={styles.accountDivider} />
-          <Tappable style={styles.btnSalir} onPress={handleCerrarSesion} haptic={false}>
+          {/* Versión a la vista: sin esto no hay forma de saber qué build corre el
+              teléfono cuando algo "no se ve aplicado". */}
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>Acerca de</Text>
+            <Text style={styles.aboutValue}>{APP_BUILD}</Text>
+          </View>
+          <View style={styles.accountDivider} />
+          <Tappable
+            style={styles.btnSalir}
+            onPress={handleCerrarSesion}
+            haptic={false}
+            accessibilityLabel="Cerrar sesión"
+          >
             <Text style={styles.btnSalirTxt}>Cerrar sesión</Text>
           </Tappable>
         </SectionCard>
@@ -608,6 +751,12 @@ const useStyles = makeThemedStyles((t) => ({
   back: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { marginLeft: 6 },
   headerTitle: { ...t.typography.type.title, color: t.colors.onHeader },
+  headerSubtitle: {
+    ...t.typography.type.caption,
+    color: t.colors.onHeader,
+    opacity: 0.78,
+    marginTop: 1,
+  },
   container: {
     width: '100%',
     maxWidth: 680,
@@ -663,7 +812,7 @@ const useStyles = makeThemedStyles((t) => ({
   },
   optionTagline: { fontSize: t.fontSize(12), color: t.colors.textMuted },
   swatches: { flexDirection: 'row', gap: 4, marginLeft: 10 },
-  swatch: { width: 18, height: 18, borderRadius: 9, borderWidth: 1, borderColor: t.colors.border },
+  swatch: { width: 18, height: 18, borderRadius: 9, borderWidth: 1, borderColor: swatchStroke(t) },
   editor: {
     marginBottom: 16,
     borderRadius: t.shape.radiusLg,
@@ -680,12 +829,25 @@ const useStyles = makeThemedStyles((t) => ({
     marginBottom: 8,
   },
   colorHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  hexWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  hexInput: {
+    minWidth: 82,
+    fontSize: t.fontSize(12),
+    color: t.colors.text,
+    backgroundColor: t.colors.surface,
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.border,
+    borderRadius: t.shape.radiusSm,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    textAlign: 'center',
+  },
   colorPreview: {
     width: 26,
     height: 26,
     borderRadius: 13,
     borderWidth: t.shape.borderThin,
-    borderColor: t.colors.border,
+    borderColor: swatchStroke(t),
   },
   sliderCap: {
     fontSize: t.fontSize(11),
@@ -710,7 +872,7 @@ const useStyles = makeThemedStyles((t) => ({
     height: 28,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: t.colors.border,
+    borderColor: swatchStroke(t),
   },
   nameInput: {
     ...t.typography.type.body,
@@ -723,24 +885,39 @@ const useStyles = makeThemedStyles((t) => ({
     paddingVertical: 10,
   },
   placeholder: { color: t.colors.textFaint },
-  fontRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  fontChip: {
-    minHeight: 44,
-    paddingHorizontal: 14,
-    borderRadius: t.shape.radiusMd,
+  fontCarousel: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  fontArrow: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: t.shape.borderThin,
     borderColor: t.colors.border,
     backgroundColor: t.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fontChipSelected: {
-    borderColor: t.colors.primary,
+  fontStage: {
+    flex: 1,
+    minHeight: 104,
+    borderRadius: t.shape.radiusLg,
     borderWidth: t.shape.borderThick,
-    backgroundColor: t.colors.primarySoft,
+    borderColor: t.colors.primary,
+    backgroundColor: t.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    ...t.shadows.card,
   },
-  fontChipTxt: { fontSize: t.fontSize(14), color: t.colors.textMuted },
-  fontChipTxtSelected: { color: t.colors.primary },
+  fontStageName: { fontSize: t.fontSize(22), color: t.colors.text },
+  fontStageTag: { fontSize: t.fontSize(12), color: t.colors.textMuted, marginTop: 3 },
+  fontStageSample: { fontSize: t.fontSize(15), color: t.colors.text, marginTop: 10 },
+  fontStageCount: {
+    fontSize: t.fontSize(11),
+    ...t.typography.fonts.semibold,
+    color: t.colors.primary,
+    marginTop: 10,
+  },
   palRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -751,9 +928,15 @@ const useStyles = makeThemedStyles((t) => ({
     marginBottom: 8,
   },
   palRowSelected: { borderColor: t.colors.primary, borderWidth: t.shape.borderThick },
-  palMain: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: 10 },
-  palSwatches: { flexDirection: 'row', gap: 3, marginRight: 10 },
-  palSwatch: { width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: t.colors.border },
+  palMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  palSwatches: { flexDirection: 'row', gap: 4, marginRight: 10 },
+  palSwatch: { width: 22, height: 22, borderRadius: 11, borderWidth: 1, borderColor: swatchStroke(t) },
   palInfo: { flex: 1, minWidth: 0 },
   palName: {
     fontSize: t.fontSize(14),
@@ -774,21 +957,6 @@ const useStyles = makeThemedStyles((t) => ({
   },
   palNewTxt: { fontSize: t.fontSize(14), ...t.typography.fonts.semibold, color: t.colors.primary },
   palLimit: { fontSize: t.fontSize(12), color: t.colors.textMuted, marginTop: 2 },
-  contrastOk: { ...t.typography.type.caption, color: t.colors.textMuted, marginBottom: 14 },
-  contrastWarn: {
-    backgroundColor: t.colors.dangerSoft,
-    borderRadius: t.shape.radiusMd,
-    padding: 12,
-    marginBottom: 14,
-  },
-  contrastWarnTitle: {
-    fontSize: t.fontSize(13),
-    ...t.typography.fonts.semibold,
-    color: t.colors.danger,
-    marginBottom: 6,
-  },
-  contrastWarnItem: { fontSize: t.fontSize(12), color: t.colors.danger, marginBottom: 2 },
-  contrastWarnHint: { fontSize: t.fontSize(12), color: t.colors.danger, marginTop: 6 },
   btnGuardar: {
     backgroundColor: t.colors.accent,
     borderRadius: t.shape.radiusMd,
@@ -814,10 +982,17 @@ const useStyles = makeThemedStyles((t) => ({
     fontSize: t.fontSize(15),
     ...t.typography.fonts.bold,
   },
-  accessibilityRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  accessibilityCopy: { flex: 1 },
-  accessibilityTitle: { ...t.typography.type.body, ...t.typography.fonts.semibold, color: t.colors.text },
-  accessibilityHint: { ...t.typography.type.caption, color: t.colors.textMuted, marginTop: 2 },
+  a11yLabel: {
+    fontSize: t.fontSize(13),
+    ...t.typography.fonts.semibold,
+    color: t.colors.text,
+    marginBottom: 8,
+  },
+  a11yGap: { height: 6 },
+  contrastHint: { ...t.typography.type.caption, color: t.colors.textMuted, marginBottom: 14 },
+  aboutRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  aboutLabel: { ...t.typography.type.body, color: t.colors.text },
+  aboutValue: { ...t.typography.type.caption, color: t.colors.textMuted },
   btnSalir: {
     borderWidth: t.shape.borderMedium,
     borderColor: t.colors.border,

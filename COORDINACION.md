@@ -41,6 +41,19 @@ necesitas un endpoint que no existe aún, créalo tú mismo dentro de tu propia 
 
 ## Estado actual
 
+> **AVISO (2026-07-24) — `theme/` y los primitivos compartidos tocados de forma
+> aditiva:** Accesibilidad en Ajustes sumó tres controles, así que
+> `theme/persistence.js` y `theme/ThemeContext.jsx` ganan las preferencias de
+> movimiento reducido y vibración, y la escala de texto pasó de un sí/no a tres
+> pasos. Autorizado por el usuario y **aditivo**: el contexto solo agrega claves
+> al value (`reduceMotion`, `hapticsEnabled` y sus setters) sin renombrar ni
+> quitar ninguna de las que ya había. Lo que sí conviene saber si tocas UI:
+> `Tappable` y `Entrance` ahora leen esas preferencias con `useMotionPrefs`, un
+> accesor que fuera del proveedor cae al comportamiento de siempre, y con
+> movimiento reducido no corren ni el pulso al presionar ni las animaciones de
+> entrada. `LARGE_TEXT_SCALE` sigue exportado pero ahora vale 1.3. Va en la rama
+> `feature/ajustes-pulido`, sin mergear.
+
 > **AVISO (Fase 15, 2026-07-22) — `schema.prisma` tocado de forma aditiva:** se
 > agrega a `User` el campo `memoriaChat Json?` (nullable) para la memoria del
 > chat de emociones entre sesiones. Migración `fase15_memoria_chat`, generada
@@ -48,21 +61,21 @@ necesitas un endpoint que no existe aún, créalo tú mismo dentro de tu propia 
 > una sola columna nullable: no afecta a ningún otro agente ni a los datos
 > existentes, pero avisar antes de volver a tocar `User`.
 
-Fase activa: **Fase 16** (navegación tipo Instagram + eliminar mascota),
-planificada en `FASE16-navegacion-mascota.md`. Alcance chico, dos partes que se
-trabajan en paralelo sin solapamiento de archivos:
+Fase activa: **Fase 17** (rework visual y de mecánicas de la mascota, estilo
+Pou / Pocket Love), planificada en `FASE17-mascota-pou.md`. Se trabaja en
+`feature/mascota-pulido-visual` (worktree `../MoodMatch-agenteC`). **Toma el
+visual de la mascota** — `app/mascota/sprites/` y `app/mascota/animation/`:
+nadie más los toca mientras dure la fase.
 
-- **Parte 1 — navegación** (`feature/perfil-navegacion`): Perfil pasa a ser tab
-  y Ajustes cuelga de él como pantalla push. **Toma la definición de tabs**
-  (`app/app/(tabs)/_layout.jsx`, `app/app/_layout.jsx` y el nuevo
-  `app/components/tabsConfig.js`): nadie más los toca mientras dure la parte.
-- **Parte 2 — eliminar mascota** (`feature/eliminar-mascota`): archivar la
-  mascota compartida. No toca navegación raíz.
+Fases 15 y 16 mergeadas a `main` (2026-07-22) y pusheadas. Pendiente solo la
+prueba visual en dispositivo, que va en el mismo build de preview que valida
+Fase 14 y Sentry.
 
-> **Nota de rutas (Parte 1, 2026-07-22):** Ajustes dejó de ser tab. Vive en
+> **Nota de rutas (Fase 16 Parte 1):** Ajustes dejó de ser tab. Vive en
 > `app/app/ajustes/index.jsx` — la ruta pública sigue siendo `/ajustes` y
 > `/ajustes/notificaciones` sigue colgando de ella. El Perfil se movió a
-> `app/app/(tabs)/perfil.jsx`; `/perfil` no cambió.
+> `app/app/(tabs)/perfil.jsx`; `/perfil` no cambió. La lista de destinos de la
+> barra vive en `app/components/tabsConfig.js`.
 
 Fase 14 cerrada (mascota independiente + perfil de usuario), planificada en
 `docs/fases/FASE14-mascota-perfil.md`.

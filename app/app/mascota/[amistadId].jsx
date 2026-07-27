@@ -18,6 +18,7 @@ import {
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../../components/Tappable';
 import MascotaAnimada from '../../mascota/animation/MascotaAnimada';
+import { animoDeMascota } from '../../mascota/animation/animo';
 import { CATALOGO_ACCESORIOS } from '../../mascota/sprites/accesorios';
 import { estadoMascota } from '../../mascota/estadoMascota';
 import { nombreEspecie } from '../../mascota/especiesCatalogo';
@@ -103,6 +104,7 @@ export default function MascotaDetalleScreen() {
   const [editarNombre, setEditarNombre] = useState(false);
   const [nombre, setNombre] = useState('');
   const [celebracion, setCelebracion] = useState(0);
+  const [saludo, setSaludo] = useState(0);
   const [confirmarPausa, setConfirmarPausa] = useState(false);
 
   const cargar = useCallback(async () => {
@@ -120,7 +122,13 @@ export default function MascotaDetalleScreen() {
     }
   }, [amistadId]);
 
-  useFocusEffect(useCallback(() => { cargar(); }, [cargar]));
+  // Cada vez que se entra a la pantalla la mascota saluda. El contador sube
+  // antes de que la mascota termine de cargar la primera vez, y está bien: el
+  // rig dispara el saludo también al montar.
+  useFocusEffect(useCallback(() => {
+    cargar();
+    setSaludo((s) => s + 1);
+  }, [cargar]));
 
   const ejecutar = async (tipo, request, exito) => {
     setAccion(tipo);
@@ -129,7 +137,9 @@ export default function MascotaDetalleScreen() {
       const data = await request();
       if (data?.error) throw new Error(data.error);
       if (!data?.mascota) throw new Error('No se pudo actualizar a la mascota');
-      // Celebración cuando el cariño sube (cuidado/reto): el rig muestra confetti.
+      // Cuando el cariño sube (cuidado/reto/regalo) la mascota pone cara de
+      // encantada y salta el confetti. `key` es lo que el rig usa para saber que
+      // es un evento nuevo y no un re-render.
       if (mascota && data.mascota.nivelCarino > mascota.nivelCarino) {
         setCelebracion((c) => c + 1);
       }
@@ -270,8 +280,9 @@ export default function MascotaDetalleScreen() {
             personalidad={mascota.personalidad}
             accesorioCabeza={mascota.accesorios?.cabeza ?? null}
             accesorioColor={mascota.accesorios?.color ?? null}
-            necesitaAtencion={mascota.necesitaAtencion}
-            celebracionKey={celebracion}
+            animo={animoDeMascota(mascota)}
+            evento={{ tipo: 'encantada', key: celebracion }}
+            saludo={saludo}
             size={132}
           />
         </View>

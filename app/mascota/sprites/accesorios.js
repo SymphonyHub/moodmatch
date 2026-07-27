@@ -11,15 +11,16 @@ import { elip, circ, path } from './geometria';
 import { GOLD, CORAL, GLOW } from './paletas';
 
 // [cabezaX, cabezaY] = dónde se apoya un sombrero; [cuerpoX, cuerpoY, r] = zona
-// del cuerpo donde cae un patrón de color.
+// del cuerpo donde cae un patrón de color. Recalibradas en Fase 17: las siete
+// siluetas cambiaron de tamaño y de altura de cabeza al pulirlas.
 const ANCLAS = {
-  polluelo: { cabeza: [50, 39], cuerpo: [50, 61, 15] },
-  'nutria-lunar': { cabeza: [50, 26], cuerpo: [50, 66, 13] },
-  'espiritu-calma': { cabeza: [50, 25], cuerpo: [50, 56, 12] },
-  pinguino: { cabeza: [50, 37], cuerpo: [50, 62, 11] },
-  perro: { cabeza: [50, 29], cuerpo: [50, 67, 12] },
-  dinosaurio: { cabeza: [39, 33], cuerpo: [50, 64, 12] },
-  huevo: { cabeza: [50, 25], cuerpo: [50, 56, 14] },
+  polluelo: { cabeza: [50, 40], cuerpo: [50, 62, 15] },
+  'nutria-lunar': { cabeza: [50, 27], cuerpo: [50, 70, 13] },
+  'espiritu-calma': { cabeza: [50, 33], cuerpo: [50, 58, 12] },
+  pinguino: { cabeza: [50, 26], cuerpo: [50, 63, 12] },
+  perro: { cabeza: [50, 29], cuerpo: [50, 70, 12] },
+  dinosaurio: { cabeza: [47, 28], cuerpo: [50, 71, 12] },
+  huevo: { cabeza: [50, 25], cuerpo: [50, 58, 14] },
 };
 const anclas = (especie) => ANCLAS[especie] ?? ANCLAS.polluelo;
 

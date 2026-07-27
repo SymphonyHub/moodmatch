@@ -5,7 +5,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 jest.mock('expo-router', () => {
   const React = require('react');
   return {
-    router: { back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
+    router: { back: jest.fn(), replace: jest.fn(), push: jest.fn(), canGoBack: () => true },
     useFocusEffect: (callback) => React.useEffect(callback, [callback]),
     useLocalSearchParams: () => ({ amistadId: '7' }),
     Stack: { Screen: () => null },
@@ -26,6 +26,12 @@ const mascota = {
   nombrePropuesto: null,
   historialHitos: [],
   accesorios: { desbloqueados: ['gorrito', 'lunares'], cabeza: 'gorrito', color: null },
+  energia: 50,
+  monedas: 3,
+  minijuegos: {
+    ATRAPALA: { puedeJugar: true, disponibleEn: null },
+    RITMO_CARINO: { puedeJugar: false, disponibleEn: '2026-07-28T12:00:00.000Z' },
+  },
 };
 
 jest.mock('../services/api', () => ({
@@ -64,6 +70,7 @@ test('renderiza el detalle con sprite animado y grid de accesorios', async () =>
   expect(renderer.root.findByProps({ children: 'Cabeza' })).toBeTruthy();
   expect(renderer.root.findByProps({ children: 'Color y patrón' })).toBeTruthy();
   expect(renderer.root.findByProps({ children: 'Corona' })).toBeTruthy();
+  expect(renderer.root.findByProps({ children: 'Momentos de juego' })).toBeTruthy();
 
   act(() => renderer.unmount());
 });

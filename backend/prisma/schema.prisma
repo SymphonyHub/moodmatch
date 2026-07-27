@@ -116,6 +116,7 @@ model MascotaAmistad {
   amistad     Friendship @relation(fields: [amistadId], references: [id], onDelete: Cascade)
   nombre      String
   nivelCarino Int        @default(0)
+  energia     Int        @default(50)
   ultimoCuidadoUsuario1 DateTime?
   ultimoCuidadoUsuario2 DateTime?
   retoCooperativo       Json?

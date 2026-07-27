@@ -35,6 +35,11 @@ const { diaUTC } = require('../lib/interaccionesSociales');
 const { derivarEspecie } = require('../lib/especies');
 const { CATEGORIAS, derivarDesbloqueados, puedeEquipar } = require('../lib/accesorios');
 const {
+  calcularEnergiaActual,
+  presentarEnergia,
+  recuperarEnergia,
+} = require('../lib/energiaMascota');
+const {
   dispatchNotification,
   notifyPetArchived,
   notifyPetInvitation,
@@ -54,6 +59,20 @@ const parseAmistadId = (raw) => {
   const id = Number(raw);
   return Number.isInteger(id) && id > 0 ? id : null;
 };
+
+const MAX_REINTENTOS_TRANSACCION = 3;
+
+async function transaccionSerializable(operacion) {
+  let intento = 0;
+  while (true) {
+    try {
+      return await prisma.$transaction(operacion, { isolationLevel: 'Serializable' });
+    } catch (error) {
+      intento += 1;
+      if (error?.code !== 'P2034' || intento >= MAX_REINTENTOS_TRANSACCION) throw error;
+    }
+  }
+}
 
 // Último regalo del vínculo (en cualquier dirección) para saber si se puede
 // mandar otro. Un regalo se registra como un Cheer marcado con PREFIJO_REGALO,
@@ -153,6 +172,7 @@ const presentarResumen = (mascota, amigo, ahora) => ({
   amigo,
   nombre: mascota.nombre,
   nivelCarino: mascota.nivelCarino,
+  ...presentarEnergia(mascota, ahora),
   // Especie negociada (MascotaAmistad.especie); derivarEspecie solo como
   // fallback para mascotas previas a Fase 14 (especie null tras el backfill).
   especie: mascota.especie ?? derivarEspecie(mascota.amistadId),
@@ -360,9 +380,10 @@ router.get('/:amistadId', requireAuth, async (req, res) => {
   return res.json({ mascota: await mascotaVisible(prisma, mascota, amistad, req.user.userId, { conRegalo: true }) });
 });
 
-// POST /api/mascota/:amistadId/cuidado — cada integrante tiene su propio
-// cooldown; completar ambos cuidados antes de vencer evoluciona la mascota.
-router.post('/:amistadId/cuidado', requireAuth, async (req, res) => {
+// Alimentar y jugar comparten el cooldown de cuidado que ya existia por
+// persona. Alimentar suma carino; jugar recupera energia. Ambas acciones pueden
+// completar el progreso cooperativo porque las dos son momentos de cuidado.
+async function responderCuidado(req, res, accion) {
   const amistadId = parseAmistadId(req.params.amistadId);
   if (!amistadId) return res.status(400).json({ error: 'amistadId inválido' });
 
@@ -371,51 +392,74 @@ router.post('/:amistadId/cuidado', requireAuth, async (req, res) => {
   if (!(await exigirAceptada(res, amistadId))) return undefined;
 
   const ahora = new Date();
-  const resultado = await prisma.$transaction(async (tx) => {
-    const actual = await asegurarMascota(tx, amistad.id);
-    const campoCuidado = amistad.userId === req.user.userId
-      ? 'ultimoCuidadoUsuario1'
-      : 'ultimoCuidadoUsuario2';
-    const ultimoCuidado = actual[campoCuidado];
-    if (ultimoCuidado && ahora.getTime() - new Date(ultimoCuidado).getTime() < COOLDOWN_CUIDADO_MS) {
-      return { cooldown: true, mascota: actual };
-    }
+  let resultado;
+  try {
+    resultado = await transaccionSerializable(async (tx) => {
+      const actual = await asegurarMascota(tx, amistad.id);
+      if (!mascotaAceptada(actual)) return { noDisponible: true };
+      const campoCuidado = amistad.userId === req.user.userId
+        ? 'ultimoCuidadoUsuario1'
+        : 'ultimoCuidadoUsuario2';
+      const ultimoCuidado = actual[campoCuidado];
+      if (ultimoCuidado && ahora.getTime() - new Date(ultimoCuidado).getTime() < COOLDOWN_CUIDADO_MS) {
+        return { cooldown: true, mascota: actual };
+      }
 
-    let reto = actual.retoCooperativo;
-    if (!reto || retoExpirado(reto, ahora) || reto.completado) {
-      reto = crearReto(ahora, reto?.tipo);
-    }
-    // El progreso del reto activo se recalcula con la señal que le corresponde
-    // (cuidado en dúo, ánimo el mismo día, mensajes o actividad compartida).
-    const senales = await reunirSenales(tx, reto, amistad);
-    reto = aplicarProgresoReto(reto, {
-      esUsuario1: amistad.userId === req.user.userId,
-      senales,
-    });
-    const completado = reto.completado;
+      let reto = actual.retoCooperativo;
+      if (!reto || retoExpirado(reto, ahora) || reto.completado) {
+        reto = crearReto(ahora, reto?.tipo);
+      }
+      // El progreso del reto activo se recalcula con la señal que le corresponde
+      // (cuidado en dúo, ánimo el mismo día, mensajes o actividad compartida).
+      const senales = await reunirSenales(tx, reto, amistad);
+      reto = aplicarProgresoReto(reto, {
+        esUsuario1: amistad.userId === req.user.userId,
+        senales,
+      });
+      const completado = reto.completado;
 
-    const premioReto = completado ? bonusReto(actual.nivelCarino + CARINO_POR_CUIDADO) : 0;
-    const nuevoNivel = actual.nivelCarino + CARINO_POR_CUIDADO + premioReto;
-    let historial = actual.historialHitos;
-    if (completado) {
-      historial = agregarHito(historial, `Completaron un reto y llegaron a ${nuevoNivel} cariño`, ahora);
-    }
+      const carinoBase = accion === 'alimentar' ? CARINO_POR_CUIDADO : 0;
+      const premioReto = completado ? bonusReto(actual.nivelCarino + carinoBase) : 0;
+      const incrementoCarino = carinoBase + premioReto;
+      const nuevoNivel = actual.nivelCarino + incrementoCarino;
+      let historial = actual.historialHitos;
+      if (completado) {
+        historial = agregarHito(historial, `Completaron un reto y llegaron a ${nuevoNivel} cariño`, ahora);
+      }
 
-    const mascota = await tx.mascotaAmistad.update({
-      where: { amistadId: amistad.id },
-      data: {
+      const energiaActual = calcularEnergiaActual(actual, ahora);
+      const data = {
         [campoCuidado]: ahora,
-        nivelCarino: { increment: CARINO_POR_CUIDADO + premioReto },
+        energia: accion === 'jugar' ? recuperarEnergia(energiaActual) : energiaActual,
         retoCooperativo: reto,
         historialHitos: historial,
-      },
+      };
+      if (incrementoCarino > 0) data.nivelCarino = { increment: incrementoCarino };
+
+      const mascota = await tx.mascotaAmistad.update({
+        where: {
+          amistadId: amistad.id,
+          activa: true,
+          invitacionEstado: 'aceptada',
+        },
+        data,
+      });
+      return { cooldown: false, mascota };
     });
-    return { cooldown: false, mascota };
-  }, { isolationLevel: 'Serializable' });
+  } catch (error) {
+    if (error?.code === 'P2025') {
+      return res.status(404).json({ error: 'No hay una mascota activa para esta amistad' });
+    }
+    throw error;
+  }
+
+  if (resultado.noDisponible) {
+    return res.status(404).json({ error: 'No hay una mascota activa para esta amistad' });
+  }
 
   if (resultado.cooldown) {
     return res.status(429).json({
-      error: 'Tu próximo cuidado estará disponible en menos de 24 horas',
+      error: 'Tu próximo momento de cuidado estará disponible en menos de 24 horas',
       mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId, { conRegalo: true }),
     });
   }
@@ -430,7 +474,12 @@ router.post('/:amistadId/cuidado', requireAuth, async (req, res) => {
   }));
 
   return res.status(201).json({ mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId, { conRegalo: true }) });
-});
+}
+
+router.post('/:amistadId/alimentar', requireAuth, (req, res) => responderCuidado(req, res, 'alimentar'));
+router.post('/:amistadId/jugar', requireAuth, (req, res) => responderCuidado(req, res, 'jugar'));
+// Alias transitorio para clientes del Bloque 1 que aun muestran la accion unida.
+router.post('/:amistadId/cuidado', requireAuth, (req, res) => responderCuidado(req, res, 'alimentar'));
 
 router.post('/:amistadId/reto', requireAuth, async (req, res) => {
   const amistadId = parseAmistadId(req.params.amistadId);

@@ -29,7 +29,7 @@ const token = jwt.sign({ userId: MY_USER_ID }, 'moodmatch-dev-secret');
 const friendToken = jwt.sign({ userId: FRIEND_ID }, 'moodmatch-dev-secret');
 const amistad = { id: AMISTAD_ID, userId: FRIEND_ID, friendId: MY_USER_ID };
 const mascota = {
-  id: 'pet-1', amistadId: AMISTAD_ID, nombre: 'Lumi', nivelCarino: 0,
+  id: 'pet-1', amistadId: AMISTAD_ID, nombre: 'Lumi', nivelCarino: 0, energia: 50,
   invitacionEstado: 'aceptada', activa: true, invitadaPor: FRIEND_ID,
 };
 
@@ -100,6 +100,140 @@ describe('GET /api/mascota/:amistadId', () => {
 });
 
 describe('mecánicas avanzadas de mascota', () => {
+  test('alimentar suma cariño y conserva la energía actual', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.upsert.mockResolvedValue({ ...mascota, retoCooperativo: null });
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, nivelCarino: 6 });
+
+    const res = await request(app)
+      .post(`/api/mascota/${AMISTAD_ID}/alimentar`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(201);
+    expect(prisma.mascotaAmistad.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        energia: 50,
+        nivelCarino: { increment: 6 },
+      }),
+    }));
+  });
+
+  test('jugar recupera energía sin sumar cariño base', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.upsert.mockResolvedValue({ ...mascota, retoCooperativo: null });
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, energia: 70 });
+
+    const res = await request(app)
+      .post(`/api/mascota/${AMISTAD_ID}/jugar`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(201);
+    const data = prisma.mascotaAmistad.update.mock.calls[0][0].data;
+    expect(data.energia).toBe(70);
+    expect(data).not.toHaveProperty('nivelCarino');
+    expect(data.ultimoCuidadoUsuario2).toEqual(expect.any(Date));
+  });
+
+  test('jugar respeta el máximo de energía', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.upsert.mockResolvedValue({ ...mascota, energia: 95, retoCooperativo: null });
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, energia: 100 });
+
+    const res = await request(app)
+      .post(`/api/mascota/${AMISTAD_ID}/jugar`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(201);
+    expect(prisma.mascotaAmistad.update.mock.calls[0][0].data.energia).toBe(100);
+  });
+
+  test('jugar recupera energía después de materializar el desgaste diario', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.upsert.mockResolvedValue({
+      ...mascota,
+      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      retoCooperativo: null,
+    });
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, energia: 40 });
+
+    const res = await request(app)
+      .post(`/api/mascota/${AMISTAD_ID}/jugar`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(201);
+    expect(prisma.mascotaAmistad.update.mock.calls[0][0].data.energia).toBe(40);
+  });
+
+  test('alimentar respeta el cooldown iniciado al jugar', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.upsert.mockResolvedValue({ ...mascota, retoCooperativo: null });
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, energia: 70 });
+
+    const juego = await request(app)
+      .post(`/api/mascota/${AMISTAD_ID}/jugar`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(juego.status).toBe(201);
+
+    prisma.mascotaAmistad.upsert.mockResolvedValue({
+      ...mascota,
+      ultimoCuidadoUsuario2: new Date(),
+      retoCooperativo: null,
+    });
+    const alimento = await request(app)
+      .post(`/api/mascota/${AMISTAD_ID}/alimentar`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(alimento.status).toBe(429);
+    expect(prisma.mascotaAmistad.update).toHaveBeenCalledTimes(1);
+  });
+
+  test('reintenta un conflicto serializable antes de responder', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.upsert.mockResolvedValue({ ...mascota, retoCooperativo: null });
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, energia: 70 });
+    prisma.$transaction.mockRejectedValueOnce(Object.assign(new Error('write conflict'), { code: 'P2034' }));
+
+    const res = await request(app)
+      .post(`/api/mascota/${AMISTAD_ID}/jugar`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(201);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+  });
+
+  test('no cuida una mascota archivada mientras comenzaba la acción', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.upsert.mockResolvedValue({
+      ...mascota,
+      activa: false,
+      retoCooperativo: null,
+    });
+
+    const res = await request(app)
+      .post(`/api/mascota/${AMISTAD_ID}/jugar`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(404);
+    expect(prisma.mascotaAmistad.update).not.toHaveBeenCalled();
+  });
+
+  test('expone el estado con sueño sin un mensaje culpabilizante', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({ ...mascota, energia: 20 });
+
+    const res = await request(app)
+      .get(`/api/mascota/${AMISTAD_ID}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.mascota.energia).toBe(20);
+    expect(res.body.mascota.estadoEnergia).toEqual({
+      estado: 'con_sueno',
+      cansada: true,
+      pose: 'siesta',
+    });
+  });
+
   test('el cuidado suma más cariño que un par de mensajes y respeta 24 horas por usuario', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
     prisma.mascotaAmistad.upsert.mockResolvedValue({ ...mascota, retoCooperativo: null });

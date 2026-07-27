@@ -42,20 +42,26 @@ ese contrato. Ninguno modifica archivos del otro sin coordinación del Agente E.
 
 ## Estado actual
 
-### Red activa de Fase 17
+### Cierre local de Fase 17
 
 | Agente | Rama | Worktree | Responsabilidad | Estado |
 | --- | --- | --- | --- | --- |
-| A | `feature/fase17-backend-energia` | `../MoodMatch-agenteA` | Backend, Prisma y persistencia para energía/minijuegos | Sincronizado con `main`; bloqueado hasta cerrar visualmente el Bloque 1 |
-| B | `feature/fase17-contratos-minijuegos` | `../MoodMatch-agenteB` | Lógica de negocio y contratos API de energía, monedas y cooldowns | Sincronizado con `main`; bloqueado hasta cerrar visualmente el Bloque 1 |
-| C | `feature/mascota-pulido-visual` | `../MoodMatch-agenteC` | UI, sprites y rig de animación de Mascota | Bloque 1 en curso; integrado con Ajustes y `useMotionPrefs` |
-| D | `feature/ajustes-pulido` | `../MoodMatch-agenteD` | Ajustes, accesibilidad y navegación | Entrega integrada; worktree de soporte sincronizado con `main` |
-| E | `main` | checkout principal `MoodMatch` | Integración, resolución de merges, QA, hardening y coordinación | Único responsable de publicar `main` durante la estabilización |
+| A | `feature/fase17-backend-energia` | `../MoodMatch-agenteA` | Energía, EXP, hitos de evolución y anti-spam | Integrado en `main` local mediante `61a229e` |
+| B | `feature/fase17-contratos-minijuegos` | `../MoodMatch-agenteB` | Atrápala, Ritmo de cariño y cooldown diario | Integrado en `main` local mediante `b07fa9c` |
+| C | `feature/mascota-pulido-visual` | `../MoodMatch-agenteC` | SVG, rig, jugosidad y catálogo visual de accesorios | Integrado en `main` local mediante `d0d43dc` |
+| D | `feature/fase17-tienda-habitat` | `../MoodMatch-agenteD` | Layout de tienda y fondo de hábitat | Integrado en `main` local mediante `2b094f5` |
+| E | `main` | checkout principal `MoodMatch` | Integración, QA, hardening y coordinación | Cierre técnico local validado; publicación bloqueada hasta confirmación del usuario |
 
-El reparto y los gates completos viven en `PLAN-INTEGRACION-FASE17.md`. Los
-Agentes A y B no comienzan Bloques 2/3 ni tocan Prisma hasta que el usuario
-apruebe visualmente el Bloque 1. Toda migración de Neon requiere autorización
-explícita adicional.
+El reparto y el historial de gates viven en `PLAN-INTEGRACION-FASE17.md`.
+**Fase 17 está completada e integrada al 100% en `main` local.** El corte de
+código `2b094f5` pasó 78/78 suites y 1171/1171 tests en app, 33/33 suites y
+558/558 tests en backend, además de `git diff --check`. No publicar ni iniciar
+otra fase hasta la prueba final y confirmación explícita del usuario.
+
+> **AVISO (Fase 17, 2026-07-27) — Prisma listo, despliegue pendiente:** las
+> migraciones de Energía y EXP están versionadas e integradas localmente, pero
+> el Agente E no las aplicó en Neon. Ejecutarlas sigue requiriendo autorización
+> explícita del usuario y revisión previa del SQL.
 
 > **AVISO (2026-07-27) — configuración EAS/FCM aislada:** los cambios de
 > `.gitignore`, `app/.gitignore`, `app/app.json`, `app/.easignore` y
@@ -74,7 +80,7 @@ explícita adicional.
 > movimiento reducido no corren ni el pulso al presionar ni las animaciones de
 > entrada. `LARGE_TEXT_SCALE` sigue exportado pero ahora vale 1.3. Ajustes quedó
 > integrado en `main` mediante `5a68c38`; el rig de Mascota consume la misma
-> preferencia en `feature/mascota-pulido-visual` desde `b0e72ac`.
+> preferencia desde `b0e72ac`, también integrado en `main` local.
 
 > **AVISO (Fase 15, 2026-07-22) — `schema.prisma` tocado de forma aditiva:** se
 > agrega a `User` el campo `memoriaChat Json?` (nullable) para la memoria del
@@ -83,12 +89,11 @@ explícita adicional.
 > una sola columna nullable: no afecta a ningún otro agente ni a los datos
 > existentes, pero avisar antes de volver a tocar `User`.
 
-Fase activa: **Fase 17** (rework visual y de mecánicas de la mascota, estilo
-Pou / Pocket Love), planificada en `FASE17-mascota-pou.md` y estabilizada según
-`PLAN-INTEGRACION-FASE17.md`. El Bloque 1 se trabaja en
-`feature/mascota-pulido-visual`. **C toma el visual de la mascota**:
-`app/mascota/sprites/` y `app/mascota/animation/`; nadie más los toca mientras
-dure el bloque.
+Fase vigente: **Fase 17 completada e integrada al 100% en `main` local**
+(rework visual y de mecánicas de la mascota, estilo Pou / Pocket Love),
+planificada en `FASE17-mascota-pou.md` y cerrada técnicamente según
+`PLAN-INTEGRACION-FASE17.md`. Permanece sin push y sin archivar hasta que el
+usuario complete la prueba final y autorice la publicación.
 
 Fases 15 y 16 mergeadas a `main` (2026-07-22) y pusheadas. Pendiente solo la
 prueba visual en dispositivo, que va en el mismo build de preview que valida

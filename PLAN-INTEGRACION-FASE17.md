@@ -2,7 +2,7 @@
 
 **Responsable:** Agente E - Integracion y Lead QA
 **Fecha de corte:** 2026-07-27
-**Estado:** estabilizacion previa al cierre del Bloque 1
+**Estado:** Fase 17 completada e integrada al 100% en `main` local; push pendiente
 
 Este documento es la hoja de ruta autoritativa para sincronizar las ramas de
 Fase 17. Si una instruccion de trabajo contradice este plan o
@@ -21,13 +21,13 @@ modificar archivos compartidos.
 
 ## 2. Red de trabajo
 
-| Agente | Rama | Worktree | Dominio exclusivo | Estado de entrada |
+| Agente | Rama | Worktree | Dominio exclusivo | Estado final |
 | --- | --- | --- | --- | --- |
-| A | `feature/fase17-backend-energia` | `../MoodMatch-agenteA` | Persistencia backend, Prisma y soporte de datos para energia/minijuegos | Se crea desde `main` estabilizado; no migra Neon sin autorizacion explicita |
-| B | `feature/fase17-contratos-minijuegos` | `../MoodMatch-agenteB` | Reglas de negocio y contratos API de energia, monedas y cooldowns | Se crea desde `main` estabilizado; no modifica `schema.prisma` |
-| C | `feature/mascota-pulido-visual` | `../MoodMatch-agenteC` | UI, sprites y rig de animacion de mascota | Bloque 1 avanzado; debe recibir `main` y unificar movimiento reducido |
-| D | `feature/ajustes-pulido` | `../MoodMatch-agenteD` | Ajustes, accesibilidad y navegacion | Implementacion en `0e0513c`; se integra primero en `main` |
-| E | `main` | checkout principal `MoodMatch` | Integracion, merges, QA general, hardening y coordinacion | Unico responsable de publicar `main` y editar archivos compartidos durante la estabilizacion |
+| A | `feature/fase17-backend-energia` | `../MoodMatch-agenteA` | Energia, EXP, evolucion y anti-spam | Integrado mediante `61a229e`; migraciones versionadas, no aplicadas en Neon |
+| B | `feature/fase17-contratos-minijuegos` | `../MoodMatch-agenteB` | Minijuegos y cooldown diario | Integrado mediante `b07fa9c` |
+| C | `feature/mascota-pulido-visual` | `../MoodMatch-agenteC` | SVG, rig, jugosidad y accesorios | Integrado mediante `d0d43dc` |
+| D | `feature/fase17-tienda-habitat` | `../MoodMatch-agenteD` | Tienda y fondo de habitat | Integrado mediante `2b094f5` |
+| E | `main` | checkout principal `MoodMatch` | Integracion, QA general, hardening y coordinacion | Cierre tecnico local completo; no publica sin confirmacion del usuario |
 
 ### Limites entre A y B
 
@@ -37,8 +37,8 @@ modificar archivos compartidos.
   implementa la logica de negocio y sus tests fuera de Prisma.
 - A y B no editan simultaneamente la misma ruta o modulo. El Agente E asigna
   cualquier archivo puente despues de aprobar el contrato.
-- Los Bloques 2 y 3 no comienzan hasta que el usuario cierre visualmente el
-  Bloque 1.
+- La dependencia historica entre Bloques 1, 2 y 3 quedo satisfecha antes de la
+  integracion final.
 
 ## 3. Regla de oro y seguridad de commits
 
@@ -76,7 +76,7 @@ requiere una revision independiente de build y seguridad.
 
 ## 5. Estrategia de merge sincronizado
 
-### Fase A - Ajustes hacia main
+### Fase A - Ajustes hacia main [COMPLETADA]
 
 Entrada: `feature/ajustes-pulido` en `0e0513c` y checkout principal limpio.
 
@@ -89,7 +89,7 @@ Entrada: `feature/ajustes-pulido` en `0e0513c` y checkout principal limpio.
 
 Salida: `main` contiene Ajustes, accesibilidad y `useMotionPrefs()`.
 
-### Fase B - Sincronizacion de Mascota
+### Fase B - Sincronizacion de Mascota [COMPLETADA]
 
 Entrada: Fase A publicada y worktree C limpio.
 
@@ -99,24 +99,37 @@ Entrada: Fase A publicada y worktree C limpio.
 3. Ajustar las pruebas para verificar que el override elegido en Ajustes
    gobierna saludo, parpadeo, caricia, inactividad, celebracion y rig.
 4. Ejecutar la suite completa de la app en el worktree C.
-5. No mergear C a `main` mientras falten la jugosidad y la aprobacion visual
-   del Bloque 1.
+5. C se mergea a `main` solo despues de completar la jugosidad y su QA local.
 
-Salida: C queda sincronizado y accesible, pero conserva su rama de feature.
+Salida alcanzada: C quedo sincronizado, accesible e integrado en `main` local.
 
-### Fase C - QA visual y cierre del Bloque 1
+### Fase C - QA visual y cierre del Bloque 1 [COMPLETADA LOCALMENTE]
 
 1. Completar numeros flotantes, barra animada con brillo, celebracion corporal
    y feedback cotidiano pendiente.
 2. Validar las siete especies y todos los estados en dispositivo.
 3. Comprobar las combinaciones de movimiento reducido del sistema y de la app.
 4. Ejecutar app, backend y `git diff --check`.
-5. Obtener aprobacion visual explicita del usuario.
-6. El Agente E integra C, repite QA sobre `main` y publica.
+5. Completar el QA local del agente responsable.
+6. El Agente E integra C y repite QA sobre `main`.
 
-Solo despues de esta salida se habilitan los worktrees A y B para Bloques 2 y
-3. El Bloque 4 permanece bloqueado hasta que exista el contrato de moneda del
-Bloque 3.
+Esta salida habilito los Bloques 2 y 3. Ambos se completaron antes de integrar
+el Bloque 4.
+
+### Fase D - Integracion final de Bloques 2, 3 y 4 [COMPLETADA]
+
+1. Energia, EXP, evolucion y anti-spam integrados desde A.
+2. Atrapala, Ritmo de carino y cooldown diario integrados desde B.
+3. Jugosidad, catalogo SVG y accesorios integrados desde C.
+4. Tienda y fondo de habitat integrados desde D.
+5. Corte final de codigo en `2b094f5`.
+6. App verde: 78/78 suites, 1171/1171 tests.
+7. Backend verde: 33/33 suites, 558/558 tests.
+8. `git diff --check` sin errores.
+
+La Fase 17 esta completada e integrada al 100% en `main` local. El push, la
+aplicacion de migraciones en Neon y el archivado del documento de fase quedan
+pendientes de la prueba final y autorizacion explicita del usuario.
 
 ## 6. Matriz minima de QA
 
@@ -126,16 +139,17 @@ Bloque 3.
 | Fase A | `npm test -- --runInBand` | `npm test -- --runInBand` | Ajustes, WCAG y persistencia |
 | Fase B | `npm test -- --runInBand` | Sin cambios esperados | Movimiento reducido unificado |
 | Fase C | Suite completa | Suite completa | Dispositivo, siete especies y `git diff --check` |
+| Cierre Fase 17 | 78 suites / 1171 tests | 33 suites / 558 tests | `git diff --check` limpio; push pendiente |
 
 Un warning conocido de `expo-notifications` bajo Expo Go no equivale a fallo,
 pero las notificaciones remotas se validan exclusivamente en un build nativo.
 
 ## 7. Criterios de repositorio estable
 
-- `main` y `origin/main` apuntan al mismo commit publicado.
-- Los worktrees A, B y D parten del `main` estabilizado; C contiene ese `main`
-  mas sus commits visuales.
+- `main` local contiene las entregas completas de A, B, C y D.
+- `origin/main` permanece deliberadamente sin cambios hasta la confirmacion
+  final del usuario.
 - Ningun worktree tiene cambios locales no documentados.
 - No hay conflictos pendientes, marcadores de merge ni errores de whitespace.
-- Las suites de app y backend estan verdes en el corte publicado.
+- Las suites de app y backend estan verdes en el corte local integrado.
 - `COORDINACION.md` refleja ramas, worktrees, propietarios y bloqueos reales.

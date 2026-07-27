@@ -197,6 +197,7 @@ test('la caricia pausa el parpadeo y lo devuelve al soltar', () => {
   // La caricia detiene los ritmos de fondo, parpadeo incluido.
   act(() => sprite.props.onLongPress());
   expect(jest.getTimerCount()).toBe(antes);
+  expect(renderer.root.findByProps({ testID: 'particulas-caricia' })).toBeTruthy();
 
   act(() => sprite.props.onPressOut());
   expect(jest.getTimerCount()).toBe(enReposo);
@@ -232,6 +233,34 @@ test('con reduce-motion no programa ningún parpadeo', () => {
   });
 
   expect(jest.getTimerCount()).toBe(antes);
+  const sprite = renderer.root.findByProps({ accessibilityRole: 'image' });
+  act(() => sprite.props.onLongPress({ nativeEvent: { locationX: 30, locationY: 40 } }));
+  expect(renderer.root.findAllByProps({ testID: 'particulas-caricia' })).toHaveLength(0);
+
+  act(() => renderer.unmount());
+  spy.mockRestore();
+});
+
+test('activar reduce-motion desmonta las partículas de una caricia activa', () => {
+  const ThemeContext = require('../theme/ThemeContext');
+  const spy = jest.spyOn(ThemeContext, 'useMotionPrefs').mockReturnValue({
+    reduceMotion: false,
+    hapticsEnabled: true,
+  });
+  const pinta = () => <MascotaAnimada especie="perro" etapa={2} size={100} />;
+  let renderer;
+  act(() => { renderer = create(pinta()); });
+  const sprite = renderer.root.findByProps({ accessibilityRole: 'image' });
+
+  act(() => {
+    sprite.props.onPressIn({ nativeEvent: { locationX: 22, locationY: 35 } });
+    sprite.props.onLongPress({ nativeEvent: { locationX: 22, locationY: 35 } });
+  });
+  expect(renderer.root.findAllByProps({ testID: 'particulas-caricia' }).length).toBeGreaterThan(0);
+
+  spy.mockReturnValue({ reduceMotion: true, hapticsEnabled: true });
+  act(() => renderer.update(pinta()));
+  expect(renderer.root.findAllByProps({ testID: 'particulas-caricia' })).toHaveLength(0);
 
   act(() => renderer.unmount());
   spy.mockRestore();

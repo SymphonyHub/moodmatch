@@ -34,6 +34,7 @@ jest.mock('../services/api', () => ({
   apiIniciarRetoMascota: jest.fn(),
   apiProponerNombreMascota: jest.fn(),
   apiEquiparAccesorioMascota: jest.fn(),
+  apiRegalarMascota: jest.fn(),
   apiArchivarMascota: jest.fn(),
 }));
 
@@ -41,6 +42,12 @@ import React from 'react';
 import { act, create } from 'react-test-renderer';
 import MascotaDetalleScreen from '../app/mascota/[amistadId]';
 import { ThemeProvider } from '../theme/ThemeContext';
+import { apiCuidarMascota, apiGetMascota } from '../services/api';
+
+beforeEach(() => {
+  apiGetMascota.mockResolvedValue({ mascota });
+  apiCuidarMascota.mockReset();
+});
 
 test('renderiza el detalle con sprite animado y grid de accesorios', async () => {
   let renderer;
@@ -57,6 +64,36 @@ test('renderiza el detalle con sprite animado y grid de accesorios', async () =>
   expect(renderer.root.findByProps({ children: 'Cabeza' })).toBeTruthy();
   expect(renderer.root.findByProps({ children: 'Color y patrón' })).toBeTruthy();
   expect(renderer.root.findByProps({ children: 'Corona' })).toBeTruthy();
+
+  act(() => renderer.unmount());
+});
+
+test('muestra la ganancia real y actualiza la barra al cuidar', async () => {
+  apiCuidarMascota.mockResolvedValueOnce({
+    mascota: { ...mascota, nivelCarino: 30 },
+  });
+  let renderer;
+  await act(async () => {
+    renderer = create(
+      <ThemeProvider>
+        <MascotaDetalleScreen />
+      </ThemeProvider>,
+    );
+    await Promise.resolve();
+  });
+
+  const cuidar = renderer.root.findByProps({
+    accessibilityLabel: 'Alimentar y jugar con la mascota',
+  });
+  const progresoInicial = renderer.root.findByProps({ accessibilityRole: 'progressbar' });
+  act(() => progresoInicial.props.onLayout({ nativeEvent: { layout: { width: 240 } } }));
+  await act(async () => {
+    await cuidar.props.onPress();
+  });
+
+  expect(renderer.root.findByProps({ children: '+6 cariño' })).toBeTruthy();
+  const progreso = renderer.root.findByProps({ accessibilityRole: 'progressbar' });
+  expect(progreso.props.accessibilityValue.now).toBe(70);
 
   act(() => renderer.unmount());
 });

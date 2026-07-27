@@ -189,3 +189,33 @@ export const followApendice = {
   spring: { damping: 7, stiffness: 90, mass: 1.1 },
   gradosPorSalto: 10,
 };
+
+// Feedback cotidiano del Bloque 1. Son movimientos de una sola pasada: el
+// número asciende con un pop suave, el brillo cruza la barra y las partículas
+// salen desde la mano al acariciar. Con movimiento reducido no se ejecutan.
+export const feedbackCarino = {
+  duracionMs: 1180,
+  estaticoMs: 900,
+  elevacionPx: 44,
+  escalaInicial: 0.72,
+  escalaPico: 1.12,
+  esperaFadeMs: 760,
+  fadeMs: 420,
+  easing: Easing.out(Easing.cubic),
+  pop: { damping: 9, stiffness: 190, mass: 0.62 },
+  asentamiento: { damping: 14, stiffness: 130, mass: 0.8 },
+};
+
+export const brilloProgreso = {
+  rellenoMs: 620,
+  esperaMs: 150,
+  recorridoMs: 720,
+  margenPx: 28,
+  rellenoEasing: Easing.inOut(Easing.sin),
+  recorridoEasing: Easing.inOut(Easing.quad),
+};
+
+export const particulasCaricia = {
+  duracionMs: 820,
+  easing: Easing.out(Easing.cubic),
+};

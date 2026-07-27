@@ -23,6 +23,7 @@ import { CATALOGO_ACCESORIOS } from '../../mascota/sprites/accesorios';
 import { estadoMascota } from '../../mascota/estadoMascota';
 import { nombreEspecie } from '../../mascota/especiesCatalogo';
 import SeccionSocial from '../../mascota/SeccionSocial';
+import SeccionMinijuegos from '../../mascota/minijuegos/SeccionMinijuegos';
 import { TEXTOS_PAUSA } from '../../mascota/textosPausa';
 
 // Progreso hacia la próxima evolución (Cachorro→Joven en 16, Joven→Adulta en
@@ -320,6 +321,8 @@ export default function MascotaDetalleScreen() {
       {!mascota.puedeCuidar && (
         <Text style={styles.notaSuave}>Tu cuidado vuelve mañana. Tu amistad puede cuidarla hoy.</Text>
       )}
+
+      <SeccionMinijuegos mascota={mascota} onActualizar={cargar} />
 
       {/* Reto cooperativo activo */}
       <View style={styles.bloque}>

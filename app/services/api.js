@@ -205,6 +205,57 @@ export const apiGetMascota = async (amistadId) => {
   return fetch(`${API_URL}/api/mascota/${amistadId}`, { headers }).then((r) => r.json());
 };
 
+// Finaliza una partida: el cliente reporta puntuación y el backend valida su
+// rango y decide recompensa/cooldown. A diferencia de las acciones antiguas de
+// mascota, lanza en !ok para conservar status/disponibilidad ante un 429.
+export const apiCompletarMinijuegoMascota = async (amistadId, tipo, puntuacion) => {
+  const headers = await authHeaders();
+  const res = await fetch(
+    `${API_URL}/api/mascota/${amistadId}/minijuegos/${encodeURIComponent(tipo)}/completar`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ puntuacion }),
+    },
+  );
+  const data = await res.json();
+  if (!res.ok) {
+    const error = new Error(data?.error ?? 'No se pudo guardar la partida');
+    error.status = res.status;
+    error.disponibleEn = data?.disponibleEn ?? null;
+    throw error;
+  }
+  const cooldownValido = (estado) => {
+    if (!estado || typeof estado.puedeJugar !== 'boolean') return false;
+    if (estado.puedeJugar) return estado.disponibleEn === null;
+    return typeof estado.disponibleEn === 'string'
+      && Number.isFinite(new Date(estado.disponibleEn).getTime());
+  };
+  const recompensaValida = data?.recompensa
+    && ['energia', 'carino', 'monedas'].every(
+      (campo) => Number.isInteger(data.recompensa[campo]) && data.recompensa[campo] >= 0,
+    );
+  const contratoValido = data?.mascota
+    && Number.isInteger(data.mascota.energia)
+    && data.mascota.energia >= 0
+    && data.mascota.energia <= 100
+    && Number.isInteger(data.mascota.monedas)
+    && data.mascota.monedas >= 0
+    && cooldownValido(data.mascota.minijuegos?.ATRAPALA)
+    && cooldownValido(data.mascota.minijuegos?.RITMO_CARINO)
+    && data?.minijuego?.tipo === tipo
+    && data.minijuego.puntuacion === puntuacion
+    && typeof data.minijuego.completadoEn === 'string'
+    && Number.isFinite(new Date(data.minijuego.completadoEn).getTime())
+    && typeof data.minijuego.disponibleEn === 'string'
+    && Number.isFinite(new Date(data.minijuego.disponibleEn).getTime())
+    && recompensaValida;
+  if (!contratoValido) {
+    throw new Error('Respuesta inválida del minijuego');
+  }
+  return data;
+};
+
 // Mascotas activas y aceptadas del usuario ({ mascotas }), para la sección
 // "Mascotas destacadas" del perfil. La etapa/sprite se deriva en el cliente.
 export const apiGetMyMascotas = async () => {

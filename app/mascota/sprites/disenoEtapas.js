@@ -5,7 +5,7 @@
 // accesorios.js.
 //
 // Grupos devueltos (orden de dibujo defs → shadow → apendice → cuerpo → cara →
-// frente):
+// contorno → frente):
 //   defs     → definiciones referenciadas por los demás nodos (el gradiente de
 //              sombreado de la especie); no dibuja nada por sí mismo
 //   shadow   → sombra de contacto (estática)
@@ -14,6 +14,7 @@
 //   cara     → { rubor, resto, ojos, gesto } en ese orden de dibujo:
 //              rubor parpadea de intensidad con la expresión, ojos parpadean, y
 //              gesto son los párpados/cejas de la expresión, que van por encima
+//   contorno → trazo exterior opcional, encima del rostro y sin líneas internas
 //   frente   → accesorio de cabeza equipado (encima de todo)
 //
 // El rubor sale separado del resto de la cara justamente para que el rig pueda
@@ -46,6 +47,7 @@ export function escenaMascota({
       ojos: base.cara.ojos,
       gesto: parpados(base.cara.ojos, parpado, paleta),
     },
+    contorno: base.contorno ?? [],
     frente: acc.cabeza,
   };
 }
@@ -55,6 +57,7 @@ export function escenaPlana(opciones) {
   const e = escenaMascota(opciones);
   return [
     ...e.defs, ...e.shadow, ...e.apendice, ...e.cuerpo,
-    ...e.cara.rubor, ...e.cara.resto, ...e.cara.ojos, ...e.cara.gesto, ...e.frente,
+    ...e.cara.rubor, ...e.cara.resto, ...e.cara.ojos, ...e.cara.gesto,
+    ...e.contorno, ...e.frente,
   ];
 }

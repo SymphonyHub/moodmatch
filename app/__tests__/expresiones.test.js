@@ -9,33 +9,32 @@ const ETAPAS = [1, 2, 3];
 const cada = ESPECIES.flatMap((especie) => ETAPAS.map((etapa) => [especie, etapa]));
 
 // ── Regresión de silueta ────────────────────────────────────────────────────
-// Las 7 siluetas ya están aprobadas en dispositivo. Estos hashes se generaron
-// con el código ANTERIOR al sistema de expresiones y se verificó que el nuevo
-// produce exactamente los mismos: sin expresión, la geometría no se mueve ni un
-// decimal. Si este test falla, la silueta cambió — y si el cambio es a
-// propósito, hay que regenerar el hash y volver a probar en el teléfono.
+// Los hashes cambian únicamente ante una corrección visual explícita. Los de
+// etapa 3 incluyen el saneamiento de opacidad de sus parches claros y, para el
+// pingüino, la separación entre base sólida y contorno exterior. Si este test
+// falla, hay que revisar el diff y volver a validar la silueta en dispositivo.
 const HASH_SILUETA = {
   'polluelo-1': '99db800c2959',
   'polluelo-2': '1f408dccfba2',
-  'polluelo-3': '929369a13b75',
+  'polluelo-3': '1ac577bb0460',
   'nutria-lunar-1': 'df7e9923a3c7',
   'nutria-lunar-2': '9269400a10b0',
-  'nutria-lunar-3': '4ddeb4c350b7',
+  'nutria-lunar-3': 'c7b94742b43a',
   'espiritu-calma-1': 'b25930823eb8',
   'espiritu-calma-2': 'be2e0d1c7eed',
-  'espiritu-calma-3': 'cf0340bc7474',
+  'espiritu-calma-3': '88ae43163d2b',
   'pinguino-1': '861571dca297',
   'pinguino-2': '37556d7681b5',
-  'pinguino-3': '96552b40ba3f',
+  'pinguino-3': '508f5e83c788',
   'perro-1': '79510a7cc17b',
   'perro-2': '4e2036693238',
-  'perro-3': 'b68521dfe673',
+  'perro-3': 'd10420035372',
   'dinosaurio-1': 'af1ef25fea00',
   'dinosaurio-2': '4d54b0a65ebe',
-  'dinosaurio-3': '1d49c116c924',
+  'dinosaurio-3': '1c05ae7fc732',
   'huevo-1': 'f39c81b5acb5',
   'huevo-2': 'f559ec3e20ff',
-  'huevo-3': 'c0f2cd65fb68',
+  'huevo-3': '130e642dee20',
 };
 
 const hashDe = (nodos) => crypto

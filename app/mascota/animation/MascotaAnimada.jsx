@@ -428,6 +428,7 @@ export default function MascotaAnimada({
           {renderNodos(escena.cara.resto, 're')}
           <AG animatedProps={ojosProps}>{renderNodos(escena.cara.ojos, 'oj')}</AG>
           <AG animatedProps={gestoProps}>{renderNodos(escena.cara.gesto, 'ge')}</AG>
+          {renderNodos(escena.contorno, 'co')}
           {renderNodos(escena.frente, 'fr')}
         </AG>
       </Svg>

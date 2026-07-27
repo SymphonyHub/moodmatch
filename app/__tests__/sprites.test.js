@@ -11,6 +11,7 @@ const masasDe = (grupo, gid) => grupo.filter((n) => n.fill === `url(#${gid})`);
 const ESPECIES_ESPERADAS = [
   'polluelo', 'nutria-lunar', 'espiritu-calma', 'pinguino', 'perro', 'dinosaurio', 'huevo',
 ];
+const ESPECIES_CON_PARCHE_CLARO = ESPECIES_ESPERADAS.filter((id) => id !== 'espiritu-calma');
 
 describe('catálogo de siluetas', () => {
   test('expone exactamente las 7 especies acordadas', () => {
@@ -25,6 +26,7 @@ describe('catálogo de siluetas', () => {
       expect(nodosValidos(g.cuerpo)).toBe(true);
       expect(nodosValidos(g.cara.ojos)).toBe(true);
       expect(nodosValidos(g.apendice)).toBe(true);
+      expect(nodosValidos(g.contorno ?? [])).toBe(true);
     }
   });
 
@@ -61,12 +63,34 @@ describe('reglas de familia', () => {
   });
 
   test.each(ESPECIES)('%s: toda masa lleva el mismo contorno tonal', (especie) => {
-    const P = paletaEtapa(2);
-    const g = dibujarEspecie(especie, 2, P);
-    for (const m of masasDe(g.cuerpo, g.defs[0].id)) {
-      expect(m.stroke).toBe(P.tonal);
-      expect(m.strokeWidth).toBe(1.8);
+    for (const etapa of [1, 2, 3]) {
+      const P = paletaEtapa(etapa);
+      const g = dibujarEspecie(especie, etapa, P);
+      for (const m of masasDe(g.cuerpo, g.defs[0].id)) {
+        const separado = (g.contorno ?? []).find((n) => n.d === m.d);
+        const borde = separado ?? m;
+        expect(borde.stroke).toBe(P.tonal);
+        expect(borde.strokeWidth).toBe(1.8);
+      }
     }
+  });
+
+  test.each(ESPECIES)('%s: la masa adulta es opaca y no deja contornos cerrados huérfanos', (especie) => {
+    const g = dibujarEspecie(especie, 3, paletaEtapa(3));
+    for (const m of masasDe(g.cuerpo, g.defs[0].id)) {
+      expect(m.opacity ?? 1).toBe(1);
+    }
+    const cerradosSinRelleno = g.cuerpo.filter(
+      (n) => n.t === 'path' && n.fill === 'none' && /Z\s*$/i.test(n.d),
+    );
+    expect(cerradosSinRelleno).toEqual([]);
+  });
+
+  test.each(ESPECIES_CON_PARCHE_CLARO)('%s: el parche claro adulto es sólido', (especie) => {
+    const P = paletaEtapa(3);
+    const parches = dibujarEspecie(especie, 3, P).cuerpo.filter((n) => n.fill === P.belly);
+    expect(parches.length).toBeGreaterThan(0);
+    expect(parches.every((n) => (n.opacity ?? 1) === 1)).toBe(true);
   });
 
   test.each(ESPECIES)('%s: lleva rubor y ojos con brillo', (especie) => {
@@ -114,6 +138,35 @@ describe('escena compuesta', () => {
     });
     expect(con.frente.length).toBeGreaterThan(0); // corona
     expect(con.cuerpo.length).toBeGreaterThan(sin.cuerpo.length); // + lunares
+  });
+
+  test('el pingüino adulto ordena base, guatita, rostro y contorno exterior', () => {
+    const P = paletaEtapa(3);
+    const plano = escenaPlana({ especie: 'pinguino', etapa: 3 });
+    const gid = plano[0].id;
+    const rellenoIndex = plano.findIndex((n) => n.fill === `url(#${gid})`);
+    const relleno = plano[rellenoIndex];
+    const baseIndex = plano.findIndex(
+      (n) => n.t === 'path' && n.d === relleno.d && n.fill === P.body,
+    );
+    const guatitaIndex = plano.findIndex((n) => n.fill === P.belly);
+    const rostroIndex = plano.findIndex(
+      (n) => n.t === 'ellipse' && n.cy === 40 && n.fill === P.ink,
+    );
+    const contornoIndex = plano.findIndex(
+      (n) => n.t === 'path' && n.d === relleno.d && n.fill === 'none',
+    );
+
+    expect(plano[baseIndex].opacity).toBeUndefined();
+    expect(plano[guatitaIndex].opacity ?? 1).toBe(1);
+    expect(baseIndex).toBeLessThan(rellenoIndex);
+    expect(rellenoIndex).toBeLessThan(guatitaIndex);
+    expect(guatitaIndex).toBeLessThan(rostroIndex);
+    expect(rostroIndex).toBeLessThan(contornoIndex);
+    expect(plano[contornoIndex]).toMatchObject({
+      stroke: P.tonal, strokeWidth: 1.8, fill: 'none',
+    });
+    expect(plano.some((n) => n.stroke === P.deep && n.d?.includes('Q50,59'))).toBe(false);
   });
 });
 

@@ -2,7 +2,7 @@
 // que, dada la etapa (0..2), la paleta de esa etapa y el id de su gradiente,
 // devuelve la silueta como grupos de nodos SVG:
 //
-//   { shadow, cuerpo, apendice, cara: { ojos, resto } }
+//   { shadow, cuerpo, apendice, cara: { ojos, resto }, contorno? }
 //
 // Convención estructural compartida por TODAS las especies, para que el rig de
 // animación (MascotaAnimada) sea único y no conozca especies:
@@ -13,6 +13,7 @@
 //                 [] si la especie es rígida (huevo)
 //   · cara.ojos → globos de los ojos (el rig los aplana al parpadear)
 //   · cara.resto→ rubor, nariz, boca y marcas que no parpadean
+//   · contorno   → trazo exterior opcional, encima de cara y debajo de accesorios
 //
 // Las siluetas se diferencian por FORMA, no por color: todas usan la misma
 // paleta (paletas.js) y las mismas reglas de familia (geometria.js). Se
@@ -51,7 +52,7 @@ function polluelo(s, P, gid) {
   cuerpo.push(path(ruta`M${50 - RX + 4},57 q-10,3 -8,13 q1.5,4 6,1 q-1,-7 2,-12Z`, { fill: P.edge, ...contornoFino(P) }));
   cuerpo.push(path(ruta`M${50 + RX - 4},57 q10,3 8,13 q-1.5,4 -6,1 q1,-7 -2,-12Z`, { fill: P.edge, ...contornoFino(P) }));
   cuerpo.push(masa(50, cy, RX, R * 0.97, gid, P));
-  cuerpo.push(elip(50, cy + R * 0.3, RX * 0.6, R * 0.56, P.belly, 0.7));
+  cuerpo.push(elip(50, cy + R * 0.3, RX * 0.6, R * 0.56, P.belly, s === 2 ? 1 : 0.7));
   cuerpo.push(brillo(50 - RX * 0.4, cy - R * 0.46, 6.6, 4.5));
   if (s === 2) {
     cuerpo.push(path(ruta`M${50 + RX * 0.5},${cy - R * 0.58} l1.1,2.6 l2.6,1.1 l-2.6,1.1 l-1.1,2.6 l-1.1,-2.6 l-2.6,-1.1 l2.6,-1.1Z`,
@@ -94,7 +95,7 @@ function nutria(s, P, gid) {
   cuerpo.push(pieza(50 - 8.5, 84.5, 5.4, 3.4, P.edge, P));
   cuerpo.push(pieza(50 + 8.5, 84.5, 5.4, 3.4, P.edge, P));
   cuerpo.push(masa(50, bY, bRx, bRy, gid, P));
-  cuerpo.push(elip(50, bY + 2, bRx * 0.58, bRy * 0.66, P.belly, 0.75));
+  cuerpo.push(elip(50, bY + 2, bRx * 0.58, bRy * 0.66, P.belly, s === 2 ? 1 : 0.75));
   // orejas chicas y bajas, contra el costado de la cabeza
   for (const g of [-1, 1]) {
     cuerpo.push(con(circ(50 + g * hRX * 0.78, hY - hR * 0.5, oR, P.edge), contornoFino(P)));
@@ -105,7 +106,7 @@ function nutria(s, P, gid) {
   // creciente lunar: tenue ya en la etapa 1, dorado recién al evolucionar
   cuerpo.push(path(ruta`M48,${hY - hR * 0.56} a4.6,4.6 0 1 0 3.4,7.8 a3.5,3.5 0 1 1 -3.4,-7.8Z`,
     s === 2 ? { fill: GOLD } : { fill: P.deep, opacity: 0.42 }));
-  cuerpo.push(elip(50, mcy, mrx, hR * 0.28, P.belly, 0.9));
+  cuerpo.push(elip(50, mcy, mrx, hR * 0.28, P.belly, s === 2 ? 1 : 0.9));
 
   const tx = 50 + bRx * 0.7;
   const ty = bY + 2;
@@ -165,8 +166,8 @@ function espiritu(s, P, gid) {
   }
 
   const apendice = s >= 1 ? [
-    path(ruta`M${50 - w + 2},56 q-10,1 -8.6,-8 q4,7 8.6,8Z`, { fill: P.edge, opacity: 0.9, ...contornoFino(P) }),
-    path(ruta`M${50 + w - 2},56 q10,1 8.6,-8 q-4,7 -8.6,8Z`, { fill: P.edge, opacity: 0.9, ...contornoFino(P) }),
+    path(ruta`M${50 - w + 2},56 q-10,1 -8.6,-8 q4,7 8.6,8Z`, { fill: P.edge, opacity: s === 2 ? 1 : 0.9, ...contornoFino(P) }),
+    path(ruta`M${50 + w - 2},56 q10,1 8.6,-8 q-4,7 -8.6,8Z`, { fill: P.edge, opacity: s === 2 ? 1 : 0.9, ...contornoFino(P) }),
   ] : [];
 
   return {
@@ -192,6 +193,7 @@ function pinguino(s, P, gid) {
   const bot = 80;
   const wH = [12.5, 12.5, 12][s];
   const wB = [19.5, 20, 20.5][s];
+  const silueta = ruta`M50,${top} C${50 + wH * 0.86},${top} ${50 + wH},${top + 7} ${50 + wH * 1.04},${top + 14} C${50 + wB * 0.82},${top + 24} ${50 + wB},${top + 30} ${50 + wB},${top + 38} C${50 + wB},${bot - 4} ${50 + wB * 0.66},${bot} 50,${bot} C${50 - wB * 0.66},${bot} ${50 - wB},${bot - 4} ${50 - wB},${top + 38} C${50 - wB},${top + 30} ${50 - wB * 0.82},${top + 24} ${50 - wH * 1.04},${top + 14} C${50 - wH},${top + 7} ${50 - wH * 0.86},${top} 50,${top}Z`;
 
   const cuerpo = [];
   for (const g of [-1, 1]) {
@@ -207,15 +209,21 @@ function pinguino(s, P, gid) {
       { fill: P.edge, ...contornoFino(P) },
     ));
   }
-  cuerpo.push(path(
-    ruta`M50,${top} C${50 + wH * 0.86},${top} ${50 + wH},${top + 7} ${50 + wH * 1.04},${top + 14} C${50 + wB * 0.82},${top + 24} ${50 + wB},${top + 30} ${50 + wB},${top + 38} C${50 + wB},${bot - 4} ${50 + wB * 0.66},${bot} 50,${bot} C${50 - wB * 0.66},${bot} ${50 - wB},${bot - 4} ${50 - wB},${top + 38} C${50 - wB},${top + 30} ${50 - wB * 0.82},${top + 24} ${50 - wH * 1.04},${top + 14} C${50 - wH},${top + 7} ${50 - wH * 0.86},${top} 50,${top}Z`,
-    { fill: relleno(gid), ...contorno(P) },
-  ));
-  // Panza opaca: a 0.85 el gradiente de abajo la teñía un poco; opaca queda lisa.
+  if (s === 2) {
+    // Respaldo sólido: si el gradiente tarda en resolver dentro del <G> animado,
+    // la silueta sigue siendo opaca y tapa por completo las capas posteriores.
+    cuerpo.push(path(silueta, { fill: P.body }));
+    cuerpo.push(path(silueta, { fill: relleno(gid) }));
+  } else {
+    cuerpo.push(path(silueta, { fill: relleno(gid), ...contorno(P) }));
+  }
+  // Panza opaca: el gradiente de abajo no debe teñirla ni transparentarse.
   cuerpo.push(elip(50, 58, wB * 0.72, 19, P.belly, 1));
   cuerpo.push(brillo(50 - wH * 0.5, top + 9, 5.8, 4.2));
-  cuerpo.push(path(ruta`M${50 - 12},53 Q50,59 ${50 + 12},53`,
-    { stroke: P.deep, strokeWidth: 2, fill: 'none', opacity: 0.8, strokeLinecap: 'round' }));
+  if (s !== 2) {
+    cuerpo.push(path(ruta`M${50 - 12},53 Q50,59 ${50 + 12},53`,
+      { stroke: P.deep, strokeWidth: 2, fill: 'none', opacity: 0.8, strokeLinecap: 'round' }));
+  }
 
   // Penacho: detrás del cuerpo, así solo asoman las puntas por encima de la
   // coronilla. Cada pluma nace en la ceja, sube y barre hacia afuera/atrás en un
@@ -257,6 +265,9 @@ function pinguino(s, P, gid) {
     cuerpo,
     apendice,
     cara: { ojos: ojos(50, 40, P, wH), resto },
+    // En Adulta el stroke se separa del relleno para quedar encima de rostro y
+    // guatita, sin agregar ningún trazo interno que atraviese el pecho.
+    contorno: s === 2 ? [path(silueta, { fill: 'none', ...contorno(P) })] : [],
   };
 }
 
@@ -274,7 +285,7 @@ function perro(s, P, gid) {
   cuerpo.push(pieza(50 - 8.5, 85, 5.6, 3.6, P.edge, P));
   cuerpo.push(pieza(50 + 8.5, 85, 5.6, 3.6, P.edge, P));
   cuerpo.push(masa(50, bY, bRx, bRy, gid, P));
-  cuerpo.push(elip(50, bY + 2, bRx * 0.56, bRy * 0.68, P.belly, 0.75));
+  cuerpo.push(elip(50, bY + 2, bRx * 0.56, bRy * 0.68, P.belly, s === 2 ? 1 : 0.75));
   cuerpo.push(masa(50, hY, hRX, hR, gid, P));
   // mancha de cachorro: un solo ojo y descentrada. Va del lado opuesto al
   // brillo especular, si no la luz de peluche cae encima y la apaga.
@@ -290,7 +301,7 @@ function perro(s, P, gid) {
       { stroke: CORAL, strokeWidth: 3.2, fill: 'none', strokeLinecap: 'round' }));
     cuerpo.push(circ(50, hY + hR + 2.4, 2.6, GOLD));
   }
-  cuerpo.push(elip(50, hY + hR * 0.42, hRX * 0.54, hR * 0.4, P.belly, 0.9));
+  cuerpo.push(elip(50, hY + hR * 0.42, hRX * 0.54, hR * 0.4, P.belly, s === 2 ? 1 : 0.9));
 
   const apendice = [];
   for (const g of [-1, 1]) {
@@ -350,7 +361,7 @@ function dinosaurio(s, P, gid) {
     cuerpo.push(aleta(50 + u * bRx, bY - bRy * Math.sqrt(1 - u * u), 3, 4 + s * 0.5, P));
   }
   cuerpo.push(masa(50, bY, bRx, bRy, gid, P));
-  cuerpo.push(elip(50, bY + 3, bRx * 0.55, bRy * 0.62, P.belly, 0.7));
+  cuerpo.push(elip(50, bY + 3, bRx * 0.55, bRy * 0.62, P.belly, s === 2 ? 1 : 0.7));
   // brazos cortos con garras, por delante del pecho
   for (const g of [-1, 1]) {
     const ax = 50 + g * (bRx - 2.5);
@@ -418,7 +429,7 @@ function huevo(s, P, gid) {
     ruta`M50,${top} C${50 + w * 0.9},${top} ${50 + w},${mid - 6} ${50 + w},${mid + 8} C${50 + w},${bot - 6} ${50 + w * 0.55},${bot} 50,${bot} C${50 - w * 0.55},${bot} ${50 - w},${bot - 6} ${50 - w},${mid + 8} C${50 - w},${mid - 6} ${50 - w * 0.9},${top} 50,${top}Z`,
     { fill: relleno(gid), ...contorno(P) },
   ));
-  cuerpo.push(elip(50, mid + 17, w * 0.62, 12, P.belly, 0.5));
+  cuerpo.push(elip(50, mid + 17, w * 0.62, 12, P.belly, s === 2 ? 1 : 0.5));
   cuerpo.push(brillo(50 - w * 0.36, mid - 12, 6.6, 4.8));
   if (s === 1) {
     cuerpo.push(path(ruta`M${50 - 18.5},${mid + 14} l5.3,-5 l5.3,5 l5.3,-5 l5.3,5 l5.3,-5 l5.3,5 l5.3,-5`,

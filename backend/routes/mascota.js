@@ -40,6 +40,13 @@ const {
   recuperarEnergia,
 } = require('../lib/energiaMascota');
 const {
+  calcularProgresion,
+  normalizarMinijuego,
+  prepararActualizacionExperiencia,
+  reclamarRecompensaDiaria,
+  respuestaProgresion,
+} = require('../lib/mascotaProgresion');
+const {
   dispatchNotification,
   notifyPetArchived,
   notifyPetInvitation,
@@ -105,7 +112,10 @@ async function mascotaVisible(db, mascota, amistad, userId, opciones = {}) {
   // El estado del regalo solo se consulta en las pantallas de detalle que lo
   // muestran (conRegalo), para no pagar la consulta en los flujos de lista.
   const regalo = opciones.conRegalo ? await estadoRegaloVinculo(db, amistad) : null;
-  return presentarMascota(mascota, amistad, userId, calcularPersonalidad(entries), { regalo });
+  return presentarMascota(mascota, amistad, userId, calcularPersonalidad(entries), {
+    regalo,
+    progresion: opciones.progresion,
+  });
 }
 
 // Reúne de la base solo la señal que el tipo de reto activo necesita para
@@ -167,25 +177,105 @@ async function exigirAceptada(res, amistadId) {
 // Tarjeta ligera para la pantalla lista. No expone ánimos individuales, solo la
 // especie, la etapa y si necesita atención (mismo umbral de 48h que la push de
 // Fase 12).
-const presentarResumen = (mascota, amigo, ahora) => ({
-  amistadId: mascota.amistadId,
-  amigo,
-  nombre: mascota.nombre,
-  nivelCarino: mascota.nivelCarino,
-  ...presentarEnergia(mascota, ahora),
-  // Especie negociada (MascotaAmistad.especie); derivarEspecie solo como
-  // fallback para mascotas previas a Fase 14 (especie null tras el backfill).
-  especie: mascota.especie ?? derivarEspecie(mascota.amistadId),
-  etapa: etapaVisual(mascota.nivelCarino),
-  accesorioCabeza: mascota.accesorioCabeza ?? null,
-  accesorioColor: mascota.accesorioColor ?? null,
-  necesitaAtencion: necesitaAtencion(mascota, ahora),
-});
+function presentarResumen(mascota, amigo, ahora) {
+  const progresion = calcularProgresion(mascota.experiencia);
+  return {
+    amistadId: mascota.amistadId,
+    amigo,
+    nombre: mascota.nombre,
+    nivelCarino: mascota.nivelCarino,
+    experiencia: progresion.experiencia,
+    nivel: progresion.nivel,
+    progresion,
+    ...presentarEnergia(mascota, ahora),
+    // Especie negociada (MascotaAmistad.especie); derivarEspecie solo como
+    // fallback para mascotas previas a Fase 14 (especie null tras el backfill).
+    especie: mascota.especie ?? derivarEspecie(mascota.amistadId),
+    etapa: etapaVisual(mascota.experiencia),
+    accesorioCabeza: mascota.accesorioCabeza ?? null,
+    accesorioColor: mascota.accesorioColor ?? null,
+    necesitaAtencion: necesitaAtencion(mascota, ahora),
+  };
+}
 
 // En una negociación de especie, quien hizo la última propuesta espera; el otro
 // responde. El pivote es especiePropuestaPor (con fallback a invitadaPor para
 // invitaciones creadas antes de la selección de especie).
 const proponenteDe = (mascota) => mascota.especiePropuestaPor ?? mascota.invitadaPor ?? null;
+
+const respuestaExperiencia = (resultado) => ({
+  ...respuestaProgresion(resultado.progresion),
+  experienciaOtorgada: resultado.recompensa.experienciaOtorgada,
+  limiteDiarioAlcanzado: resultado.recompensa.limiteDiarioAlcanzado,
+});
+
+async function responderEstado(req, res, amistadIdRaw) {
+  const amistadId = parseAmistadId(amistadIdRaw);
+  if (!amistadId) return res.status(400).json({ error: 'amistadId inválido' });
+
+  const amistad = await buscarAmistadPropia(amistadId, req.user.userId);
+  if (!amistad) return res.status(404).json({ error: 'Amistad no encontrada' });
+  const mascota = await exigirAceptada(res, amistadId);
+  if (!mascota) return undefined;
+
+  const progresion = calcularProgresion(mascota.experiencia);
+  return res.json({
+    mascota: await mascotaVisible(prisma, mascota, amistad, req.user.userId, { conRegalo: true }),
+    ...respuestaProgresion(progresion),
+  });
+}
+
+async function responderRecompensaSimple(req, res, amistadIdRaw, tipo, minijuego) {
+  const amistadId = parseAmistadId(amistadIdRaw);
+  if (!amistadId) return res.status(400).json({ error: 'amistadId inválido' });
+  const amistad = await buscarAmistadPropia(amistadId, req.user.userId);
+  if (!amistad) return res.status(404).json({ error: 'Amistad no encontrada' });
+
+  let resultado;
+  try {
+    resultado = await transaccionSerializable(async (tx) => {
+      const actual = await tx.mascotaAmistad.findUnique({ where: { amistadId } });
+      if (!mascotaAceptada(actual)) return { noDisponible: true };
+
+      const recompensa = await reclamarRecompensaDiaria(tx, {
+        amistad,
+        userId: req.user.userId,
+        tipo,
+        minijuego,
+      });
+      const avance = prepararActualizacionExperiencia(
+        actual,
+        recompensa.experienciaOtorgada,
+      );
+      const mascota = recompensa.experienciaOtorgada > 0
+        ? await tx.mascotaAmistad.update({
+          where: { amistadId, activa: true, invitacionEstado: 'aceptada' },
+          data: avance.data,
+        })
+        : actual;
+      return {
+        mascota: { ...mascota, experiencia: avance.progresion.experiencia },
+        progresion: avance.progresion,
+        recompensa,
+      };
+    });
+  } catch (error) {
+    if (error?.code === 'P2025') {
+      return res.status(404).json({ error: 'No hay una mascota activa para esta amistad' });
+    }
+    throw error;
+  }
+
+  if (resultado.noDisponible) {
+    return res.status(404).json({ error: 'No hay una mascota activa para esta amistad' });
+  }
+  return res.json({
+    mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId, {
+      progresion: resultado.progresion,
+    }),
+    ...respuestaExperiencia(resultado),
+  });
+}
 
 // GET /api/mascota — índice de la sección: mascotas activas del usuario,
 // invitaciones (recibidas y enviadas) y amigos elegibles para invitar.
@@ -237,6 +327,36 @@ router.get('/', requireAuth, async (req, res) => {
   }
 
   return res.json({ mascotas, invitaciones: { recibidas, enviadas }, amigosElegibles });
+});
+
+// Alias de estado solicitado por el contrato de progresion.
+router.get('/estado', requireAuth, (req, res) => responderEstado(req, res, req.query.amistadId));
+
+// Punto unico para interacciones que solo necesitan animacion + recompensa.
+// Alimentar/jugar conservan sus mecanicas actuales; caricia y minijuego solo EXP.
+router.post('/cuidar', requireAuth, (req, res) => {
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+    ? req.body
+    : {};
+  if (body.accion !== undefined && typeof body.accion !== 'string') {
+    return res.status(400).json({ error: 'Acción de cuidado inválida' });
+  }
+  const accion = (body.accion ?? 'CUIDADO').trim().toUpperCase();
+  if (['CUIDADO', 'CUIDAR', 'ALIMENTAR'].includes(accion)) {
+    return responderCuidado(req, res, 'alimentar', body.amistadId, { exitoEnCooldown: true });
+  }
+  if (accion === 'JUGAR') {
+    return responderCuidado(req, res, 'jugar', body.amistadId, { exitoEnCooldown: true });
+  }
+  if (accion === 'CARICIA') {
+    return responderRecompensaSimple(req, res, body.amistadId, 'CARICIA');
+  }
+  if (accion === 'MINIJUEGO') {
+    const minijuego = normalizarMinijuego(body.minijuego);
+    if (!minijuego) return res.status(400).json({ error: 'Minijuego inválido' });
+    return responderRecompensaSimple(req, res, body.amistadId, 'MINIJUEGO', minijuego);
+  }
+  return res.status(400).json({ error: 'Acción de cuidado inválida' });
 });
 
 // POST /api/mascota/invitacion — crea la mascota en estado "pendiente" con la
@@ -367,24 +487,19 @@ router.post('/:amistadId/invitacion/rechazar', requireAuth, async (req, res) => 
 
 // GET /api/mascota/:amistadId — detalle de una mascota activa. Ya no crea la
 // mascota de forma diferida: sin invitación aceptada responde 404.
-router.get('/:amistadId', requireAuth, async (req, res) => {
-  const amistadId = parseAmistadId(req.params.amistadId);
-  if (!amistadId) return res.status(400).json({ error: 'amistadId inválido' });
-
-  const amistad = await buscarAmistadPropia(amistadId, req.user.userId);
-  if (!amistad) return res.status(404).json({ error: 'Amistad no encontrada' });
-
-  const mascota = await exigirAceptada(res, amistadId);
-  if (!mascota) return undefined;
-
-  return res.json({ mascota: await mascotaVisible(prisma, mascota, amistad, req.user.userId, { conRegalo: true }) });
-});
+router.get('/:amistadId', requireAuth, (req, res) => responderEstado(req, res, req.params.amistadId));
 
 // Alimentar y jugar comparten el cooldown de cuidado que ya existia por
 // persona. Alimentar suma carino; jugar recupera energia. Ambas acciones pueden
 // completar el progreso cooperativo porque las dos son momentos de cuidado.
-async function responderCuidado(req, res, accion) {
-  const amistadId = parseAmistadId(req.params.amistadId);
+async function responderCuidado(
+  req,
+  res,
+  accion,
+  amistadIdRaw = req.params.amistadId,
+  opciones = {},
+) {
+  const amistadId = parseAmistadId(amistadIdRaw);
   if (!amistadId) return res.status(400).json({ error: 'amistadId inválido' });
 
   const amistad = await buscarAmistadPropia(amistadId, req.user.userId);
@@ -401,8 +516,40 @@ async function responderCuidado(req, res, accion) {
         ? 'ultimoCuidadoUsuario1'
         : 'ultimoCuidadoUsuario2';
       const ultimoCuidado = actual[campoCuidado];
-      if (ultimoCuidado && ahora.getTime() - new Date(ultimoCuidado).getTime() < COOLDOWN_CUIDADO_MS) {
-        return { cooldown: true, mascota: actual };
+      const enCooldown = ultimoCuidado
+        && ahora.getTime() - new Date(ultimoCuidado).getTime() < COOLDOWN_CUIDADO_MS;
+      if (enCooldown && !opciones.exitoEnCooldown) {
+        return { cooldown: true, legacy: true, mascota: actual };
+      }
+
+      const recompensa = await reclamarRecompensaDiaria(tx, {
+        amistad,
+        userId: req.user.userId,
+        tipo: 'CUIDADO',
+        ahora,
+      });
+      if (enCooldown) {
+        const avance = prepararActualizacionExperiencia(
+          actual,
+          recompensa.experienciaOtorgada,
+          ahora,
+        );
+        const mascota = recompensa.experienciaOtorgada > 0
+          ? await tx.mascotaAmistad.update({
+            where: {
+              amistadId: amistad.id,
+              activa: true,
+              invitacionEstado: 'aceptada',
+            },
+            data: avance.data,
+          })
+          : actual;
+        return {
+          cooldown: true,
+          mascota: { ...mascota, experiencia: avance.progresion.experiencia },
+          progresion: avance.progresion,
+          recompensa,
+        };
       }
 
       let reto = actual.retoCooperativo;
@@ -427,12 +574,17 @@ async function responderCuidado(req, res, accion) {
         historial = agregarHito(historial, `Completaron un reto y llegaron a ${nuevoNivel} cariño`, ahora);
       }
 
+      const avance = prepararActualizacionExperiencia({
+        ...actual,
+        historialHitos: historial,
+      }, recompensa.experienciaOtorgada, ahora);
       const energiaActual = calcularEnergiaActual(actual, ahora);
       const data = {
         [campoCuidado]: ahora,
         energia: accion === 'jugar' ? recuperarEnergia(energiaActual) : energiaActual,
         retoCooperativo: reto,
         historialHitos: historial,
+        ...avance.data,
       };
       if (incrementoCarino > 0) data.nivelCarino = { increment: incrementoCarino };
 
@@ -444,7 +596,12 @@ async function responderCuidado(req, res, accion) {
         },
         data,
       });
-      return { cooldown: false, mascota };
+      return {
+        cooldown: false,
+        mascota: { ...mascota, experiencia: avance.progresion.experiencia },
+        progresion: avance.progresion,
+        recompensa,
+      };
     });
   } catch (error) {
     if (error?.code === 'P2025') {
@@ -458,9 +615,19 @@ async function responderCuidado(req, res, accion) {
   }
 
   if (resultado.cooldown) {
-    return res.status(429).json({
-      error: 'Tu próximo momento de cuidado estará disponible en menos de 24 horas',
-      mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId, { conRegalo: true }),
+    if (resultado.legacy) {
+      return res.status(429).json({
+        error: 'Tu próximo momento de cuidado estará disponible en menos de 24 horas',
+        mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId, { conRegalo: true }),
+      });
+    }
+    return res.json({
+      mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId, {
+        conRegalo: true,
+        progresion: resultado.progresion,
+      }),
+      ...respuestaExperiencia(resultado),
+      enCooldown: true,
     });
   }
 
@@ -473,7 +640,14 @@ async function responderCuidado(req, res, accion) {
     nombre: resultado.mascota.nombre,
   }));
 
-  return res.status(201).json({ mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId, { conRegalo: true }) });
+  return res.status(201).json({
+    mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId, {
+      conRegalo: true,
+      progresion: resultado.progresion,
+    }),
+    ...respuestaExperiencia(resultado),
+    enCooldown: false,
+  });
 }
 
 router.post('/:amistadId/alimentar', requireAuth, (req, res) => responderCuidado(req, res, 'alimentar'));

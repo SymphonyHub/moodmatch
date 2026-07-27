@@ -2,7 +2,7 @@ jest.mock('../lib/prisma', () => {
   const db = {
     friendship: { findFirst: jest.fn() },
     mascotaAmistad: { upsert: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
-    cheer: { findFirst: jest.fn(), create: jest.fn() },
+    cheer: { findFirst: jest.fn(), create: jest.fn(), count: jest.fn() },
     moodEntry: { findMany: jest.fn() },
   };
   db.$transaction = jest.fn((callback) => callback(db));
@@ -29,7 +29,7 @@ const token = jwt.sign({ userId: MY_USER_ID }, 'moodmatch-dev-secret');
 const friendToken = jwt.sign({ userId: FRIEND_ID }, 'moodmatch-dev-secret');
 const amistad = { id: AMISTAD_ID, userId: FRIEND_ID, friendId: MY_USER_ID };
 const mascota = {
-  id: 'pet-1', amistadId: AMISTAD_ID, nombre: 'Lumi', nivelCarino: 0, energia: 50,
+  id: 'pet-1', amistadId: AMISTAD_ID, nombre: 'Lumi', nivelCarino: 0, energia: 50, experiencia: 0,
   invitacionEstado: 'aceptada', activa: true, invitadaPor: FRIEND_ID,
 };
 
@@ -42,6 +42,7 @@ beforeEach(() => {
   prisma.mascotaAmistad.upsert.mockResolvedValue(mascota);
   prisma.mascotaAmistad.findUnique.mockResolvedValue(mascota);
   prisma.moodEntry.findMany.mockResolvedValue([]);
+  prisma.cheer.count.mockResolvedValue(0);
 });
 
 describe('GET /api/mascota/:amistadId', () => {

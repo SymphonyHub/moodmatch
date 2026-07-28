@@ -52,9 +52,11 @@ const mascotaDisponible = {
 
 const mockApiGetMascota = jest.fn();
 const mockApiCompletarMinijuegoMascota = jest.fn();
+const mockApiIniciarMinijuegoMascota = jest.fn();
 jest.mock('../services/api', () => ({
   apiGetMascota: (...args) => mockApiGetMascota(...args),
   apiCompletarMinijuegoMascota: (...args) => mockApiCompletarMinijuegoMascota(...args),
+  apiIniciarMinijuegoMascota: (...args) => mockApiIniciarMinijuegoMascota(...args),
   apiUpdateThemePreference: jest.fn().mockResolvedValue({}),
   apiUpdateMe: jest.fn().mockResolvedValue({}),
 }));
@@ -79,8 +81,24 @@ const montar = async (slug = 'atrapala') => {
   return renderer;
 };
 
+// Comenzar abre la partida contra el backend, asi que el press ya no es sincrono.
+const comenzar = async (renderer, etiqueta = 'Comenzar Atrápala') => {
+  await act(async () => {
+    renderer.root.findAllByProps({ accessibilityLabel: etiqueta })[0].props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+};
+
+const SESION = 'v1.cuerpo.firma';
+
 beforeEach(() => {
   mockFocusCleanup = null;
+  mockApiIniciarMinijuegoMascota.mockReset().mockResolvedValue({
+    sesion: SESION,
+    expiraEn: '2026-07-27T13:00:00.000Z',
+    duracionMinimaMs: 3000,
+  });
   mockApiGetMascota.mockReset().mockResolvedValue({ mascota: mascotaDisponible });
   mockApiCompletarMinijuegoMascota.mockReset().mockResolvedValue({
     mascota: {
@@ -104,8 +122,7 @@ beforeEach(() => {
 
 test('abre Atrápala, guarda el resultado del motor y muestra deltas efectivos', async () => {
   const renderer = await montar();
-  const comenzar = renderer.root.findAllByProps({ accessibilityLabel: 'Comenzar Atrápala' })[0];
-  act(() => comenzar.props.onPress());
+  await comenzar(renderer);
 
   await act(async () => {
     renderer.root.findByProps({ testID: 'atrapala-game' }).props.onPress();
@@ -113,10 +130,57 @@ test('abre Atrápala, guarda el resultado del motor y muestra deltas efectivos',
     await Promise.resolve();
   });
 
-  expect(mockApiCompletarMinijuegoMascota).toHaveBeenCalledWith('7', 'ATRAPALA', 4);
+  expect(mockApiIniciarMinijuegoMascota).toHaveBeenCalledWith('7', 'ATRAPALA');
+  expect(mockApiCompletarMinijuegoMascota).toHaveBeenCalledWith('7', 'ATRAPALA', 4, SESION);
   expect(renderer.root.findByProps({ children: '4 encuentros' })).toBeTruthy();
   expect(renderer.root.findByProps({ children: '+8 energía' })).toBeTruthy();
   expect(renderer.root.findByProps({ children: '+2 semillitas' })).toBeTruthy();
+  act(() => renderer.unmount());
+});
+
+test('sin ticket de partida no se juega y el aviso invita a volver a intentarlo', async () => {
+  mockApiIniciarMinijuegoMascota.mockRejectedValue(new Error('Network request failed'));
+  const renderer = await montar();
+  await comenzar(renderer);
+
+  expect(renderer.root.findAllByProps({ testID: 'atrapala-game' })).toHaveLength(0);
+  expect(renderer.root.findByProps({ children: 'El momento sigue aquí. Puedes intentar guardarlo otra vez sin repetir el juego.' })).toBeTruthy();
+  expect(renderer.root.findAllByProps({ accessibilityLabel: 'Comenzar Atrápala' }).length).toBeGreaterThan(0);
+  act(() => renderer.unmount());
+});
+
+test('si el juego ya se jugó desde otro dispositivo, abrir muestra el descanso', async () => {
+  const error = new Error('Este minijuego está tomando una pausa.');
+  error.status = 429;
+  error.codigo = 'EN_DESCANSO';
+  error.disponibleEn = '2026-07-28T12:00:00.000Z';
+  mockApiIniciarMinijuegoMascota.mockRejectedValue(error);
+
+  const renderer = await montar();
+  await comenzar(renderer);
+
+  expect(renderer.root.findByProps({ children: 'Ya hay una partida registrada para este juego' })).toBeTruthy();
+  expect(mockApiCompletarMinijuegoMascota).not.toHaveBeenCalled();
+  act(() => renderer.unmount());
+});
+
+test('un ticket rechazado no ofrece reintentar el mismo guardado', async () => {
+  const error = new Error('No pudimos registrar esta partida.');
+  error.status = 400;
+  error.codigo = 'SESION_INVALIDA';
+  mockApiCompletarMinijuegoMascota.mockRejectedValue(error);
+
+  const renderer = await montar();
+  await comenzar(renderer);
+  await act(async () => {
+    renderer.root.findByProps({ testID: 'atrapala-game' }).props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(renderer.root.findByProps({ children: 'El momento no quedó registrado' })).toBeTruthy();
+  expect(renderer.root.findAllByProps({ children: 'Intentar guardar otra vez' })).toHaveLength(0);
+  expect(mockApiGetMascota).toHaveBeenCalledTimes(1);
   act(() => renderer.unmount());
 });
 
@@ -127,10 +191,14 @@ test('un juego en cooldown muestra descanso y no ofrece comenzar', async () => {
   act(() => renderer.unmount());
 });
 
-test('sin contrato de cooldown mantiene una salida segura y no inicia a ciegas', async () => {
-  mockApiGetMascota.mockResolvedValue({ mascota: { ...mascotaDisponible, minijuegos: undefined } });
+test.each([
+  ['ausente', undefined],
+  ['a medias', { ATRAPALA: { puedeJugar: true, disponibleEn: null } }],
+])('con contrato de cooldown %s mantiene una salida segura y no inicia a ciegas', async (_, minijuegos) => {
+  mockApiGetMascota.mockResolvedValue({ mascota: { ...mascotaDisponible, minijuegos } });
   const renderer = await montar();
   expect(renderer.root.findByProps({ children: 'Los juegos se están preparando' })).toBeTruthy();
+  expect(mockApiIniciarMinijuegoMascota).not.toHaveBeenCalled();
   expect(mockApiCompletarMinijuegoMascota).not.toHaveBeenCalled();
   act(() => renderer.unmount());
 });
@@ -152,7 +220,7 @@ test('reconcilia el detalle si la red cae despues de que el backend confirma', a
   mockApiCompletarMinijuegoMascota.mockRejectedValue(new Error('Network request failed'));
 
   const renderer = await montar();
-  act(() => renderer.root.findAllByProps({ accessibilityLabel: 'Comenzar Atrápala' })[0].props.onPress());
+  await comenzar(renderer);
   await act(async () => {
     renderer.root.findByProps({ testID: 'atrapala-game' }).props.onPress();
     await Promise.resolve();
@@ -168,7 +236,7 @@ test('reconcilia el detalle si la red cae despues de que el backend confirma', a
 
 test('al perder foco desmonta el motor sin completar ni consumir cooldown', async () => {
   const renderer = await montar();
-  act(() => renderer.root.findAllByProps({ accessibilityLabel: 'Comenzar Atrápala' })[0].props.onPress());
+  await comenzar(renderer);
   expect(renderer.root.findByProps({ testID: 'atrapala-game' })).toBeTruthy();
 
   act(() => mockFocusCleanup());
@@ -190,7 +258,7 @@ test('en web no activa el falso positivo del lector y ofrece eleccion explicita'
         && typeof node.props.onPress === 'function'
     ))[0];
     act(() => selector.props.onPress());
-    act(() => renderer.root.findAllByProps({ accessibilityLabel: 'Comenzar Atrápala' })[0].props.onPress());
+    await comenzar(renderer);
     expect(renderer.root.findByProps({ accessibilityLabel: 'Atrápala accesible' })).toBeTruthy();
   } finally {
     if (renderer) act(() => renderer.unmount());

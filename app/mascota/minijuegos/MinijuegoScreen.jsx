@@ -8,7 +8,11 @@ import {
   router, Stack, useFocusEffect,
 } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { apiCompletarMinijuegoMascota, apiGetMascota } from '../../services/api';
+import {
+  apiCompletarMinijuegoMascota,
+  apiGetMascota,
+  apiIniciarMinijuegoMascota,
+} from '../../services/api';
 import { useMotionPrefs, useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Entrance from '../../components/Entrance';
 import Tappable from '../../components/Tappable';
@@ -24,6 +28,12 @@ import {
   resumenResultado,
   tipoDeSlug,
 } from './logica';
+import {
+  CODIGO_DESCANSO,
+  interpretarErrorMinijuego,
+  normalizarEstadosMinijuego,
+  recompensasVisibles,
+} from './contrato';
 
 const INSTRUCCIONES = {
   ATRAPALA: [
@@ -51,10 +61,12 @@ export default function MinijuegoScreen({ amistadId, slug }) {
   const [errorCarga, setErrorCarga] = useState('');
   const [intentoCarga, setIntentoCarga] = useState(0);
   const [iniciada, setIniciada] = useState(false);
+  const [iniciando, setIniciando] = useState(false);
+  const [errorInicio, setErrorInicio] = useState(null);
   const [resultadoLocal, setResultadoLocal] = useState(null);
   const [respuesta, setRespuesta] = useState(null);
   const [guardando, setGuardando] = useState(false);
-  const [errorGuardado, setErrorGuardado] = useState('');
+  const [errorGuardado, setErrorGuardado] = useState(null);
   const [conflictoCooldown, setConflictoCooldown] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [appActiva, setAppActiva] = useState(
@@ -63,6 +75,10 @@ export default function MinijuegoScreen({ amistadId, slug }) {
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
   const [modoAccesibleManual, setModoAccesibleManual] = useState(false);
   const guardandoRef = useRef(false);
+  const iniciandoRef = useRef(false);
+  // El ticket de partida no se pinta, así que vive en un ref: el callback del
+  // juego lo lee sin depender de qué render lo capturó.
+  const sesionRef = useRef(null);
 
   useFocusEffect(useCallback(() => {
     setIsFocused(true);
@@ -97,7 +113,12 @@ export default function MinijuegoScreen({ amistadId, slug }) {
     modoAccesibleManual,
   );
   useEffect(() => {
-    if (!pantallaActiva && iniciada && !resultadoLocal) setIniciada(false);
+    if (!pantallaActiva && iniciada && !resultadoLocal) {
+      // Abandonar la partida descarta su ticket: la próxima abre uno nuevo y
+      // el cooldown sigue sin consumirse.
+      sesionRef.current = null;
+      setIniciada(false);
+    }
   }, [iniciada, pantallaActiva, resultadoLocal]);
 
   useEffect(() => {
@@ -115,7 +136,7 @@ export default function MinijuegoScreen({ amistadId, slug }) {
         if (!activo) return;
         if (!data?.mascota) throw new Error(data?.error || 'Mascota no disponible');
         setMascota(data.mascota);
-        setCooldown(data.mascota.minijuegos?.[tipo] ?? null);
+        setCooldown(normalizarEstadosMinijuego(data.mascota.minijuegos)?.[tipo] ?? null);
       })
       .catch((error) => {
         if (activo) setErrorCarga(error.message || 'No se pudo abrir el juego.');
@@ -132,44 +153,52 @@ export default function MinijuegoScreen({ amistadId, slug }) {
     else router.replace(`/mascota/${amistadId}`);
   };
 
+  const anotarDescanso = (disponibleEn) => {
+    setCooldown({ puedeJugar: false, disponibleEn });
+    setConflictoCooldown(true);
+    setIniciada(false);
+    sesionRef.current = null;
+  };
+
   const guardarResultado = async (resultado) => {
     if (guardandoRef.current || !tipo) return;
     guardandoRef.current = true;
     setResultadoLocal(resultado);
     setGuardando(true);
-    setErrorGuardado('');
+    setErrorGuardado(null);
 
     try {
       const data = await apiCompletarMinijuegoMascota(
         amistadId,
         tipo,
         resultado.puntuacion,
+        sesionRef.current,
       );
       setMascota(data.mascota);
-      setCooldown(data.mascota.minijuegos?.[tipo] ?? {
-        puedeJugar: false,
-        disponibleEn: data.minijuego.disponibleEn,
-      });
+      setCooldown(data.mascota.minijuegos[tipo]);
       setRespuesta(data);
+      sesionRef.current = null;
     } catch (error) {
-      if (error.status === 429) {
-        setCooldown({ puedeJugar: false, disponibleEn: error.disponibleEn });
-        setConflictoCooldown(true);
-        setIniciada(false);
+      const guion = interpretarErrorMinijuego(error);
+      if (guion.codigo === CODIGO_DESCANSO) {
+        anotarDescanso(guion.disponibleEn);
       } else {
         // Un corte puede ocurrir después del commit. Antes de ofrecer otro POST,
         // refrescamos el detalle para no convertir un 201 perdido en un 429
-        // ambiguo ni hacer que la persona repita la partida.
+        // ambiguo ni hacer que la persona repita la partida. Solo tiene sentido
+        // cuando el fallo era de conexión: un ticket rechazado no cambia al
+        // reintentarlo.
         let confirmada = false;
-        if (!error.status || error.status >= 500) {
+        if (guion.reintentable) {
           try {
             const data = await apiGetMascota(amistadId);
-            const estado = data?.mascota?.minijuegos?.[tipo];
+            const estado = normalizarEstadosMinijuego(data?.mascota?.minijuegos)?.[tipo];
             if (estado?.puedeJugar === false) {
               setMascota(data.mascota);
               setCooldown(estado);
               setConflictoCooldown(true);
               setIniciada(false);
+              sesionRef.current = null;
               confirmada = true;
             }
           } catch {
@@ -177,7 +206,7 @@ export default function MinijuegoScreen({ amistadId, slug }) {
             // para reconciliar el detalle.
           }
         }
-        if (!confirmada) setErrorGuardado(error.message || 'No se pudo guardar la partida.');
+        if (!confirmada) setErrorGuardado(guion);
       }
     } finally {
       guardandoRef.current = false;
@@ -185,11 +214,30 @@ export default function MinijuegoScreen({ amistadId, slug }) {
     }
   };
 
-  const comenzar = () => {
+  // La partida se abre contra el backend: el ticket sella allí el instante de
+  // inicio. Sin ticket no se juega, porque el resultado no tendría dónde
+  // apoyarse al reportarse.
+  const comenzar = async () => {
+    if (iniciandoRef.current || !tipo) return;
+    iniciandoRef.current = true;
     setResultadoLocal(null);
     setRespuesta(null);
-    setErrorGuardado('');
-    setIniciada(true);
+    setErrorGuardado(null);
+    setErrorInicio(null);
+    setIniciando(true);
+
+    try {
+      const { sesion } = await apiIniciarMinijuegoMascota(amistadId, tipo);
+      sesionRef.current = sesion;
+      setIniciada(true);
+    } catch (error) {
+      const guion = interpretarErrorMinijuego(error);
+      if (guion.codigo === CODIGO_DESCANSO) anotarDescanso(guion.disponibleEn);
+      else setErrorInicio(guion);
+    } finally {
+      iniciandoRef.current = false;
+      setIniciando(false);
+    }
   };
 
   const estadoCooldown = estadoCooldownTarjeta(cooldown);
@@ -280,11 +328,7 @@ export default function MinijuegoScreen({ amistadId, slug }) {
   }
 
   if (respuesta && resumen) {
-    const recompensas = [
-      { key: 'energia', icono: 'flash', texto: `${respuesta.recompensa.energia} energía` },
-      { key: 'carino', icono: 'heart', texto: `${respuesta.recompensa.carino} cariño` },
-      { key: 'monedas', icono: 'leaf', texto: `${respuesta.recompensa.monedas} semillitas` },
-    ].filter(({ key }) => respuesta.recompensa[key] > 0);
+    const recompensas = recompensasVisibles(respuesta.recompensa);
 
     return (
       <ScrollView key="resultado" contentContainerStyle={styles.container}>
@@ -311,9 +355,9 @@ export default function MinijuegoScreen({ amistadId, slug }) {
 
           <View style={styles.recompensas}>
             {recompensas.map((item) => (
-              <View key={item.key} style={styles.recompensaChip}>
+              <View key={item.clave} style={styles.recompensaChip}>
                 <Ionicons name={item.icono} size={16} color={theme.colors.primary} />
-                <Text style={styles.recompensaTexto}>{`+${item.texto}`}</Text>
+                <Text style={styles.recompensaTexto}>{item.texto}</Text>
               </View>
             ))}
           </View>
@@ -334,25 +378,34 @@ export default function MinijuegoScreen({ amistadId, slug }) {
   }
 
   if (resultadoLocal) {
+    const reintentable = errorGuardado?.reintentable === true;
     return (
       <View style={styles.pantallaCentro}>
         {encabezado}
         {guardando ? (
           <ActivityIndicator size="large" color={theme.colors.primary} />
         ) : (
-          <Ionicons name="cloud-offline-outline" size={40} color={theme.colors.textFaint} />
+          <Ionicons
+            name={reintentable ? 'cloud-offline-outline' : 'paw-outline'}
+            size={40}
+            color={theme.colors.textFaint}
+          />
         )}
-        <Text style={styles.estadoTitulo}>{guardando ? 'Guardando el momento...' : 'El momento sigue aquí'}</Text>
-        <Text style={styles.estadoTexto}>
-          {guardando
-            ? 'Estamos sumando la recompensa de la partida.'
-            : `${errorGuardado} Puedes intentar guardarlo otra vez sin repetir el juego.`}
+        <Text style={styles.estadoTitulo}>
+          {guardando ? 'Guardando el momento...' : errorGuardado?.titulo}
         </Text>
-        {!guardando && (
+        <Text style={styles.estadoTexto}>
+          {guardando ? 'Estamos sumando la recompensa de la partida.' : errorGuardado?.mensaje}
+        </Text>
+        {!guardando && (reintentable ? (
           <Tappable style={styles.botonPrincipal} onPress={() => guardarResultado(resultadoLocal)}>
             <Text style={styles.botonPrincipalTexto}>Intentar guardar otra vez</Text>
           </Tappable>
-        )}
+        ) : (
+          <Tappable style={styles.botonPrincipal} onPress={volver} haptic={false}>
+            <Text style={styles.botonPrincipalTexto}>Volver con {mascota.nombre}</Text>
+          </Tappable>
+        ))}
       </View>
     );
   }
@@ -450,9 +503,30 @@ export default function MinijuegoScreen({ amistadId, slug }) {
           </Tappable>
         )}
 
-        <Tappable style={styles.botonPrincipal} onPress={comenzar} accessibilityLabel={`Comenzar ${juego.titulo}`}>
-          <Ionicons name="play" size={18} color={theme.colors.onPrimary} />
-          <Text style={styles.botonPrincipalTexto}>Comenzar</Text>
+        {errorInicio && (
+          <View style={styles.avisoInicio}>
+            <Ionicons name="cloud-offline-outline" size={17} color={theme.colors.textMuted} />
+            <Text style={styles.avisoInicioTexto}>
+              {`${errorInicio.titulo}. ${errorInicio.mensaje}`}
+            </Text>
+          </View>
+        )}
+
+        <Tappable
+          style={[styles.botonPrincipal, iniciando && styles.botonEsperando]}
+          onPress={comenzar}
+          disabled={iniciando}
+          accessibilityLabel={`Comenzar ${juego.titulo}`}
+          accessibilityState={{ disabled: iniciando, busy: iniciando }}
+        >
+          {iniciando ? (
+            <ActivityIndicator size="small" color={theme.colors.onPrimary} />
+          ) : (
+            <Ionicons name="play" size={18} color={theme.colors.onPrimary} />
+          )}
+          <Text style={styles.botonPrincipalTexto}>
+            {iniciando ? 'Preparando la partida...' : 'Comenzar'}
+          </Text>
         </Tappable>
       </Entrance>
     </ScrollView>
@@ -594,6 +668,21 @@ const useStyles = makeThemedStyles((t) => ({
     borderColor: t.colors.primarySoftBorder,
   },
   modoAccesibleTexto: { ...t.typography.fonts.semibold, fontSize: t.fontSize(13), color: t.colors.primary },
+  avisoInicio: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    padding: 11,
+    borderRadius: t.shape.radiusMd,
+    backgroundColor: t.colors.background,
+  },
+  avisoInicioTexto: {
+    flex: 1,
+    fontSize: t.fontSize(11),
+    lineHeight: Math.round(t.fontSize(11) * 1.45),
+    color: t.colors.textMuted,
+  },
   botonPrincipal: {
     minHeight: 50,
     flexDirection: 'row',
@@ -604,6 +693,7 @@ const useStyles = makeThemedStyles((t) => ({
     borderRadius: t.shape.radiusLg,
     backgroundColor: t.colors.primary,
   },
+  botonEsperando: { opacity: 0.75 },
   botonPrincipalTexto: { ...t.typography.fonts.semibold, fontSize: t.fontSize(14), color: t.colors.onPrimary },
   juegoCard: {
     padding: 18,

@@ -1,5 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../config';
+import {
+  validarRespuestaCompletar,
+  validarRespuestaIniciar,
+} from '../mascota/minijuegos/contrato';
 
 // Exportado para que los stores de datos (p.ej. friendsCountStore) gateen
 // por sesión sin duplicar la clave de AsyncStorage.
@@ -205,55 +209,46 @@ export const apiGetMascota = async (amistadId) => {
   return fetch(`${API_URL}/api/mascota/${amistadId}`, { headers }).then((r) => r.json());
 };
 
-// Finaliza una partida: el cliente reporta puntuación y el backend valida su
-// rango y decide recompensa/cooldown. A diferencia de las acciones antiguas de
-// mascota, lanza en !ok para conservar status/disponibilidad ante un 429.
-export const apiCompletarMinijuegoMascota = async (amistadId, tipo, puntuacion) => {
+// Los dos minijuegos hablan por este par de funciones y por contrato.js: el
+// shape de la petición y de la respuesta no se reescribe en cada pantalla. A
+// diferencia de las acciones antiguas de mascota, lanzan en !ok para conservar
+// status, código y disponibilidad.
+const errorMinijuego = (res, data) => {
+  const error = new Error(data?.error ?? 'No se pudo guardar la partida');
+  error.status = res.status;
+  error.codigo = typeof data?.codigo === 'string' ? data.codigo : null;
+  error.disponibleEn = data?.disponibleEn ?? null;
+  return error;
+};
+
+// Abre la partida. El backend sella el instante de inicio dentro del ticket
+// firmado; el cliente no aporta tiempo ni interpreta el ticket.
+export const apiIniciarMinijuegoMascota = async (amistadId, tipo) => {
+  const headers = await authHeaders();
+  const res = await fetch(
+    `${API_URL}/api/mascota/${amistadId}/minijuegos/${encodeURIComponent(tipo)}/iniciar`,
+    { method: 'POST', headers },
+  );
+  const data = await res.json();
+  if (!res.ok) throw errorMinijuego(res, data);
+  return validarRespuestaIniciar(data);
+};
+
+// Finaliza una partida: el cliente reporta puntuación y devuelve el ticket; el
+// backend valida rango, duración mínima y decide recompensa/cooldown.
+export const apiCompletarMinijuegoMascota = async (amistadId, tipo, puntuacion, sesion) => {
   const headers = await authHeaders();
   const res = await fetch(
     `${API_URL}/api/mascota/${amistadId}/minijuegos/${encodeURIComponent(tipo)}/completar`,
     {
       method: 'POST',
       headers,
-      body: JSON.stringify({ puntuacion }),
+      body: JSON.stringify({ puntuacion, sesion }),
     },
   );
   const data = await res.json();
-  if (!res.ok) {
-    const error = new Error(data?.error ?? 'No se pudo guardar la partida');
-    error.status = res.status;
-    error.disponibleEn = data?.disponibleEn ?? null;
-    throw error;
-  }
-  const cooldownValido = (estado) => {
-    if (!estado || typeof estado.puedeJugar !== 'boolean') return false;
-    if (estado.puedeJugar) return estado.disponibleEn === null;
-    return typeof estado.disponibleEn === 'string'
-      && Number.isFinite(new Date(estado.disponibleEn).getTime());
-  };
-  const recompensaValida = data?.recompensa
-    && ['energia', 'carino', 'monedas'].every(
-      (campo) => Number.isInteger(data.recompensa[campo]) && data.recompensa[campo] >= 0,
-    );
-  const contratoValido = data?.mascota
-    && Number.isInteger(data.mascota.energia)
-    && data.mascota.energia >= 0
-    && data.mascota.energia <= 100
-    && Number.isInteger(data.mascota.monedas)
-    && data.mascota.monedas >= 0
-    && cooldownValido(data.mascota.minijuegos?.ATRAPALA)
-    && cooldownValido(data.mascota.minijuegos?.RITMO_CARINO)
-    && data?.minijuego?.tipo === tipo
-    && data.minijuego.puntuacion === puntuacion
-    && typeof data.minijuego.completadoEn === 'string'
-    && Number.isFinite(new Date(data.minijuego.completadoEn).getTime())
-    && typeof data.minijuego.disponibleEn === 'string'
-    && Number.isFinite(new Date(data.minijuego.disponibleEn).getTime())
-    && recompensaValida;
-  if (!contratoValido) {
-    throw new Error('Respuesta inválida del minijuego');
-  }
-  return data;
+  if (!res.ok) throw errorMinijuego(res, data);
+  return validarRespuestaCompletar(data, { tipo, puntuacion });
 };
 
 // Mascotas activas y aceptadas del usuario ({ mascotas }), para la sección

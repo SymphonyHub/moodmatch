@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { View, Text } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme, makeThemedStyles } from '../../theme/ThemeContext';
 import Tappable from '../../components/Tappable';
 import { MINIJUEGOS, estadoCooldownTarjeta } from './logica';
+import { normalizarEstadosMinijuego } from './contrato';
 
 const ICONO_POR_TIPO = {
   ATRAPALA: 'paw',
@@ -14,7 +15,12 @@ const ICONO_POR_TIPO = {
 export default function SeccionMinijuegos({ mascota, onActualizar }) {
   const { theme } = useTheme();
   const styles = useStyles();
-  const cooldowns = mascota?.minijuegos;
+  // El memo conserva la identidad del objeto normalizado: sin él, el temporizador
+  // de reaparición se reiniciaría en cada render.
+  const cooldowns = useMemo(
+    () => normalizarEstadosMinijuego(mascota?.minijuegos),
+    [mascota?.minijuegos],
+  );
 
   useEffect(() => {
     if (!cooldowns || !onActualizar) return undefined;

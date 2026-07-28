@@ -30,6 +30,7 @@ import { planInactividad } from './inactividad';
 import { useRitmo } from './useRitmo';
 import FeedbackCarino from './FeedbackCarino';
 import ParticulasCaricia from './ParticulasCaricia';
+import CelebracionLottie from './CelebracionLottie';
 
 const AG = Animated.createAnimatedComponent(G);
 const timingRig = (toValue, config = {}) => withTiming(toValue, {
@@ -492,26 +493,50 @@ export default function MascotaAnimada({
           {renderNodos(escena.frente, 'fr')}
         </AG>
       </Svg>
+      {/* Corazones al acariciar y festejo al subir de etapa. Las dos van por
+          CelebracionLottie, que dibuja la animación importada si el binario trae
+          el módulo nativo y, si no, la pieza que ya existía — misma señal, mismo
+          momento, sin depender de un build nuevo. */}
       {!reduce && particulas.key > 0 && (
-        <ParticulasCaricia
+        <CelebracionLottie
           key={particulas.key}
+          tipo="corazones"
+          base={size}
           origen={{ x: particulas.x, y: particulas.y }}
-          size={size}
+          respaldo={(
+            <ParticulasCaricia
+              origen={{ x: particulas.x, y: particulas.y }}
+              size={size}
+            />
+          )}
+          testID="celebracion-caricia"
         />
       )}
       {Number(evento?.cantidad) > 0 && (
         <FeedbackCarino eventoKey={eventoKey} cantidad={evento.cantidad} />
       )}
       {fiesta && (
-        <Pressable
-          pointerEvents="none"
-          style={{
-            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-            alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <RecompensaCompletada categoria="social" size={Math.round(size * 0.5)} onFin={() => setFiesta(false)} />
-        </Pressable>
+        <CelebracionLottie
+          tipo="subida-nivel"
+          base={size}
+          onFin={() => setFiesta(false)}
+          respaldo={(
+            <Pressable
+              pointerEvents="none"
+              style={{
+                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <RecompensaCompletada
+                categoria="social"
+                size={Math.round(size * 0.5)}
+                onFin={() => setFiesta(false)}
+              />
+            </Pressable>
+          )}
+          testID="celebracion-fiesta"
+        />
       )}
     </Pressable>
   );

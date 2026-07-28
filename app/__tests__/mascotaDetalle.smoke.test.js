@@ -2,6 +2,9 @@ jest.mock('@expo/vector-icons/Ionicons', () => 'Ionicons');
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 24, bottom: 0, left: 0, right: 0 }),
+}));
 jest.mock('expo-router', () => {
   const React = require('react');
   return {
@@ -40,6 +43,7 @@ jest.mock('../services/api', () => ({
 
 import React from 'react';
 import { act, create } from 'react-test-renderer';
+import { StyleSheet } from 'react-native';
 import MascotaDetalleScreen from '../app/mascota/[amistadId]';
 import { ThemeProvider } from '../theme/ThemeContext';
 import { apiCuidarMascota, apiGetMascota } from '../services/api';
@@ -64,6 +68,10 @@ test('renderiza el detalle con sprite animado y grid de accesorios', async () =>
   expect(renderer.root.findByProps({ children: 'Cabeza' })).toBeTruthy();
   expect(renderer.root.findByProps({ children: 'Color y patrón' })).toBeTruthy();
   expect(renderer.root.findByProps({ children: 'Corona' })).toBeTruthy();
+  const volver = renderer.root.findByProps({ accessibilityLabel: 'Volver' });
+  const volverStyle = StyleSheet.flatten(volver.props.style);
+  expect(volverStyle.paddingTop).toBe(32);
+  expect(volverStyle.minHeight - volverStyle.paddingTop).toBe(44);
 
   act(() => renderer.unmount());
 });

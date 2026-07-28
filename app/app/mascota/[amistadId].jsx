@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, ActivityIndicator, TextInput, Modal,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   router, useFocusEffect, useLocalSearchParams, Stack,
 } from 'expo-router';
@@ -96,6 +97,7 @@ export default function MascotaDetalleScreen() {
   const { amistadId } = useLocalSearchParams();
   const { theme } = useTheme();
   const styles = useStyles();
+  const insets = useSafeAreaInsets();
 
   const [mascota, setMascota] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -140,7 +142,7 @@ export default function MascotaDetalleScreen() {
       const data = await request();
       if (data?.error) throw new Error(data.error);
       if (!data?.mascota) throw new Error('No se pudo actualizar a la mascota');
-      // Cuando el cariño sube (cuidado/reto/regalo) la mascota pone cara de
+      // Cuando el cariño sube por cuidado/regalo la mascota pone cara de
       // encantada y salta el confetti. `key` es lo que el rig usa para saber que
       // es un evento nuevo y no un re-render.
       const antes = Number(mascota?.nivelCarino);
@@ -148,7 +150,8 @@ export default function MascotaDetalleScreen() {
       const ganancia = Number.isFinite(antes) && Number.isFinite(despues)
         ? Math.max(0, despues - antes)
         : 0;
-      if (ganancia > 0) {
+      const accionConCarino = tipo === 'cuidado' || tipo === 'regalo';
+      if (accionConCarino && ganancia > 0) {
         setCelebracion((evento) => ({
           ...evento, key: evento.key + 1, cantidad: ganancia,
         }));
@@ -228,7 +231,10 @@ export default function MascotaDetalleScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.topBar}>
         <Tappable
-          style={styles.back}
+          style={[styles.back, {
+            paddingTop: insets.top + 8,
+            minHeight: insets.top + 8 + 44,
+          }]}
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/mascota'))}
           haptic={false}
           accessibilityLabel="Volver"
@@ -503,8 +509,8 @@ const useStyles = makeThemedStyles((t) => ({
     paddingBottom: 48,
   },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-  topBar: { width: '100%', paddingTop: 8, paddingBottom: 4 },
-  back: { width: 44, height: 44, justifyContent: 'center', alignItems: 'flex-start' },
+  topBar: { width: '100%', paddingBottom: 4 },
+  back: { width: 44, minHeight: 44, justifyContent: 'center', alignItems: 'flex-start' },
   errorEmoji: { fontSize: 40, marginBottom: 10 },
   errorTxt: { color: t.colors.textMuted, fontSize: t.fontSize(15), marginBottom: 16, textAlign: 'center' },
   btnReintentar: {

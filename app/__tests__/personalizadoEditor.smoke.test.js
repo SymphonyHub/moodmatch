@@ -172,6 +172,24 @@ test('la fuente es un carrusel: las flechas cambian la fuente activa', async () 
   act(() => renderer.unmount());
 });
 
+test('paletas, colores y fuente comparten un editor compacto horizontal', async () => {
+  const renderer = await renderEditorPersonalizado();
+  const lista = renderer.root.findByProps({ testID: 'lista-paletas-compacta' });
+  const controles = renderer.root.findByProps({ testID: 'controles-paleta-compactos' });
+
+  expect(lista.props.horizontal).toBe(true);
+  expect(controles.findByProps({ accessibilityLabel: 'Nombre de la paleta' })).toBeTruthy();
+  expect(controles.findByProps({ accessibilityLabel: 'Fuente siguiente' })).toBeTruthy();
+  const sliders = new Set(
+    controles
+      .findAll((n) => n.props.accessibilityRole === 'adjustable')
+      .map((n) => n.props.accessibilityLabel),
+  );
+  expect(sliders.size).toBe(7);
+
+  act(() => renderer.unmount());
+});
+
 test('el Fondo tiene matiz/saturación/luminosidad y las barras son accesibles (adjustable)', async () => {
   const renderer = await renderEditorPersonalizado();
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, View, Text, TextInput, useColorScheme } from 'react-native';
+import { Alert, ScrollView, View, Text, TextInput, useColorScheme } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -155,7 +155,12 @@ function ThemeOptionRow({ option, selected, onPress, customDraft }) {
 function SwatchRow({ colors, selected, onSelect, label }) {
   const styles = useStyles();
   return (
-    <View style={styles.swatchGrid}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={styles.swatchGrid}
+    >
       {colors.map((color) => {
         const isSelected = color === selected;
         return (
@@ -171,7 +176,7 @@ function SwatchRow({ colors, selected, onSelect, label }) {
           </Tappable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -234,33 +239,38 @@ function HexInput({ value, onChange, label }) {
 function ColorField({ label, value, onChange, swatches, sliderId, fondo = false }) {
   const styles = useStyles();
   return (
-    <View style={styles.swatchBlock}>
+    <View style={styles.colorField}>
       <View style={styles.colorHead}>
-        <Text style={styles.swatchLabel}>{label}</Text>
+        <Text style={[styles.swatchLabel, styles.labelSinMargen]}>{label}</Text>
         <View style={styles.hexWrap}>
           <HexInput value={value} onChange={onChange} label={label} />
           <View style={[styles.colorPreview, { backgroundColor: value }]} />
         </View>
       </View>
-      <Text style={styles.sliderCap}>Matiz</Text>
-      <HueBar value={value} onChange={onChange} id={sliderId} label={`Matiz de ${label}`} />
-      {fondo ? (
-        <>
-          <View style={styles.sliderGap} />
-          <Text style={styles.sliderCap}>Saturación</Text>
-          <SatBar value={value} onChange={onChange} id={sliderId} label={`Saturación de ${label}`} />
-        </>
-      ) : null}
-      <View style={styles.sliderGap} />
-      <Text style={styles.sliderCap}>Luminosidad</Text>
-      <LumBar
-        value={value}
-        onChange={onChange}
-        id={sliderId}
-        label={`Luminosidad de ${label}`}
-        fondo={fondo}
-      />
-      <View style={styles.sliderGap} />
+
+      <View style={styles.sliderGrid}>
+        <View style={styles.sliderCell}>
+          <Text style={styles.sliderCap}>Matiz</Text>
+          <HueBar value={value} onChange={onChange} id={sliderId} label={`Matiz de ${label}`} />
+        </View>
+        {fondo ? (
+          <View style={styles.sliderCell}>
+            <Text style={styles.sliderCap}>Saturación</Text>
+            <SatBar value={value} onChange={onChange} id={sliderId} label={`Saturación de ${label}`} />
+          </View>
+        ) : null}
+        <View style={styles.sliderCell}>
+          <Text style={styles.sliderCap}>Luminosidad</Text>
+          <LumBar
+            value={value}
+            onChange={onChange}
+            id={sliderId}
+            label={`Luminosidad de ${label}`}
+            fondo={fondo}
+          />
+        </View>
+      </View>
+
       <SwatchRow colors={swatches} selected={value} onSelect={onChange} label={label} />
     </View>
   );
@@ -278,8 +288,11 @@ function FontPicker({ selected, onSelect }) {
   const go = (delta) => onSelect(BODY_FONT_IDS[(idx + delta + total) % total]);
 
   return (
-    <View style={styles.swatchBlock}>
-      <Text style={styles.swatchLabel}>Fuente</Text>
+    <View style={styles.fontBlock}>
+      <View style={styles.fontHead}>
+        <Text style={[styles.swatchLabel, styles.labelSinMargen]}>Fuente</Text>
+        <Text style={styles.fontStageCount}>{idx + 1} / {total}</Text>
+      </View>
       <View style={styles.fontCarousel}>
         <Tappable
           style={styles.fontArrow}
@@ -297,14 +310,8 @@ function FontPicker({ selected, onSelect }) {
           <Text style={[styles.fontStageName, { fontFamily: font.bodyFamily }]} numberOfLines={1}>
             {font.label}
           </Text>
-          <Text style={styles.fontStageTag} numberOfLines={1}>
-            {font.tagline}
-          </Text>
           <Text style={[styles.fontStageSample, { fontFamily: font.bodyFamily }]} numberOfLines={1}>
             Hoy me siento en calma
-          </Text>
-          <Text style={styles.fontStageCount}>
-            {idx + 1} / {total}
           </Text>
         </View>
 
@@ -325,53 +332,64 @@ function FontPicker({ selected, onSelect }) {
 function PaletteList({ palettes, draftId, activeId, applied, onSelect, onDelete, onNew }) {
   const styles = useStyles();
   return (
-    <View style={styles.swatchBlock}>
-      <Text style={styles.swatchLabel}>Mis paletas</Text>
-      {palettes.map((p) => {
-        const isDraft = p.id === draftId;
-        const enUso = applied && p.id === activeId;
-        return (
-          <View key={p.id} style={[styles.palRow, isDraft && styles.palRowSelected]}>
-            <Tappable
-              style={styles.palMain}
-              onPress={() => onSelect(p)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: isDraft }}
-              accessibilityLabel={`Paleta ${p.name}${enUso ? ', en uso' : ''}`}
-            >
-              <View style={styles.palSwatches}>
-                {[p.primary, p.background, p.accent].map((c, i) => (
-                  <View key={`${c}-${i}`} style={[styles.palSwatch, { backgroundColor: c }]} />
-                ))}
-              </View>
-              <View style={styles.palInfo}>
-                <Text style={styles.palName} numberOfLines={1}>{p.name}</Text>
-                <Text style={styles.palFont}>
-                  {BODY_FONTS[p.bodyFont]?.label ?? p.bodyFont}
-                  {enUso ? '  ·  en uso' : ''}
-                </Text>
-              </View>
-            </Tappable>
-            {palettes.length > 1 ? (
+    <View style={styles.paletteSection}>
+      <View style={styles.paletteSectionHead}>
+        <Text style={[styles.swatchLabel, styles.labelSinMargen]}>Mis paletas</Text>
+        {palettes.length < MAX_PALETAS ? (
+          <Tappable style={styles.palNew} onPress={onNew} accessibilityLabel="Crear paleta nueva">
+            <Text style={styles.palNewTxt}>＋ Nueva</Text>
+          </Tappable>
+        ) : (
+          <Text style={styles.palLimit}>Máximo {MAX_PALETAS}</Text>
+        )}
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.paletteStrip}
+        testID="lista-paletas-compacta"
+      >
+        {palettes.map((p) => {
+          const isDraft = p.id === draftId;
+          const enUso = applied && p.id === activeId;
+          return (
+            <View key={p.id} style={[styles.palRow, isDraft && styles.palRowSelected]}>
               <Tappable
-                style={styles.palDelete}
-                onPress={() => onDelete(p.id)}
-                haptic={false}
-                accessibilityLabel={`Borrar paleta ${p.name}`}
+                wrapperStyle={styles.palMainWrap}
+                style={styles.palMain}
+                onPress={() => onSelect(p)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: isDraft }}
+                accessibilityLabel={`Paleta ${p.name}${enUso ? ', en uso' : ''}`}
               >
-                <Text style={styles.palDeleteTxt}>Borrar</Text>
+                <View style={styles.palSwatches}>
+                  {[p.primary, p.background, p.accent].map((c, i) => (
+                    <View key={`${c}-${i}`} style={[styles.palSwatch, { backgroundColor: c }]} />
+                  ))}
+                </View>
+                <View style={styles.palInfo}>
+                  <Text style={styles.palName} numberOfLines={1}>{p.name}</Text>
+                  <Text style={styles.palFont} numberOfLines={1}>
+                    {BODY_FONTS[p.bodyFont]?.label ?? p.bodyFont}
+                    {enUso ? '  ·  en uso' : ''}
+                  </Text>
+                </View>
               </Tappable>
-            ) : null}
-          </View>
-        );
-      })}
-      {palettes.length < MAX_PALETAS ? (
-        <Tappable style={styles.palNew} onPress={onNew} accessibilityLabel="Crear paleta nueva">
-          <Text style={styles.palNewTxt}>＋ Nueva paleta</Text>
-        </Tappable>
-      ) : (
-        <Text style={styles.palLimit}>Máximo {MAX_PALETAS} paletas guardadas.</Text>
-      )}
+              {palettes.length > 1 ? (
+                <Tappable
+                  style={styles.palDelete}
+                  onPress={() => onDelete(p.id)}
+                  haptic={false}
+                  accessibilityLabel={`Borrar paleta ${p.name}`}
+                >
+                  <Text style={styles.palDeleteTxt}>Borrar</Text>
+                </Tappable>
+              ) : null}
+            </View>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
@@ -408,7 +426,7 @@ function CustomThemeEditor({
 }) {
   const styles = useStyles();
   return (
-    <View style={styles.editor}>
+    <>
       <PaletteList
         palettes={palettes}
         draftId={draft.id}
@@ -419,57 +437,63 @@ function CustomThemeEditor({
         onNew={onNewPalette}
       />
 
-      <View style={styles.swatchBlock}>
-        <Text style={styles.swatchLabel}>Nombre</Text>
-        <TextInput
-          style={styles.nameInput}
-          value={draft.name}
-          onChangeText={onRename}
-          maxLength={NAME_MAX}
-          placeholder="Mi paleta"
-          placeholderTextColor={styles.placeholder.color}
-          accessibilityLabel="Nombre de la paleta"
+      <View style={styles.paletteControlsCard} testID="controles-paleta-compactos">
+        <View style={styles.nameRow}>
+          <Text style={[styles.swatchLabel, styles.labelSinMargen]}>Nombre</Text>
+          <TextInput
+            style={styles.nameInput}
+            value={draft.name}
+            onChangeText={onRename}
+            maxLength={NAME_MAX}
+            placeholder="Mi paleta"
+            placeholderTextColor={styles.placeholder.color}
+            accessibilityLabel="Nombre de la paleta"
+          />
+        </View>
+
+        <View style={styles.controlDivider} />
+        <ColorField
+          label="Primario"
+          value={draft.primary}
+          onChange={(primary) => onChangeConfig({ primary })}
+          swatches={SWATCHES.primary}
+          sliderId="primary"
         />
+        <View style={styles.controlDivider} />
+        <ColorField
+          label="Acento"
+          value={draft.accent}
+          onChange={(accent) => onChangeConfig({ accent })}
+          swatches={SWATCHES.accent}
+          sliderId="accent"
+        />
+        <View style={styles.controlDivider} />
+        <ColorField
+          label="Fondo"
+          value={draft.background}
+          onChange={(background) => onChangeConfig({ background })}
+          swatches={SWATCHES.background}
+          sliderId="background"
+          fondo
+        />
+        <View style={styles.controlDivider} />
+        <FontPicker
+          selected={draft.bodyFont}
+          onSelect={(bodyFont) => onChangeConfig({ bodyFont })}
+        />
+
+        <ContrastHint issues={contrastIssues} />
+
+        <Tappable
+          style={[styles.btnGuardar, !canSave && styles.btnGuardarDisabled]}
+          onPress={onSavePalette}
+          disabled={!canSave}
+          accessibilityLabel="Guardar paleta"
+        >
+          <Text style={styles.btnGuardarTxt}>Guardar paleta</Text>
+        </Tappable>
       </View>
-
-      <ColorField
-        label="Primario"
-        value={draft.primary}
-        onChange={(primary) => onChangeConfig({ primary })}
-        swatches={SWATCHES.primary}
-        sliderId="primary"
-      />
-      <ColorField
-        label="Acento"
-        value={draft.accent}
-        onChange={(accent) => onChangeConfig({ accent })}
-        swatches={SWATCHES.accent}
-        sliderId="accent"
-      />
-      <ColorField
-        label="Fondo"
-        value={draft.background}
-        onChange={(background) => onChangeConfig({ background })}
-        swatches={SWATCHES.background}
-        sliderId="background"
-        fondo
-      />
-      <FontPicker
-        selected={draft.bodyFont}
-        onSelect={(bodyFont) => onChangeConfig({ bodyFont })}
-      />
-
-      <ContrastHint issues={contrastIssues} />
-
-      <Tappable
-        style={[styles.btnGuardar, !canSave && styles.btnGuardarDisabled]}
-        onPress={onSavePalette}
-        disabled={!canSave}
-        accessibilityLabel="Guardar paleta"
-      >
-        <Text style={styles.btnGuardarTxt}>Guardar paleta</Text>
-      </Tappable>
-    </View>
+    </>
   );
 }
 
@@ -813,21 +837,34 @@ const useStyles = makeThemedStyles((t) => ({
   optionTagline: { fontSize: t.fontSize(12), color: t.colors.textMuted },
   swatches: { flexDirection: 'row', gap: 4, marginLeft: 10 },
   swatch: { width: 18, height: 18, borderRadius: 9, borderWidth: 1, borderColor: swatchStroke(t) },
-  editor: {
-    marginBottom: 16,
+  paletteSection: { marginTop: 16, marginBottom: 12 },
+  paletteSectionHead: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  paletteStrip: { gap: 8, paddingVertical: 4, paddingRight: 4 },
+  paletteControlsCard: {
     borderRadius: t.shape.radiusLg,
     borderWidth: t.shape.borderThin,
     borderColor: t.colors.border,
-    backgroundColor: t.colors.background,
-    padding: 14,
+    backgroundColor: t.colors.surfaceElevated,
+    padding: 12,
+    marginBottom: 16,
+    ...t.shadows.card,
   },
-  swatchBlock: { marginBottom: 18 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  controlDivider: { height: t.shape.borderThin, backgroundColor: t.colors.border, marginVertical: 12 },
+  colorField: { minWidth: 0 },
   swatchLabel: {
     fontSize: t.fontSize(13),
     ...t.typography.fonts.semibold,
     color: t.colors.text,
     marginBottom: 8,
   },
+  labelSinMargen: { marginBottom: 0 },
   colorHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   hexWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   hexInput: {
@@ -852,11 +889,11 @@ const useStyles = makeThemedStyles((t) => ({
   sliderCap: {
     fontSize: t.fontSize(11),
     color: t.colors.textMuted,
-    marginBottom: 6,
-    marginTop: 4,
+    marginBottom: 2,
   },
-  sliderGap: { height: 10 },
-  swatchGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  sliderGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+  sliderCell: { flexGrow: 1, flexBasis: 132, minWidth: 124 },
+  swatchGrid: { flexDirection: 'row', gap: 4, paddingRight: 4 },
   swatchOuter: {
     width: 44,
     height: 44,
@@ -875,6 +912,7 @@ const useStyles = makeThemedStyles((t) => ({
     borderColor: swatchStroke(t),
   },
   nameInput: {
+    flex: 1,
     ...t.typography.type.body,
     color: t.colors.text,
     backgroundColor: t.colors.surface,
@@ -885,7 +923,15 @@ const useStyles = makeThemedStyles((t) => ({
     paddingVertical: 10,
   },
   placeholder: { color: t.colors.textFaint },
-  fontCarousel: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  fontBlock: { minWidth: 0 },
+  fontHead: {
+    minHeight: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  fontCarousel: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   fontArrow: {
     width: 44,
     height: 44,
@@ -898,45 +944,42 @@ const useStyles = makeThemedStyles((t) => ({
   },
   fontStage: {
     flex: 1,
-    minHeight: 104,
+    minHeight: 72,
     borderRadius: t.shape.radiusLg,
-    borderWidth: t.shape.borderThick,
+    borderWidth: t.shape.borderMedium,
     borderColor: t.colors.primary,
     backgroundColor: t.colors.surface,
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    ...t.shadows.card,
+    paddingVertical: 9,
+    paddingHorizontal: 11,
   },
-  fontStageName: { fontSize: t.fontSize(22), color: t.colors.text },
-  fontStageTag: { fontSize: t.fontSize(12), color: t.colors.textMuted, marginTop: 3 },
-  fontStageSample: { fontSize: t.fontSize(15), color: t.colors.text, marginTop: 10 },
+  fontStageName: { fontSize: t.fontSize(18), color: t.colors.text },
+  fontStageSample: { fontSize: t.fontSize(13), color: t.colors.textMuted, marginTop: 5 },
   fontStageCount: {
     fontSize: t.fontSize(11),
     ...t.typography.fonts.semibold,
     color: t.colors.primary,
-    marginTop: 10,
   },
   palRow: {
+    width: 252,
+    minHeight: 76,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: t.colors.surface,
     borderRadius: t.shape.radiusMd,
     borderWidth: t.shape.borderThin,
     borderColor: t.colors.border,
-    marginBottom: 8,
   },
   palRowSelected: { borderColor: t.colors.primary, borderWidth: t.shape.borderThick },
+  palMainWrap: { flex: 1 },
   palMain: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 9,
     paddingHorizontal: 10,
   },
-  palSwatches: { flexDirection: 'row', gap: 4, marginRight: 10 },
-  palSwatch: { width: 22, height: 22, borderRadius: 11, borderWidth: 1, borderColor: swatchStroke(t) },
+  palSwatches: { flexDirection: 'row', gap: 3, marginRight: 9 },
+  palSwatch: { width: 18, height: 18, borderRadius: 9, borderWidth: 1, borderColor: swatchStroke(t) },
   palInfo: { flex: 1, minWidth: 0 },
   palName: {
     fontSize: t.fontSize(14),
@@ -944,24 +987,33 @@ const useStyles = makeThemedStyles((t) => ({
     color: t.colors.text,
   },
   palFont: { fontSize: t.fontSize(11), color: t.colors.textMuted, marginTop: 1 },
-  palDelete: { minHeight: 44, paddingHorizontal: 12, justifyContent: 'center' },
-  palDeleteTxt: { fontSize: t.fontSize(12), color: t.colors.danger },
+  palDelete: {
+    alignSelf: 'stretch',
+    minWidth: 58,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderLeftWidth: t.shape.borderThin,
+    borderLeftColor: t.colors.border,
+  },
+  palDeleteTxt: { fontSize: t.fontSize(11), color: t.colors.danger },
   palNew: {
     borderWidth: t.shape.borderMedium,
     borderColor: t.colors.primarySoftBorder,
     borderRadius: t.shape.radiusMd,
     minHeight: 44,
+    paddingHorizontal: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 2,
   },
-  palNewTxt: { fontSize: t.fontSize(14), ...t.typography.fonts.semibold, color: t.colors.primary },
-  palLimit: { fontSize: t.fontSize(12), color: t.colors.textMuted, marginTop: 2 },
+  palNewTxt: { fontSize: t.fontSize(12), ...t.typography.fonts.semibold, color: t.colors.primary },
+  palLimit: { fontSize: t.fontSize(11), color: t.colors.textMuted },
   btnGuardar: {
     backgroundColor: t.colors.accent,
     borderRadius: t.shape.radiusMd,
     paddingVertical: 13,
     alignItems: 'center',
+    marginTop: 12,
   },
   btnGuardarDisabled: { backgroundColor: t.colors.primaryDisabled },
   btnGuardarTxt: {
@@ -989,7 +1041,7 @@ const useStyles = makeThemedStyles((t) => ({
     marginBottom: 8,
   },
   a11yGap: { height: 6 },
-  contrastHint: { ...t.typography.type.caption, color: t.colors.textMuted, marginBottom: 14 },
+  contrastHint: { ...t.typography.type.caption, color: t.colors.textMuted, marginTop: 12 },
   aboutRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   aboutLabel: { ...t.typography.type.body, color: t.colors.text },
   aboutValue: { ...t.typography.type.caption, color: t.colors.textMuted },

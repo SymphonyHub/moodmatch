@@ -113,12 +113,52 @@ Aplica la guía de estilo (sección 2) sobre las 7 especies existentes y su rig 
 
 ## 6. Bloque 2 — Segunda estadística: energía
 
-- Separar el botón actual "Alimentar y jugar" en dos acciones reales: **Alimentar** (sube cariño, como hoy) y **Jugar** (sube una estadística nueva, "energía")
-- Estado "cansada/con sueño" cuando la energía está baja — **nunca** se ve enferma o triste, solo más calmada, con pose de siesta. Mismo principio de tono que "necesita atención": nunca culpabilizante
-- Animación de "comer" real y distintiva (mordisco/masticada) en vez de un salto genérico de reacción
+> **Cambio de dirección (2026-07-28, aprobado por el usuario):** la energía dejó
+> de ser una barra que *se desgasta por abandono* y pasó a ser **estamina**: se
+> regenera sola con el paso del tiempo y se gasta al hacer actividades. El motivo
+> es de tono además de mecánica — con desgaste, una barra baja significa "la
+> abandonaron", que es exactamente el reproche que esta fase prohíbe; con
+> estamina significa "jugó mucho, está descansando".
+
+- Separar el botón actual "Alimentar y jugar" en dos acciones reales:
+  **Alimentar** (sube cariño, como hoy, y es gratis) y **Jugar** (gasta energía)
+- La energía **se recarga sola**: +2 puntos cada 5 minutos hasta un máximo de
+  100. Nadie tiene que "cuidarla" para que suba, y el tiempo nunca la baja
+- Costos: alimentar y acariciar 0, jugar 15, minijuego 20. Con el saldo por
+  debajo del costo la acción no arranca: no hay saldo negativo ni deuda
+- Estado "cansada/con sueño" cuando la energía está baja — **nunca** se ve
+  enferma o triste, solo más calmada, con pose de siesta. Mismo principio de
+  tono que "necesita atención": nunca culpabilizante
+- Animación de "comer" real y distintiva (mordisco/masticada) en vez de un salto
+  genérico de reacción
 - Posible sexto estado de animación en el rig (a definir en el plan del agente)
 
-**Backend:** campo nuevo aditivo en `MascotaAmistad` (algo como `energia Int @default(50)`), migración simple siguiendo el protocolo de siempre (`--create-only`, revisar SQL, confirmar antes de aplicar).
+**Backend (implementado, Agente A):** el campo `energia Int @default(50)` de
+`MascotaAmistad` ya existe y **no hace falta ninguna migración nueva**: el modelo
+de estamina cambia cómo se interpreta la columna, no su forma. La recarga se
+deriva de `updatedAt`, así que toda escritura a `MascotaAmistad` materializa la
+energía regenerada — si una escritura ajena (renombrar, equipar un accesorio,
+sumar cariño) moviera `updatedAt` sin hacerlo, se comería la recarga acumulada.
+
+Contrato expuesto por `GET /api/mascota/:amistadId` y `GET /api/mascota/estado`:
+
+| Campo | Significado |
+| --- | --- |
+| `energiaActual` | Saldo entero [0-100] ya regenerado |
+| `energiaMaxima` | 100 |
+| `segundosSiguienteRecarga` | Segundos hasta el próximo punto (0 si está llena) |
+| `segundosRecargaTotal` | Segundos hasta llegar a 100 (0 si está llena) |
+| `estadoEnergia` | `LLENO` / `DISPONIBLE` / `CRITICO` / `AGOTADO` |
+| `costosEnergia` | Costo de cada acción, para que la UI no lo hardcodee |
+| `cansada`, `poseEnergia` | Lectura de tono para el rig (`siesta` / `normal`) |
+
+El gasto es atómico: lectura, validación y descuento ocurren dentro de la misma
+transacción `Serializable` (con reintento ante `P2034`), y el rechazo por saldo
+corta **antes** de escribir nada — ni experiencia ni marcador de recompensa.
+Cuando no alcanza, la respuesta es **422** con
+`{ error: 'ENERGIA_INSUFICIENTE', energiaActual, energiaRequerida }` más la
+mascota, para que el cliente pinte la barra y el contador sin pedir el estado
+otra vez.
 
 ---
 
@@ -126,14 +166,25 @@ Aplica la guía de estilo (sección 2) sobre las 7 especies existentes y su rig 
 
 Dos minijuegos simples, reutilizando la base de animación ya pulida en el Bloque 1:
 
-- **"Atrápala"**: la mascota aparece brevemente en un punto al azar de la pantalla, se toca antes de que se esconda. Sube energía + moneda nueva (ver Bloque 4).
-- **"Ritmo de cariño"**: una barra con un indicador que se mueve, se toca cuando cae en la zona marcada. Sube cariño + moneda.
+- **"Atrápala"**: la mascota aparece brevemente en un punto al azar de la pantalla, se toca antes de que se esconda. Cuesta 20 de energía; da experiencia + moneda nueva (ver Bloque 4).
+- **"Ritmo de cariño"**: una barra con un indicador que se mueve, se toca cuando cae en la zona marcada. Cuesta 20 de energía; da experiencia + moneda.
 
 Cada minijuego con su propia micro-animación de éxito (extendiendo el sistema de partículas de Fase 14 con variaciones de color/forma, no construyendo uno nuevo por juego).
 
-**Cooldown suave**: una vez al día por persona por minijuego — coherente con el principio de "sin presión" de toda la app. A diferencia de Pou (pensado para juego repetitivo sin límite, porque vende moneda real), esta app no tiene monetización y no debería incentivar juego compulsivo.
+**Doble freno, a propósito**: el cooldown diario (una vez al día por persona por
+minijuego) sigue siendo el límite principal, y la estamina es el freno de ritmo
+dentro de una misma sesión. Los dos apuntan al mismo principio de "sin presión":
+a diferencia de Pou (pensado para juego repetitivo sin límite, porque vende
+moneda real), esta app no tiene monetización y no debería incentivar juego
+compulsivo. La estamina se agota jugando, no por dejar de jugar — quedarse sin
+barra nunca es un castigo por ausencia.
 
-**Backend:** tracking de cooldown puede resolverse igual que el límite semanal de regalos en Fase 14 (marcador en `Cheer`, sin necesidad de migración) — el agente confirma el enfoque en su plan antes de escribir código.
+**Backend (implementado, Agente A):** el cooldown diario se resuelve igual que el
+límite semanal de regalos en Fase 14 (marcador en `Cheer`, sin migración). El
+gasto de estamina se valida antes de reclamar la recompensa, así que un minijuego
+sin saldo responde 422 sin dejar rastro. Si el límite diario ya agotó la
+experiencia pero la persona vuelve a jugar, la estamina **sí** se cobra: la
+actividad ocurrió.
 
 ---
 

@@ -2,6 +2,7 @@ const router = require('express').Router();
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { mascotaAceptada } = require('../lib/mascota');
+const { datosEnergia } = require('../lib/energiaMascota');
 const {
   prepararActualizacionExperiencia,
   reclamarRecompensaDiaria,
@@ -90,7 +91,9 @@ async function recompensarMascotasPorAnimo(db, userId, ahora) {
     if (recompensa.experienciaOtorgada > 0) {
       await db.mascotaAmistad.update({
         where: { amistadId: amistad.id },
-        data: avance.data,
+        // Registrar el ánimo mueve `updatedAt`, así que la escritura arrastra la
+        // energía ya regenerada para no perder la recarga acumulada.
+        data: { ...avance.data, ...datosEnergia(mascota, ahora) },
       });
     }
     resultados.push({

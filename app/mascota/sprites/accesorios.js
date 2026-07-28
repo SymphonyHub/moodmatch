@@ -9,6 +9,9 @@
 
 import { elip, circ, path } from './geometria';
 import { GOLD, CORAL, GLOW } from './paletas';
+import {
+  ACCESORIOS_BASE_EQUIPABLES, dibujarAccesorioEquipable, esAccesorioBase,
+} from './accesorios/catalogoBase';
 
 // [cabezaX, cabezaY] = dónde se apoya un sombrero; [cuerpoX, cuerpoY, r] = zona
 // del cuerpo donde cae un patrón de color. Recalibradas en Fase 17: las siete
@@ -83,22 +86,57 @@ const COLOR = {
 // Metadata para el grid del slot de accesorios (nombre + pista de desbloqueo).
 // Las pistas reflejan las reglas de backend/lib/accesorios.js; los ids deben
 // coincidir con el catálogo del backend (verificado por la prueba de paridad).
+//
+// Los de nivel llevan también el número, que la tienda y el vestidor muestran
+// sin tener que interpretar el texto.
+const nivelDe = (n) => ({ nivel: n, pista: `Nivel ${n} de cariño` });
+
+// Los cuatro diseños del catálogo base (con sus variantes de color) se dibujan
+// en accesorios/catalogoBase.js y no acá: vienen de arte importado, no de
+// geometría escrita a mano. Su desbloqueo es el mismo mecanismo que el resto.
+const NIVEL_BASE = {
+  lazo: 4,
+  'lentes-sol': 8,
+  'sombrero-fiesta': 12,
+  'lentes-sol-b': 18,
+  'gorrito-noche': 20,
+  'sombrero-fiesta-b': 26,
+  'gorrito-noche-b': 30,
+};
+
+const CATALOGO_BASE = ACCESORIOS_BASE_EQUIPABLES.map(({ id, nombre, descripcion }) => ({
+  id,
+  categoria: 'cabeza',
+  nombre,
+  descripcion,
+  ...nivelDe(NIVEL_BASE[id]),
+}));
+
 export const CATALOGO_ACCESORIOS = [
-  { id: 'gorrito', categoria: 'cabeza', nombre: 'Gorrito', pista: 'Nivel 6 de cariño' },
-  { id: 'bufanda', categoria: 'cabeza', nombre: 'Bufanda', pista: 'Nivel 16 de cariño' },
-  { id: 'corona', categoria: 'cabeza', nombre: 'Corona', pista: 'Nivel 36 de cariño' },
+  { id: 'gorrito', categoria: 'cabeza', nombre: 'Gorrito', ...nivelDe(6) },
+  { id: 'bufanda', categoria: 'cabeza', nombre: 'Bufanda', ...nivelDe(16) },
+  { id: 'corona', categoria: 'cabeza', nombre: 'Corona', ...nivelDe(36) },
   { id: 'flor', categoria: 'cabeza', nombre: 'Flor', pista: 'Completen un reto juntos' },
-  { id: 'lunares', categoria: 'color', nombre: 'Lunares', pista: 'Nivel 10 de cariño' },
-  { id: 'estrellas', categoria: 'color', nombre: 'Estrellas', pista: 'Nivel 24 de cariño' },
-  { id: 'aura', categoria: 'color', nombre: 'Aura', pista: 'Nivel 40 de cariño' },
+  ...CATALOGO_BASE,
+  { id: 'lunares', categoria: 'color', nombre: 'Lunares', ...nivelDe(10) },
+  { id: 'estrellas', categoria: 'color', nombre: 'Estrellas', ...nivelDe(24) },
+  { id: 'aura', categoria: 'color', nombre: 'Aura', ...nivelDe(40) },
 ];
 
 // Devuelve { cabeza:[nodos], color:[nodos] } para los ids equipados (o vacíos).
+// La ranura de cabeza acepta dos familias de dibujo: la geométrica de acá y la
+// del catálogo base (arte importado). Se resuelve por id, así que quien equipa
+// no necesita saber de dónde sale el dibujo.
 export function dibujarAccesorios({
   especie, paleta, cabeza, color,
 }) {
   const { cabeza: [hx, hy], cuerpo: [bx, by, br] } = anclas(especie);
-  const cabezaNodos = cabeza && CABEZA[cabeza] ? CABEZA[cabeza](hx, hy, paleta) : [];
+  let cabezaNodos = [];
+  if (esAccesorioBase(cabeza)) {
+    cabezaNodos = dibujarAccesorioEquipable({ id: cabeza, especie, paleta });
+  } else if (cabeza && CABEZA[cabeza]) {
+    cabezaNodos = CABEZA[cabeza](hx, hy, paleta);
+  }
   const colorNodos = color && COLOR[color] ? COLOR[color](bx, by, br, paleta) : [];
   return { cabeza: cabezaNodos, color: colorNodos };
 }

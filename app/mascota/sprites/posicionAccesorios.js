@@ -1,9 +1,13 @@
-// Posiciones del catálogo visual base de Bloque 4. Cada punto vive en el mismo
-// viewBox 0 0 100 100 de las siluetas y representa el centro de apoyo del
-// accesorio; `scale` ajusta su geometría sin depender del renderer.
+// Posiciones del catálogo visual base. Cada punto vive en el mismo viewBox
+// 0 0 100 100 de las siluetas y representa el punto de apoyo del accesorio;
+// `scale` ajusta su tamaño sin depender del renderer.
 //
-// Este mapa no habilita compra ni equipamiento. Los cuatro ids permanecen fuera
-// del catálogo autoritativo del backend hasta que exista el contrato de moneda.
+// Qué punto es "el de apoyo" lo decide el anclaje del diseño (accesorios/
+// catalogoBase.js): para los lentes es el centro de los ojos, para los gorros la
+// coronilla. Los valores de abajo están medidos sobre las siluetas reales.
+//
+// Ojo: estos son ids de DISEÑO, no ids equipables. Las variantes de color
+// comparten posición porque comparten dibujo.
 export const IDS_ACCESORIOS_BASE = [
   'lentes-sol',
   'sombrero-fiesta',

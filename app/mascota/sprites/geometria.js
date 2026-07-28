@@ -24,6 +24,13 @@ export const path = (d, attrs = {}) => ({ t: 'path', d, ...attrs });
 // Mezcla atributos extra en un nodo ya construido (contorno, rotación).
 export const con = (nodo, attrs) => ({ ...nodo, ...attrs });
 
+// Grupo con transform. Envuelve nodos ya construidos SIN tocar sus coordenadas,
+// que es lo que permite montar arte importado (accesorios/trazos.generado.js)
+// —dibujado en su propio sistema de coordenadas— sobre el lienzo 0 0 100 100 de
+// las siluetas sin reescribir su path data. `hijos` es metadato de composición:
+// el renderer lo consume para anidar y no lo emite como atributo SVG.
+export const grupo = (transform, hijos = []) => ({ t: 'g', transform, hijos });
+
 // Interpola números redondeados en el `d` de un path, para que las coordenadas
 // calculadas no lo llenen de decimales de coma flotante.
 export const ruta = (trozos, ...valores) => trozos.reduce((acc, trozo, i) => {

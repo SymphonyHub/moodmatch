@@ -1,7 +1,13 @@
 import { CATALOGO_ACCESORIOS } from '../mascota/sprites/accesorios';
 import {
+  ACCESORIOS_BASE_EQUIPABLES,
   CATALOGO_ACCESORIOS_BASE,
+  accesorioBase,
   dibujarAccesorioBase,
+  dibujarAccesorioEquipable,
+  esAccesorioBase,
+  varianteValida,
+  variantesDe,
 } from '../mascota/sprites/accesorios/catalogoBase';
 import { ESPECIES } from '../mascota/sprites/especies';
 import { paletaEtapa } from '../mascota/sprites/paletas';
@@ -11,23 +17,20 @@ import {
   posicionAccesorio,
 } from '../mascota/sprites/posicionAccesorios';
 
-const IDS_ESPERADOS = ['lentes-sol', 'sombrero-fiesta', 'gorrito-noche', 'lazo'];
+const DISENOS = ['lentes-sol', 'sombrero-fiesta', 'gorrito-noche', 'lazo'];
 const TIPOS_SVG = ['circle', 'ellipse', 'path'];
 
-describe('catálogo visual base de accesorios', () => {
-  test('declara los cuatro diseños pedidos sin habilitarlos en el catálogo equipable', () => {
-    expect(IDS_ACCESORIOS_BASE).toEqual(IDS_ESPERADOS);
-    expect(CATALOGO_ACCESORIOS_BASE.map((item) => item.id)).toEqual(IDS_ESPERADOS);
-
-    const equipables = CATALOGO_ACCESORIOS.map((item) => item.id);
-    for (const id of IDS_ESPERADOS) expect(equipables).not.toContain(id);
+describe('catálogo de diseños base', () => {
+  test('declara los cuatro diseños y sus posiciones por especie', () => {
+    expect(IDS_ACCESORIOS_BASE).toEqual(DISENOS);
+    expect(CATALOGO_ACCESORIOS_BASE.map((item) => item.id)).toEqual(DISENOS);
   });
 
-  test('cada especie define x, y y escala para cada accesorio', () => {
+  test('cada especie define x, y y escala para cada diseño', () => {
     expect(Object.keys(POSICIONES_ACCESORIOS).sort()).toEqual([...ESPECIES].sort());
     for (const especie of ESPECIES) {
-      expect(Object.keys(POSICIONES_ACCESORIOS[especie]).sort()).toEqual([...IDS_ESPERADOS].sort());
-      for (const id of IDS_ESPERADOS) {
+      expect(Object.keys(POSICIONES_ACCESORIOS[especie]).sort()).toEqual([...DISENOS].sort());
+      for (const id of DISENOS) {
         const pos = posicionAccesorio(especie, id);
         expect(pos).toEqual(expect.objectContaining({
           x: expect.any(Number), y: expect.any(Number), scale: expect.any(Number),
@@ -42,10 +45,27 @@ describe('catálogo visual base de accesorios', () => {
     }
   });
 
-  test.each(IDS_ESPERADOS)('%s produce nodos SVG válidos en las 7 especies', (id) => {
+  test('varianteValida cae a 0 fuera de rango y respeta las que existen', () => {
+    expect(variantesDe('lentes-sol')).toBe(2);
+    expect(variantesDe('lazo')).toBe(1);
+    expect(variantesDe('no-existe')).toBe(1);
+    expect(varianteValida('lentes-sol', 1)).toBe(1);
+    expect(varianteValida('lentes-sol', 2)).toBe(0);
+    expect(varianteValida('lazo', 1)).toBe(0);
+    expect(varianteValida('lentes-sol', -1)).toBe(0);
+    expect(varianteValida('lentes-sol', 'x')).toBe(0);
+  });
+});
+
+describe('dibujo en código (origen "codigo")', () => {
+  // Es la salida de emergencia si el arte importado no funciona sobre la
+  // silueta: tiene que seguir produciendo geometría válida y contenida.
+  test.each(DISENOS)('%s produce nodos SVG planos y dentro del lienzo', (id) => {
     for (const especie of ESPECIES) {
       for (const etapa of [1, 2, 3]) {
-        const nodos = dibujarAccesorioBase({ id, especie, paleta: paletaEtapa(etapa) });
+        const nodos = dibujarAccesorioBase({
+          id, especie, paleta: paletaEtapa(etapa), origen: 'codigo',
+        });
         expect(nodos.length).toBeGreaterThanOrEqual(5);
         for (const nodo of nodos) {
           expect(TIPOS_SVG).toContain(nodo.t);
@@ -75,11 +95,89 @@ describe('catálogo visual base de accesorios', () => {
       }
     }
   });
+});
 
-  test('tolera especie desconocida y rechaza ids fuera del catálogo visual', () => {
+describe('dibujo desde arte importado (origen "trazo")', () => {
+  test('los tres diseños con SVG salen como UN grupo con transform', () => {
+    for (const id of ['lentes-sol', 'sombrero-fiesta', 'gorrito-noche']) {
+      for (const especie of ESPECIES) {
+        for (let v = 0; v < variantesDe(id); v += 1) {
+          const nodos = dibujarAccesorioBase({ id, especie, variante: v, origen: 'trazo' });
+          expect(nodos).toHaveLength(1);
+          expect(nodos[0].t).toBe('g');
+          expect(nodos[0].transform).toMatch(/^translate\(.+\) scale\(.+\) translate\(.+\)$/);
+          expect(nodos[0].transform).not.toMatch(/NaN|Infinity/);
+          expect(nodos[0].hijos.length).toBeGreaterThan(0);
+          for (const hijo of nodos[0].hijos) {
+            expect(hijo.t).toBe('path');
+            expect(hijo.d).toMatch(/^M-?\d/);
+            expect(hijo.fill).toMatch(/^#[0-9A-Fa-f]{6}$/);
+          }
+        }
+      }
+    }
+  });
+
+  test('el lazo no tiene SVG de origen, así que cae al dibujo en código', () => {
+    const nodos = dibujarAccesorioBase({ id: 'lazo', especie: 'perro', origen: 'trazo' });
+    expect(nodos.length).toBeGreaterThanOrEqual(5);
+    expect(nodos.every((n) => TIPOS_SVG.includes(n.t))).toBe(true);
+  });
+});
+
+describe('catálogo equipable base', () => {
+  test('cada id equipable apunta a un diseño y una variante que existen', () => {
+    for (const item of ACCESORIOS_BASE_EQUIPABLES) {
+      expect(DISENOS).toContain(item.diseno);
+      expect(item.variante).toBeLessThan(variantesDe(item.diseno));
+      expect(item.nombre.length).toBeGreaterThan(0);
+      expect(item.descripcion.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('cubre las seis piezas de arte importado más el lazo, sin repetir', () => {
+    const ids = ACCESORIOS_BASE_EQUIPABLES.map((a) => a.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const pares = ACCESORIOS_BASE_EQUIPABLES.map((a) => `${a.diseno}#${a.variante}`);
+    expect(new Set(pares).size).toBe(pares.length);
+    expect(ids).toHaveLength(7);
+  });
+
+  test('todos entran al catálogo equipable general como accesorios de cabeza', () => {
+    for (const item of ACCESORIOS_BASE_EQUIPABLES) {
+      const visual = CATALOGO_ACCESORIOS.find((a) => a.id === item.id);
+      expect(visual).toBeDefined();
+      expect(visual.categoria).toBe('cabeza');
+      expect(esAccesorioBase(item.id)).toBe(true);
+    }
+    expect(esAccesorioBase('corona')).toBe(false);
+    expect(esAccesorioBase(null)).toBe(false);
+  });
+
+  test('cada id equipable dibuja algo en las 7 especies', () => {
+    for (const item of ACCESORIOS_BASE_EQUIPABLES) {
+      for (const especie of ESPECIES) {
+        expect(dibujarAccesorioEquipable({ id: item.id, especie }).length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  test('accesorioBase resuelve por id y devuelve null si no existe', () => {
+    expect(accesorioBase('lentes-sol-b')).toEqual(
+      expect.objectContaining({ diseno: 'lentes-sol', variante: 1 }),
+    );
+    expect(accesorioBase('corona')).toBeNull();
+  });
+});
+
+describe('entradas inválidas', () => {
+  test('tolera especie desconocida y rechaza ids fuera del catálogo', () => {
     expect(posicionAccesorio('desconocida', 'lentes-sol'))
       .toEqual(POSICIONES_ACCESORIOS.polluelo['lentes-sol']);
     expect(posicionAccesorio('perro', 'no-existe')).toBeNull();
     expect(dibujarAccesorioBase({ id: 'no-existe', especie: 'perro' })).toEqual([]);
+    expect(dibujarAccesorioEquipable({ id: 'no-existe', especie: 'perro' })).toEqual([]);
+    // Un id de DISEÑO no es equipable por sí solo si no está en la lista.
+    expect(dibujarAccesorioEquipable({ id: 'sombrero-fiesta-z', especie: 'perro' })).toEqual([]);
   });
 });

@@ -8,6 +8,7 @@ import Animated, {
   withSequence,
   withSpring,
   withTiming,
+  ReduceMotion,
 } from 'react-native-reanimated';
 import { makeThemedStyles, useMotionPrefs } from '../../theme/ThemeContext';
 import { feedbackCarino } from './movimiento';
@@ -48,14 +49,23 @@ export default function FeedbackCarino({ eventoKey = 0, cantidad: valor = 0 }) {
       y.value = withTiming(-feedbackCarino.elevacionPx, {
         duration: feedbackCarino.duracionMs,
         easing: feedbackCarino.easing,
+        reduceMotion: ReduceMotion.Never,
       });
       escala.value = withSequence(
-        withSpring(feedbackCarino.escalaPico, feedbackCarino.pop),
-        withSpring(1, feedbackCarino.asentamiento),
+        ReduceMotion.Never,
+        withSpring(feedbackCarino.escalaPico, {
+          ...feedbackCarino.pop, reduceMotion: ReduceMotion.Never,
+        }),
+        withSpring(1, {
+          ...feedbackCarino.asentamiento, reduceMotion: ReduceMotion.Never,
+        }),
       );
       opacidad.value = withDelay(
         feedbackCarino.esperaFadeMs,
-        withTiming(0, { duration: feedbackCarino.fadeMs }),
+        withTiming(0, {
+          duration: feedbackCarino.fadeMs, reduceMotion: ReduceMotion.Never,
+        }),
+        ReduceMotion.Never,
       );
     }
 

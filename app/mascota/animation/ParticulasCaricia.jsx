@@ -8,6 +8,7 @@ import Animated, {
   useSharedValue,
   withDelay,
   withTiming,
+  ReduceMotion,
 } from 'react-native-reanimated';
 import { CORAL, GOLD, GLOW } from '../sprites/paletas';
 import { particulasCaricia } from './movimiento';
@@ -41,7 +42,9 @@ function Particula({ origen, pieza }) {
       withTiming(1, {
         duration: particulasCaricia.duracionMs,
         easing: particulasCaricia.easing,
+        reduceMotion: ReduceMotion.Never,
       }),
+      ReduceMotion.Never,
     );
     return () => cancelAnimation(progreso);
   }, [pieza.delayMs, progreso]);

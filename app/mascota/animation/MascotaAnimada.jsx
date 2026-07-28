@@ -10,6 +10,7 @@ import Animated, {
   withSpring,
   withDelay,
   cancelAnimation,
+  ReduceMotion,
 } from 'react-native-reanimated';
 import { escenaMascota } from '../sprites/disenoEtapas';
 import { centroDe } from '../sprites/geometria';
@@ -31,6 +32,14 @@ import FeedbackCarino from './FeedbackCarino';
 import ParticulasCaricia from './ParticulasCaricia';
 
 const AG = Animated.createAnimatedComponent(G);
+const timingRig = (toValue, config = {}) => withTiming(toValue, {
+  ...config, reduceMotion: ReduceMotion.Never,
+});
+const springRig = (toValue, config = {}) => withSpring(toValue, {
+  ...config, reduceMotion: ReduceMotion.Never,
+});
+const delayRig = (ms, animation) => withDelay(ms, animation, ReduceMotion.Never);
+const sequenceRig = (...animations) => withSequence(ReduceMotion.Never, ...animations);
 
 // Rig ÚNICO de animación de la mascota, compartido por las 7 especies (Fase 14,
 // Parte C). No conoce especies: opera sobre la estructura de grupos que expone
@@ -71,7 +80,9 @@ export default function MascotaAnimada({
   size = 132,
   onTocar,
 }) {
-  const { reduceMotion: reduce } = useMotionPrefs();
+  // Fuera del provider el fallback es animado; dentro, esta es la preferencia
+  // unificada de Ajustes + sistema. Solo `true` detiene el rig.
+  const reduce = useMotionPrefs().reduceMotion === true;
   const pose = poseDePersonalidad(personalidad);
 
   // Expresión puntual: se pisa sobre la de fondo y se va sola. La caricia gana
@@ -92,7 +103,7 @@ export default function MascotaAnimada({
   const breath = useSharedValue(0);
   const blink = useSharedValue(1);
   const jump = useSharedValue(0);
-  const sway = useSharedValue(0);
+  const sway = useSharedValue(reduce ? 0.5 : 0);
   const evo = useSharedValue(1);
   const apendiceKick = useSharedValue(0);
   // Una sola señal para todo lo que cambia con el ánimo: energía del cuerpo,
@@ -140,21 +151,37 @@ export default function MascotaAnimada({
   // con una animación anterior todavía corriendo.
   useEffect(() => {
     if (!reduce) return;
+    clearTimeout(puntualTimer.current);
+    setPuntual(null);
     setAcariciando(false);
     setParticulas((actual) => (actual.key === 0 ? actual : { ...actual, key: 0 }));
-    cancelAnimation(mimo);
+    setFiesta(false);
+    [breath, blink, jump, sway, evo, apendiceKick, miraX, miraY, mimo]
+      .forEach(cancelAnimation);
+    breath.value = 0;
+    blink.value = 1;
+    jump.value = 0;
+    sway.value = 0.5;
+    evo.value = 1;
+    apendiceKick.value = 0;
+    miraX.value = 0;
+    miraY.value = 0;
     mimo.value = 0;
-  }, [reduce, mimo]);
+  }, [
+    reduce, breath, blink, jump, sway, evo, apendiceKick, miraX, miraY, mimo,
+  ]);
 
   // Idle ambiental: respiración + balanceo del apéndice. Estos SÍ son periódicos
   // a propósito (respirar lo es), así que se quedan en withRepeat.
   useEffect(() => {
     if (reduce) return undefined;
     breath.value = withRepeat(
-      withTiming(1, { duration: respiracion.duracionMs, easing: respiracion.easing }), -1, true,
+      timingRig(1, { duration: respiracion.duracionMs, easing: respiracion.easing }),
+      -1, true, undefined, ReduceMotion.Never,
     );
     sway.value = withRepeat(
-      withTiming(1, { duration: balanceo.duracionMs, easing: balanceo.easing }), -1, true,
+      timingRig(1, { duration: balanceo.duracionMs, easing: balanceo.easing }),
+      -1, true, undefined, ReduceMotion.Never,
     );
     return () => {
       cancelAnimation(breath);
@@ -171,9 +198,9 @@ export default function MascotaAnimada({
     activo: animando,
     planear: () => planParpadeo(pose.parpadeoMs),
     hacer: ({ doble }) => {
-      blink.value = withSequence(
+      blink.value = sequenceRig(
         ...pasosParpadeo(doble).map(
-          (paso) => withTiming(paso.a, { duration: paso.ms, easing: paso.curva }),
+          (paso) => timingRig(paso.a, { duration: paso.ms, easing: paso.curva }),
         ),
       );
     },
@@ -193,11 +220,11 @@ export default function MascotaAnimada({
     hacer: ({ gesto }) => {
       distraida.current = true;
       if (gesto === 'bostezar') {
-        blink.value = withSequence(
-          withTiming(inactividad.bostezo.cerrado, {
+        blink.value = sequenceRig(
+          timingRig(inactividad.bostezo.cerrado, {
             duration: inactividad.bostezo.cierreMs, easing: parpadeo.cierreEasing,
           }),
-          withTiming(1, {
+          timingRig(1, {
             duration: inactividad.bostezo.aperturaMs, easing: parpadeo.aperturaEasing,
           }),
         );
@@ -205,19 +232,19 @@ export default function MascotaAnimada({
       }
       if (gesto === 'vistazo') {
         const lado = Math.random() < 0.5 ? -1 : 1;
-        miraX.value = withSequence(
-          withSpring(lado * mirada.maxPx, mirada.spring),
-          withDelay(inactividad.vistazo.sostenerMs, withSpring(0, mirada.vuelta)),
+        miraX.value = sequenceRig(
+          springRig(lado * mirada.maxPx, mirada.spring),
+          delayRig(inactividad.vistazo.sostenerMs, springRig(0, mirada.vuelta)),
         );
         return;
       }
       // Estirarse: se alarga despacio y vuelve. Es el salto del toque, pero
       // lento y sin despegar del suelo.
-      jump.value = withSequence(
-        withTiming(inactividad.estiron.magnitud, {
+      jump.value = sequenceRig(
+        timingRig(inactividad.estiron.magnitud, {
           duration: inactividad.estiron.subidaMs, easing: respiracion.easing,
         }),
-        withTiming(0, { duration: inactividad.estiron.vueltaMs, easing: respiracion.easing }),
+        timingRig(0, { duration: inactividad.estiron.vueltaMs, easing: respiracion.easing }),
       );
     },
   });
@@ -227,9 +254,9 @@ export default function MascotaAnimada({
   useEffect(() => {
     if (etapa > etapaPrev.current) {
       if (!reduce) {
-        evo.value = withSequence(
-          withSpring(evolucion.pop.toValue, evolucion.pop.spring),
-          withSpring(evolucion.settle.toValue, evolucion.settle.spring),
+        evo.value = sequenceRig(
+          springRig(evolucion.pop.toValue, evolucion.pop.spring),
+          springRig(evolucion.settle.toValue, evolucion.settle.spring),
         );
         setFiesta(true);
       }
@@ -241,10 +268,10 @@ export default function MascotaAnimada({
   // cambio, cambian de golpe porque son geometría y no una transición.
   useEffect(() => {
     const t = reduce ? { duration: 0 } : transicionAnimo;
-    energia.value = withTiming(receta.energia, t);
-    ojoAbre.value = withTiming(receta.ojo, t);
-    ruborSube.value = withTiming(receta.rubor, t);
-    ladeo.value = withTiming(receta.inclinacionDeg, t);
+    energia.value = timingRig(receta.energia, t);
+    ojoAbre.value = timingRig(receta.ojo, t);
+    ruborSube.value = timingRig(receta.rubor, t);
+    ladeo.value = timingRig(receta.inclinacionDeg, t);
   }, [receta, reduce, energia, ojoAbre, ruborSube, ladeo]);
 
   // Evento del contenedor (cuidado, regalo, reto): dispara la cara puntual y,
@@ -270,12 +297,12 @@ export default function MascotaAnimada({
   useEffect(() => {
     if (saludo === saludoPrev.current || saludo <= 0 || reduce) return;
     saludoPrev.current = saludo;
-    jump.value = withSequence(
-      withTiming(salto.anticipacionMag * tokenSaludo.escala, { duration: salto.anticipacionMs }),
-      withTiming(tokenSaludo.escala, {
+    jump.value = sequenceRig(
+      timingRig(salto.anticipacionMag * tokenSaludo.escala, { duration: salto.anticipacionMs }),
+      timingRig(tokenSaludo.escala, {
         duration: salto.subidaMs, easing: salto.subidaEasing,
       }),
-      withSpring(0, salto.asentamiento),
+      springRig(0, salto.asentamiento),
     );
     mostrarPuntual('saludando');
   }, [saludo, reduce]);
@@ -290,8 +317,8 @@ export default function MascotaAnimada({
     }
     if (reduce) return;
     const destino = desplazamientoMirada(locationX, locationY, size);
-    miraX.value = withSpring(destino.x, mirada.spring);
-    miraY.value = withSpring(destino.y, mirada.spring);
+    miraX.value = springRig(destino.x, mirada.spring);
+    miraY.value = springRig(destino.y, mirada.spring);
   };
 
   // Sostener el dedo es una caricia: se inclina hacia la mano y entrecierra los
@@ -305,7 +332,7 @@ export default function MascotaAnimada({
       : puntoToque.current;
     setParticulas((actual) => ({ key: actual.key + 1, ...origen }));
     setAcariciando(true);
-    mimo.value = withSpring(1, caricia.entrada);
+    mimo.value = springRig(1, caricia.entrada);
   };
 
   const soltar = () => {
@@ -314,20 +341,26 @@ export default function MascotaAnimada({
       mimo.value = 0;
       return;
     }
-    miraX.value = withDelay(mirada.vueltaMs, withSpring(0, mirada.vuelta));
-    miraY.value = withDelay(mirada.vueltaMs, withSpring(0, mirada.vuelta));
+    miraX.value = delayRig(mirada.vueltaMs, springRig(0, mirada.vuelta));
+    miraY.value = delayRig(mirada.vueltaMs, springRig(0, mirada.vuelta));
     if (!acariciando) return;
     setAcariciando(false);
-    mimo.value = withSpring(0, caricia.entrada);
+    mimo.value = springRig(0, caricia.entrada);
     // Una sacudida corta del apéndice al soltar: se sacude de gusto.
-    apendiceKick.value = withSequence(
-      withSpring(caricia.sacudida, followApendice.spring),
-      withSpring(0, followApendice.spring),
+    apendiceKick.value = sequenceRig(
+      springRig(caricia.sacudida, followApendice.spring),
+      springRig(0, followApendice.spring),
     );
   };
 
-  const reaccionarAlToque = () => {
+  const reaccionarAlToque = (evt) => {
     if (!reduce) {
+      const { locationX, locationY } = evt?.nativeEvent ?? {};
+      const origen = Number.isFinite(locationX) && Number.isFinite(locationY)
+        ? { x: locationX, y: locationY }
+        : puntoToque.current;
+      setParticulas((actual) => ({ key: actual.key + 1, ...origen }));
+
       // Reinicia el reloj de la inactividad: la acaban de atender.
       setToqueKey((k) => k + 1);
 
@@ -344,20 +377,20 @@ export default function MascotaAnimada({
       distraida.current = false;
 
       // Anticipa (squash breve, j<0) → sube → asienta con resorte.
-      jump.value = withSequence(
-        withTiming(salto.anticipacionMag, { duration: salto.anticipacionMs }),
-        withTiming(1, { duration: salto.subidaMs, easing: salto.subidaEasing }),
-        withSpring(0, salto.asentamiento),
+      jump.value = sequenceRig(
+        timingRig(salto.anticipacionMag, { duration: salto.anticipacionMs }),
+        timingRig(1, { duration: salto.subidaMs, easing: salto.subidaEasing }),
+        springRig(0, salto.asentamiento),
       );
       // Follow-through: el apéndice arranca un beat después del cuerpo y arrastra
       // al volver, con un resorte más blando (sobrepasa en vez de seguir rígido).
-      apendiceKick.value = withSequence(
-        withTiming(0, { duration: salto.anticipacionMs + salto.subidaMs * 0.5 }),
-        withSpring(1, followApendice.spring),
-        withSpring(0, followApendice.spring),
+      apendiceKick.value = sequenceRig(
+        timingRig(0, { duration: salto.anticipacionMs + salto.subidaMs * 0.5 }),
+        springRig(1, followApendice.spring),
+        springRig(0, followApendice.spring),
       );
     }
-    onTocar?.();
+    onTocar?.(evt);
   };
 
   const rebote = pose.rebote;

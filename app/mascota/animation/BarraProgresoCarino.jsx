@@ -7,6 +7,7 @@ import Animated, {
   useSharedValue,
   withDelay,
   withTiming,
+  ReduceMotion,
 } from 'react-native-reanimated';
 import { makeThemedStyles, useMotionPrefs } from '../../theme/ThemeContext';
 import { brilloProgreso } from './movimiento';
@@ -52,6 +53,7 @@ export default function BarraProgresoCarino({ progreso, nivelCarino }) {
       : withTiming(px, {
         duration: brilloProgreso.rellenoMs,
         easing: brilloProgreso.rellenoEasing,
+        reduceMotion: ReduceMotion.Never,
       });
 
     if (subio && !reduceMotion) {
@@ -60,7 +62,9 @@ export default function BarraProgresoCarino({ progreso, nivelCarino }) {
         withTiming(1, {
           duration: brilloProgreso.recorridoMs,
           easing: brilloProgreso.recorridoEasing,
+          reduceMotion: ReduceMotion.Never,
         }),
+        ReduceMotion.Never,
       );
     }
 

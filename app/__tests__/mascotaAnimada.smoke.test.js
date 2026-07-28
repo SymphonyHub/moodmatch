@@ -216,6 +216,7 @@ test('soltar sin haber acariciado no rompe nada', () => {
   act(() => sprite.props.onPressOut());
   act(() => sprite.props.onPress());
   expect(renderer.toJSON()).toBeTruthy();
+  expect(renderer.root.findByProps({ testID: 'particulas-caricia' })).toBeTruthy();
 
   act(() => renderer.unmount());
 });
@@ -235,6 +236,7 @@ test('con reduce-motion no programa ningún parpadeo', () => {
   expect(jest.getTimerCount()).toBe(antes);
   const sprite = renderer.root.findByProps({ accessibilityRole: 'image' });
   act(() => sprite.props.onLongPress({ nativeEvent: { locationX: 30, locationY: 40 } }));
+  act(() => sprite.props.onPress({ nativeEvent: { locationX: 30, locationY: 40 } }));
   expect(renderer.root.findAllByProps({ testID: 'particulas-caricia' })).toHaveLength(0);
 
   act(() => renderer.unmount());

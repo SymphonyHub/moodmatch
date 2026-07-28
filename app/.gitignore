@@ -42,3 +42,12 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Packs de origen de la mascota (Kenney Animal Pack y UI Pack). Son ~9 MB de
+# PNG y spritesheets que sirven de referencia mientras se diseña, pero la app no
+# importa ninguno: los accesorios se convierten a nodos SVG con
+# tools/mascota/importarAccesorios.js. Se versiona solo lo que el bundle usa
+# —mascota/assets/accesorios/ y mascota/assets/animaciones/—; si más adelante
+# hace falta un ícono suelto de estos packs, se agrega ESE archivo con -f.
+mascota/assets/iconos/
+mascota/assets/ui/

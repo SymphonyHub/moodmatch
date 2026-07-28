@@ -25,15 +25,33 @@ const LADO_CASILLA = 78;
 const SPRITE_CABEZA = 142;
 const SPRITE_CUERPO = 74;
 
-// Encuadre de cabeza. Con el sprite a 142 px y la casilla mostrando 78×66, la
-// ventana visible del lienzo 0 0 100 100 queda en x≈22..78, y≈3..49: entra el
-// gorro más alto (su punta llega a y≈5) y se recorta a la altura del pecho.
-const RECORTE_CABEZA = {
+// Ancho y alto útiles de la ventana de la casilla (ver `casilla`/`previewCaja`).
+const VENTANA = LADO_CASILLA - 10;
+
+// Encuadres de acercamiento, expresados en unidades del lienzo 0 0 100 100:
+// `desdeY` es la coordenada del lienzo que queda pegada al borde superior del
+// recorte. Con el sprite a 142 px sobre una ventana de 68×66, se ve una franja
+// de ~48×46 unidades, siempre centrada en x=50.
+//
+//   cabeza → y 3..49: entra el gorro más alto (punta en y≈5) y corta al pecho
+//   cuello → y 42..88: la franja de la bufanda, que según la especie va entre
+//            y=53 (pingüino) e y=88 (polluelo)
+//
+// Son dos franjas y no una sola más grande a propósito: agrandar la ventana para
+// que entren las dos deja la pieza del tamaño de una miga en una casilla de 78.
+//
+// Va posicionado en absoluto y no con márgenes: `preview` centra a sus hijos, y
+// un margen negativo sobre un hijo centrado NO reemplaza al centrado — Yoga lo
+// suma al que ya aplicó, y la franja termina corrida respecto de la que dice
+// este comentario. En absoluto, left/top son la única fuente de la posición.
+const recorte = (desdeY) => ({
+  position: 'absolute',
+  left: (VENTANA - SPRITE_CABEZA) / 2,
+  top: -(desdeY / 100) * SPRITE_CABEZA,
   width: SPRITE_CABEZA,
   height: SPRITE_CABEZA,
-  marginLeft: (LADO_CASILLA - SPRITE_CABEZA) / 2,
-  marginTop: -4,
-};
+});
+const RECORTES = { cabeza: recorte(3), cuello: recorte(42) };
 
 const GRUPOS = [
   { categoria: 'cabeza', titulo: 'Cabeza y rostro', foco: 'cabeza' },
@@ -48,15 +66,17 @@ export function VistaPreviaAccesorio({
     accesorioCabeza: item.categoria === 'cabeza' ? item.id : null,
     accesorioColor: item.categoria === 'color' ? item.id : null,
   };
-  const enCabeza = foco === 'cabeza';
+  // El acercamiento lo decide la ZONA de la pieza, no la ranura que ocupa: la
+  // bufanda es un accesorio de cabeza que se dibuja en el cuello.
+  const acercamiento = foco === 'cabeza' ? (RECORTES[item.zona] ?? RECORTES.cabeza) : null;
 
   return (
     <View style={[styles.preview, apagado && styles.previewApagado]}>
-      <View style={enCabeza ? RECORTE_CABEZA : null}>
+      <View style={acercamiento}>
         <MascotaSprite
           especie={especie}
           etapa={etapa}
-          size={enCabeza ? SPRITE_CABEZA : SPRITE_CUERPO}
+          size={acercamiento ? SPRITE_CABEZA : SPRITE_CUERPO}
           {...puesto}
         />
       </View>

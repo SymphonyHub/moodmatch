@@ -67,6 +67,29 @@ test('cada vista previa dibuja la mascota REAL con la pieza puesta', async () =>
   act(() => renderer.unmount());
 });
 
+test('la bufanda se encuadra en el cuello y no en la cabeza', async () => {
+  // La bufanda ocupa la ranura de cabeza pero se dibuja en el cuello (y≈53..88
+  // según la especie). Con el acercamiento de cabeza —que muestra y≈3..49— la
+  // casilla quedaba vacía: la pieza caía entera fuera de la ventana.
+  const renderer = await montar(
+    <VestidorAccesorios accesorios={accesorios} especie="pinguino" etapa={3} />,
+  );
+  const marco = (id) => {
+    const sprite = renderer.root.findAll((n) => n.type === MascotaSprite
+      && n.props.accesorioCabeza === id)[0];
+    return sprite.parent.props.style;
+  };
+
+  expect(marco('bufanda').top).toBeLessThan(marco('gorrito').top);
+  // Ambas siguen siendo acercamientos: misma escala de sprite, distinta franja,
+  // y las dos centradas en x=50 del lienzo.
+  expect(marco('bufanda').width).toBe(marco('gorrito').width);
+  expect(marco('bufanda').left).toBe(marco('gorrito').left);
+  // Posición absoluta: si volviera a márgenes, el centrado del padre se sumaría.
+  expect(marco('bufanda').position).toBe('absolute');
+  act(() => renderer.unmount());
+});
+
 test('lo desbloqueado se equipa y lo bloqueado no responde', async () => {
   const onEquipar = jest.fn();
   const renderer = await montar(

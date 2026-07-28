@@ -36,6 +36,16 @@ const useStyles = makeThemedStyles((t) => ({
     gap: 6,
     paddingHorizontal: 8,
   },
+  // Punto de color opcional (lo usa el selector de colores de una paleta). El
+  // aro hairline lo mantiene visible aunque el color sea casi igual a la
+  // tarjeta, en ambos temas.
+  dot: {
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: t.isDark ? 'rgba(255,255,255,0.32)' : 'rgba(0,0,0,0.22)',
+  },
   label: {
     ...t.typography.type.body,
   },
@@ -43,8 +53,9 @@ const useStyles = makeThemedStyles((t) => ({
 
 // Control segmentado de la casa: mismo lenguaje que la navbar (píldora suave
 // que se desliza con spring contenido). `tabs` acepta un ícono trailing
-// opcional por segmento (p. ej. el candado de "Con amigos" bloqueada).
-//   <SegmentedTabs tabs={[{ id, label, icon? }]} activeId onChange={(id) => {}} />
+// opcional por segmento (p. ej. el candado de "Con amigos" bloqueada) y un
+// punto de color leading (p. ej. el color que edita cada segmento en Ajustes).
+//   <SegmentedTabs tabs={[{ id, label, icon?, dot? }]} activeId onChange={(id) => {}} />
 export default function SegmentedTabs({ tabs, activeId, onChange }) {
   const { theme } = useTheme();
   const styles = useStyles();
@@ -103,6 +114,7 @@ export default function SegmentedTabs({ tabs, activeId, onChange }) {
             accessibilityState={{ selected: focused }}
             accessibilityLabel={tab.label}
           >
+            {tab.dot ? <View style={[styles.dot, { backgroundColor: tab.dot }]} /> : null}
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit

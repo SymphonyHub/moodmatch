@@ -31,10 +31,18 @@ jest.mock('../services/api', () => ({
 }));
 
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, ScrollView } from 'react-native';
 import { act, create } from 'react-test-renderer';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import AjustesScreen from '../app/ajustes/index';
 import { ThemeProvider } from '../theme/ThemeContext';
+import { MAX_PALETAS } from '../theme/customTheme';
+
+// El mock de AsyncStorage conserva lo guardado entre pruebas: sin limpiarlo, las
+// paletas que crea una prueba aparecen en la siguiente.
+beforeEach(async () => {
+  await AsyncStorage.clear();
+});
 
 // Renderiza Ajustes y conmuta el candidato a "Personalizado" para desplegar el
 // editor. Devuelve el renderer ya en modo custom.
@@ -79,6 +87,56 @@ const boton = (renderer, label) =>
       n.props && n.props.accessibilityLabel === label && typeof n.props.onPress === 'function',
   )[0];
 
+// Los tres colores comparten un juego de controles: el segmentado elige cuál se
+// edita ("Primario" / "Acento" / "Fondo").
+const elegirColor = (renderer, label) => act(() => boton(renderer, label).props.onPress());
+
+// Etiquetas de las barras montadas, en orden (cada una aparece en varios
+// niveles del árbol, de ahí el Set).
+const barrasDe = (nodo) => [
+  ...new Set(
+    nodo
+      .findAll((n) => n.props && n.props.accessibilityRole === 'adjustable')
+      .map((n) => n.props.accessibilityLabel),
+  ),
+];
+
+// Campo de nombre de la paleta en edición.
+const campoNombre = (renderer) =>
+  renderer.root.findAll(
+    (n) =>
+      n.props &&
+      n.props.accessibilityLabel === 'Nombre de la paleta' &&
+      typeof n.props.onChangeText === 'function',
+  )[0];
+
+// Tarjetas de paleta de la rejilla, por etiqueta accesible.
+const tarjetasPaleta = (renderer) => [
+  ...new Set(
+    renderer.root
+      .findAll(
+        (n) =>
+          n.props &&
+          n.props.accessibilityRole === 'radio' &&
+          typeof n.props.onPress === 'function' &&
+          String(n.props.accessibilityLabel ?? '').startsWith('Paleta '),
+      )
+      .map((n) => n.props.accessibilityLabel),
+  ),
+];
+
+// La paleta marcada como seleccionada (la que está en edición).
+const paletaSeleccionada = (renderer) =>
+  renderer.root.findAll(
+    (n) =>
+      n.props &&
+      n.props.accessibilityRole === 'radio' &&
+      typeof n.props.onPress === 'function' &&
+      n.props.accessibilityState &&
+      n.props.accessibilityState.selected &&
+      String(n.props.accessibilityLabel ?? '').startsWith('Paleta '),
+  )[0]?.props.accessibilityLabel;
+
 test('el editor de Personalizado se despliega sin bloqueo de contraste', async () => {
   const renderer = await renderEditorPersonalizado();
 
@@ -112,6 +170,7 @@ test('el aviso de contraste avisa pero no bloquea guardar ni aplicar', async () 
 
 test('el campo hex acepta el valor sin # y expande la forma corta al salir', async () => {
   const renderer = await renderEditorPersonalizado();
+  elegirColor(renderer, 'Acento');
   const campo = campoHex(renderer, 'Acento');
 
   // Sin "#": se toma igual.
@@ -172,53 +231,113 @@ test('la fuente es un carrusel: las flechas cambian la fuente activa', async () 
   act(() => renderer.unmount());
 });
 
-test('paletas, colores y fuente comparten un editor compacto horizontal', async () => {
+test('las paletas se ven todas juntas, sin scroll propio que se coma el toque', async () => {
   const renderer = await renderEditorPersonalizado();
   const lista = renderer.root.findByProps({ testID: 'lista-paletas-compacta' });
+
+  // Rejilla, no tira: sin ScrollView anidado no hay paletas fuera de vista ni
+  // toques perdidos en cerrar el teclado del nombre.
+  expect(lista.findAllByType(ScrollView).length).toBe(0);
+  // Una tarjeta por paleta guardada, más la acción de crear otra.
+  expect(tarjetasPaleta(renderer)).toEqual(['Paleta Mi paleta']);
+  expect(boton(renderer, 'Crear paleta nueva')).toBeTruthy();
+
+  act(() => renderer.unmount());
+});
+
+test('los tres colores comparten un solo juego de controles', async () => {
+  const renderer = await renderEditorPersonalizado();
   const controles = renderer.root.findByProps({ testID: 'controles-paleta-compactos' });
 
-  expect(lista.props.horizontal).toBe(true);
   expect(controles.findByProps({ accessibilityLabel: 'Nombre de la paleta' })).toBeTruthy();
   expect(controles.findByProps({ accessibilityLabel: 'Fuente siguiente' })).toBeTruthy();
-  const sliders = new Set(
-    controles
-      .findAll((n) => n.props.accessibilityRole === 'adjustable')
-      .map((n) => n.props.accessibilityLabel),
-  );
-  expect(sliders.size).toBe(7);
+
+  // Un color a la vez: el Primario trae matiz y luminosidad, y solo esos.
+  expect(barrasDe(controles)).toEqual(['Matiz de Primario', 'Luminosidad de Primario']);
+
+  // El Fondo suma Saturación (para que su Matiz sirva) sin apilar otro bloque.
+  elegirColor(renderer, 'Fondo');
+  expect(barrasDe(controles)).toEqual([
+    'Matiz de Fondo',
+    'Saturación de Fondo',
+    'Luminosidad de Fondo',
+  ]);
 
   act(() => renderer.unmount());
 });
 
-test('el Fondo tiene matiz/saturación/luminosidad y las barras son accesibles (adjustable)', async () => {
+test('cada color tiene barras accesibles y un campo hex para el valor exacto', async () => {
   const renderer = await renderEditorPersonalizado();
 
-  // Las barras se exponen como control "adjustable" para lectores de pantalla.
-  const barras = renderer.root.findAll(
-    (n) => n.props && n.props.accessibilityRole === 'adjustable',
-  );
-  const labels = barras.map((n) => n.props.accessibilityLabel);
-  // El Fondo ganó barras propias, incluida Saturación (para que el Matiz sirva).
-  expect(labels).toContain('Matiz de Fondo');
-  expect(labels).toContain('Saturación de Fondo');
-  expect(labels).toContain('Luminosidad de Fondo');
+  ['Primario', 'Acento', 'Fondo'].forEach((color) => {
+    elegirColor(renderer, color);
 
-  // Cada barra expone un valor numérico (para el anuncio del lector de pantalla).
-  const lumFondo = barras.find((n) => n.props.accessibilityLabel === 'Luminosidad de Fondo');
-  expect(typeof lumFondo.props.accessibilityValue.now).toBe('number');
-
-  act(() => renderer.unmount());
-});
-
-test('cada color tiene un campo hex para ver/escribir el valor exacto', async () => {
-  const renderer = await renderEditorPersonalizado();
-
-  ['Primario', 'Acento', 'Fondo'].forEach((c) => {
     const campos = renderer.root.findAll(
-      (n) => n.props && n.props.accessibilityLabel === `Código hex de ${c}`,
+      (n) => n.props && n.props.accessibilityLabel === `Código hex de ${color}`,
     );
     expect(campos.length).toBeGreaterThan(0);
+
+    // Las barras se exponen como control "adjustable" y anuncian un valor
+    // numérico para los lectores de pantalla.
+    const lum = renderer.root.findAll(
+      (n) =>
+        n.props &&
+        n.props.accessibilityRole === 'adjustable' &&
+        n.props.accessibilityLabel === `Luminosidad de ${color}`,
+    )[0];
+    expect(typeof lum.props.accessibilityValue.now).toBe('number');
   });
+
+  act(() => renderer.unmount());
+});
+
+test('tocar una paleta la deja en edición y marcada como seleccionada', async () => {
+  const renderer = await renderEditorPersonalizado();
+
+  // Segunda paleta con nombre propio: la nueva queda en edición al guardarla.
+  act(() => boton(renderer, 'Crear paleta nueva').props.onPress());
+  act(() => campoNombre(renderer).props.onChangeText('Noche'));
+  await act(async () => {
+    boton(renderer, 'Guardar paleta').props.onPress();
+    await Promise.resolve();
+  });
+  expect(paletaSeleccionada(renderer)).toBe('Paleta Noche');
+
+  // Volver a la primera es un solo toque, y el editor pasa a sus datos.
+  act(() => boton(renderer, 'Paleta Mi paleta').props.onPress());
+  expect(paletaSeleccionada(renderer)).toBe('Paleta Mi paleta');
+  expect(campoNombre(renderer).props.value).toBe('Mi paleta');
+
+  act(() => renderer.unmount());
+});
+
+test('con el máximo de paletas la rejilla deja de ofrecer crear otra', async () => {
+  const renderer = await renderEditorPersonalizado();
+
+  // Arranca con una paleta: crea y guarda hasta llegar al tope.
+  for (let i = 1; i < MAX_PALETAS; i += 1) {
+    act(() => boton(renderer, 'Crear paleta nueva').props.onPress());
+    // eslint-disable-next-line no-await-in-loop
+    await act(async () => {
+      boton(renderer, 'Guardar paleta').props.onPress();
+      await Promise.resolve();
+    });
+  }
+
+  expect(tarjetasPaleta(renderer)).toHaveLength(MAX_PALETAS);
+  expect(boton(renderer, 'Crear paleta nueva')).toBeUndefined();
+
+  act(() => renderer.unmount());
+});
+
+// Sin esto, crear una paleta dejaba la rejilla sin nada marcado hasta guardar.
+test('la paleta nueva sin guardar aparece marcada en la rejilla', async () => {
+  const renderer = await renderEditorPersonalizado();
+
+  act(() => boton(renderer, 'Crear paleta nueva').props.onPress());
+  expect(paletaSeleccionada(renderer)).toBe('Paleta Paleta 2, sin guardar');
+  // La guardada sigue ahí, sin marcar.
+  expect(tarjetasPaleta(renderer)).toContain('Paleta Mi paleta');
 
   act(() => renderer.unmount());
 });

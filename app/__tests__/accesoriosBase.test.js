@@ -39,7 +39,10 @@ describe('catálogo de diseños base', () => {
         expect(pos.x).toBeLessThanOrEqual(100);
         expect(pos.y).toBeGreaterThanOrEqual(0);
         expect(pos.y).toBeLessThanOrEqual(100);
-        expect(pos.scale).toBeGreaterThan(0.7);
+        // Cota de cordura, no de diseño: atrapa un 0 o un 12 por dedazo. El
+        // piso baja a 0.6 porque el lazo del pingüino va a 0.64 a propósito
+        // (cabeza angosta y ojos altos; al tamaño de las demás caía en el ojo).
+        expect(pos.scale).toBeGreaterThan(0.6);
         expect(pos.scale).toBeLessThan(1.3);
       }
     }
@@ -93,6 +96,24 @@ describe('dibujo en código (origen "codigo")', () => {
           }
         }
       }
+    }
+  });
+});
+
+describe('variantes de color', () => {
+  // El origen 'codigo' resuelve por id de DISEÑO, así que si el dibujante no
+  // mira la variante, "Lentes dorados" sale idéntico a "Lentes redondos" y el
+  // vestidor muestra dos casillas iguales. Pasó al cambiar ORIGEN_POR_DEFECTO.
+  test.each([
+    ['lentes-sol', 'lentes-sol-b'],
+    ['sombrero-fiesta', 'sombrero-fiesta-b'],
+    ['gorrito-noche', 'gorrito-noche-b'],
+  ])('%s y %s se dibujan distinto', (base, alterna) => {
+    for (const especie of ESPECIES) {
+      const a = dibujarAccesorioEquipable({ id: base, especie });
+      const b = dibujarAccesorioEquipable({ id: alterna, especie });
+      expect(a.length).toBeGreaterThan(0);
+      expect(JSON.stringify(b)).not.toEqual(JSON.stringify(a));
     }
   });
 });

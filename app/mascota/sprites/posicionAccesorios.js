@@ -38,7 +38,10 @@ export const POSICIONES_ACCESORIOS = {
     'lentes-sol': { x: 50, y: 40, scale: 0.92 },
     'sombrero-fiesta': { x: 50, y: 26, scale: 0.92 },
     'gorrito-noche': { x: 50, y: 26, scale: 0.92 },
-    lazo: { x: 62, y: 32, scale: 0.78 },
+    // El pingüino tiene la cabeza angosta y los ojos altos (centro en y=40, con
+    // el anillo llegando a y=35): el lazo del tamaño de las demás especies caía
+    // encima del ojo derecho. Se sube y se achica para que apoye sobre la sien.
+    lazo: { x: 57, y: 28, scale: 0.64 },
   },
   perro: {
     'lentes-sol': { x: 50, y: 46, scale: 1.08 },

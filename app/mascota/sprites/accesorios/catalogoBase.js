@@ -3,17 +3,22 @@
 //
 // Dos orígenes de dibujo para el mismo id:
 //
+//   'codigo' → el dibujo geométrico de este archivo, en el estilo plano de la
+//              mascota y con color derivado de la paleta de la etapa. Es el
+//              origen por defecto.
 //   'trazo'  → arte importado de app/mascota/assets/accesorios/*.svg, convertido
-//              a nodos por tools/mascota/importarAccesorios.js. Es el origen por
-//              defecto: son los assets reales del proyecto.
-//   'codigo' → el dibujo geométrico en código, hecho en el estilo plano de la
-//              mascota y con color derivado de la paleta de la etapa.
+//              a nodos por tools/mascota/importarAccesorios.js.
 //
-// Los dos se mantienen a propósito. El arte trazado viene de ilustraciones a
-// 1024×1024 con paleta propia y saturada; la mascota es plana y su color sale de
-// la etapa evolutiva. Si sobre la silueta se lee como calcomanía pegada, cambiar
-// ORIGEN_POR_DEFECTO a 'codigo' devuelve el tratamiento coherente sin tocar nada
-// más: el catálogo, los anclajes, la tienda y el equipamiento son los mismos.
+// Por qué 'codigo' y no el arte real, que era el default al importarlo: las
+// ilustraciones vienen a 1024×1024 con paleta propia y saturada (naranja fuego,
+// amarillo eléctrico, contorno negro y brillos especulares) y la mascota es
+// plana, con el color saliendo de la etapa evolutiva. Sobre la silueta se leían
+// como calcomanías pegadas. Además el arte arrastra dos defectos de origen: los
+// lentes traen placas grises del fondo de la ilustración, y la segunda variante
+// del gorro de noche es directamente un frasco con "Zz", no un gorro.
+//
+// El arte se conserva y el camino 'trazo' sigue entero: si más adelante se
+// recortan bien esas piezas, alcanza con volver a cambiar esta constante.
 //
 // `lazo` no tiene SVG de origen, así que siempre se dibuja en código.
 import {
@@ -25,7 +30,7 @@ import {
 import { posicionAccesorio } from '../posicionAccesorios';
 import { TRAZOS_ACCESORIOS } from './trazos.generado';
 
-export const ORIGEN_POR_DEFECTO = 'trazo';
+export const ORIGEN_POR_DEFECTO = 'codigo';
 
 // Caja de diseño de cada accesorio, en unidades del lienzo 0 0 100 100. El arte
 // se ajusta DENTRO de la caja conservando su proporción (encaje "contain"): así
@@ -88,60 +93,109 @@ const punto = ({ x, y, scale }) => ({
   n: (valor) => valor * scale,
 });
 
-function lentesSol(pos, P) {
+// Las variantes NO son un recoloreo automático: cada una cambia lo que la hace
+// reconocible por su nombre ("Lentes dorados" tiene marco dorado, "Gorro de
+// confeti" tiene serpentina). Un filtro de tono sobre el mismo dibujo daría dos
+// piezas que en la casilla del vestidor se ven iguales.
+function lentesSol(pos, P, variante = 0) {
   const p = punto(pos);
+  const marco = variante === 1 ? GOLD : P.deep;
   const nodos = [
     path(ruta`M${p.x(-12.5)},${p.y(-1.5)} L${p.x(-17)},${p.y(-3.8)} M${p.x(12.5)},${p.y(-1.5)} L${p.x(17)},${p.y(-3.8)}`, {
-      stroke: P.deep, strokeWidth: p.n(1.8), fill: 'none', strokeLinecap: 'round',
+      stroke: marco, strokeWidth: p.n(1.8), fill: 'none', strokeLinecap: 'round',
     }),
   ];
 
   for (const lado of [-1, 1]) {
     const cx = p.x(lado * 7.2);
-    nodos.push(con(elip(cx, p.y(), p.n(6.2), p.n(4.8), P.deep), contornoFino(P)));
+    nodos.push(con(elip(cx, p.y(), p.n(6.2), p.n(4.8), marco), contornoFino(P)));
     nodos.push(elip(cx, p.y(0.2), p.n(4.9), p.n(3.6), P.ink));
     nodos.push(elip(
       cx - p.n(1.7), p.y(-1.2), p.n(1.8), p.n(0.75), P.belly, 0.65,
     ));
   }
   nodos.push(path(ruta`M${p.x(-1.3)},${p.y(-0.8)} Q${p.x()},${p.y(-2.8)} ${p.x(1.3)},${p.y(-0.8)}`, {
-    stroke: P.deep, strokeWidth: p.n(1.8), fill: 'none', strokeLinecap: 'round',
+    stroke: marco, strokeWidth: p.n(1.8), fill: 'none', strokeLinecap: 'round',
   }));
   return nodos;
 }
 
-function sombreroFiesta(pos, P) {
+function sombreroFiesta(pos, P, variante = 0) {
   const p = punto(pos);
+  const cono = path(ruta`M${p.x(-8.5)},${p.y(1.5)} L${p.x()},${p.y(-20)} L${p.x(8.5)},${p.y(1.5)}Z`, {
+    fill: P.deep, ...contornoFino(P),
+  });
+  const ruedo = path(ruta`M${p.x(-10)},${p.y(1)} Q${p.x()},${p.y(5)} ${p.x(10)},${p.y(1)} L${p.x(9.5)},${p.y(4)} Q${p.x()},${p.y(7)} ${p.x(-9.5)},${p.y(4)}Z`, {
+    fill: CORAL_SOFT, ...contornoFino(P),
+  });
+  const pompon = con(circ(p.x(), p.y(-21), p.n(2.7), GOLD), contornoFino(P));
+
+  // Serpentina en zigzag bajando el cono, más una estrellita: es lo que el
+  // nombre "Gorro de confeti" promete y lo que lo separa del de fiesta.
+  if (variante === 1) {
+    const estrella = ruta`M${p.x(-3.4)},${p.y(-8)} l${p.n(0.9)},${p.n(-2.2)} l${p.n(2.2)},${p.n(-0.9)} l${p.n(-2.2)},${p.n(-0.9)} l${p.n(-0.9)},${p.n(-2.2)} l${p.n(-0.9)},${p.n(2.2)} l${p.n(-2.2)},${p.n(0.9)} l${p.n(2.2)},${p.n(0.9)}Z`;
+    return [
+      cono,
+      path(ruta`M${p.x(-4.6)},${p.y(-14)} Q${p.x(1)},${p.y(-12.4)} ${p.x(-3.2)},${p.y(-10)} Q${p.x(3.2)},${p.y(-7.6)} ${p.x(-2.2)},${p.y(-5)} Q${p.x(4.4)},${p.y(-2.6)} ${p.x(-1.4)},${p.y(-0.4)}`, {
+        stroke: CORAL, strokeWidth: p.n(1.7), fill: 'none', strokeLinecap: 'round',
+      }),
+      path(estrella, { fill: GOLD }),
+      circ(p.x(4.2), p.y(-11.5), p.n(1.2), P.hi),
+      ruedo,
+      pompon,
+    ];
+  }
+
   return [
-    path(ruta`M${p.x(-8.5)},${p.y(1.5)} L${p.x()},${p.y(-20)} L${p.x(8.5)},${p.y(1.5)}Z`, {
-      fill: P.deep, ...contornoFino(P),
-    }),
+    cono,
     path(ruta`M${p.x(-5.5)},${p.y(-6)} Q${p.x()},${p.y(-2.5)} ${p.x(5.5)},${p.y(-6)}`, {
       stroke: P.hi, strokeWidth: p.n(2.2), fill: 'none', strokeLinecap: 'round',
     }),
     circ(p.x(-1.8), p.y(-12), p.n(1.5), GOLD),
     circ(p.x(3.2), p.y(-8.8), p.n(1.25), CORAL_SOFT),
-    path(ruta`M${p.x(-10)},${p.y(1)} Q${p.x()},${p.y(5)} ${p.x(10)},${p.y(1)} L${p.x(9.5)},${p.y(4)} Q${p.x()},${p.y(7)} ${p.x(-9.5)},${p.y(4)}Z`, {
-      fill: CORAL_SOFT, ...contornoFino(P),
-    }),
-    con(circ(p.x(), p.y(-21), p.n(2.7), GOLD), contornoFino(P)),
+    ruedo,
+    pompon,
   ];
 }
 
-function gorritoNoche(pos, P) {
+// v0 "Gorro de lana": vuelta tejida con puntadas, sin luna. v1 "Gorro
+// dormilón": la misma caída, con la luna dorada. Comparten silueta a propósito
+// —son el mismo gorro— pero se distinguen de un vistazo en la casilla.
+function gorritoNoche(pos, P, variante = 0) {
   const p = punto(pos);
-  return [
-    path(ruta`M${p.x(-9)},${p.y()} C${p.x(-8)},${p.y(-11)} ${p.x(-2)},${p.y(-18)} ${p.x(5)},${p.y(-17)} C${p.x(11)},${p.y(-16)} ${p.x(12)},${p.y(-10)} ${p.x(17)},${p.y(-9)} C${p.x(12)},${p.y(-6.5)} ${p.x(8)},${p.y(-5)} ${p.x(6)},${p.y()}Z`, {
-      fill: P.edge, ...contornoFino(P),
-    }),
-    path(ruta`M${p.x(-2.5)},${p.y(-12.5)} a${p.n(4)},${p.n(4)} 0 1 0 ${p.n(4)},${p.n(6)} a${p.n(3.2)},${p.n(3.2)} 0 1 1 -${p.n(4)},-${p.n(6)}Z`, {
-      fill: GOLD,
-    }),
-    path(ruta`M${p.x(-10)},${p.y(-1)} Q${p.x()},${p.y(2.5)} ${p.x(10)},${p.y(-1)} L${p.x(10)},${p.y(3)} Q${p.x()},${p.y(6)} ${p.x(-10)},${p.y(3)}Z`, {
-      fill: P.belly, ...contornoFino(P),
-    }),
+  const caida = path(ruta`M${p.x(-9)},${p.y()} C${p.x(-8)},${p.y(-11)} ${p.x(-2)},${p.y(-18)} ${p.x(5)},${p.y(-17)} C${p.x(11)},${p.y(-16)} ${p.x(12)},${p.y(-10)} ${p.x(17)},${p.y(-9)} C${p.x(12)},${p.y(-6.5)} ${p.x(8)},${p.y(-5)} ${p.x(6)},${p.y()}Z`, {
+    fill: P.edge, ...contornoFino(P),
+  });
+  const vuelta = path(ruta`M${p.x(-10)},${p.y(-1)} Q${p.x()},${p.y(2.5)} ${p.x(10)},${p.y(-1)} L${p.x(10)},${p.y(3)} Q${p.x()},${p.y(6)} ${p.x(-10)},${p.y(3)}Z`, {
+    fill: P.belly, ...contornoFino(P),
+  });
+  const pompon = [
     con(circ(p.x(18), p.y(-9), p.n(3), P.hi), contornoFino(P)),
     circ(p.x(17.2), p.y(-10), p.n(1), '#FFFFFF', 0.62),
+  ];
+
+  if (variante === 1) {
+    return [
+      caida,
+      path(ruta`M${p.x(-2.5)},${p.y(-12.5)} a${p.n(4)},${p.n(4)} 0 1 0 ${p.n(4)},${p.n(6)} a${p.n(3.2)},${p.n(3.2)} 0 1 1 -${p.n(4)},-${p.n(6)}Z`, {
+        fill: GOLD,
+      }),
+      vuelta,
+      ...pompon,
+    ];
+  }
+
+  return [
+    caida,
+    // Puntadas de lana: dos hileras de "v" siguiendo la curva del gorro.
+    path(ruta`M${p.x(-5.5)},${p.y(-8.5)} l${p.n(2)},${p.n(2)} l${p.n(2)},${p.n(-2)} M${p.x(0.5)},${p.y(-11)} l${p.n(2)},${p.n(2)} l${p.n(2)},${p.n(-2)}`, {
+      stroke: P.deep, strokeWidth: p.n(1.2), fill: 'none', strokeLinecap: 'round', strokeLinejoin: 'round', opacity: 0.7,
+    }),
+    vuelta,
+    path(ruta`M${p.x(-6)},${p.y(0.6)} l0,${p.n(2.6)} M${p.x(-2)},${p.y(1.4)} l0,${p.n(2.6)} M${p.x(2)},${p.y(1.4)} l0,${p.n(2.6)} M${p.x(6)},${p.y(0.6)} l0,${p.n(2.6)}`, {
+      stroke: P.edge, strokeWidth: p.n(1.1), fill: 'none', strokeLinecap: 'round', opacity: 0.75,
+    }),
+    ...pompon,
   ];
 }
 
@@ -256,9 +310,10 @@ export function dibujarAccesorioBase({
   const pos = posicionAccesorio(especie, id);
   if (!pos) return [];
 
+  const v = varianteValida(id, variante);
   if (origen === 'trazo' && TRAZOS_ACCESORIOS[id]) {
-    return montarTrazo(id, pos, varianteValida(id, variante));
+    return montarTrazo(id, pos, v);
   }
   const dibujar = DIBUJANTES[id];
-  return dibujar ? dibujar(pos, paleta) : [];
+  return dibujar ? dibujar(pos, paleta, v) : [];
 }

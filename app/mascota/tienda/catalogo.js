@@ -1,3 +1,6 @@
+import { CATALOGO_ACCESORIOS } from '../sprites/accesorios';
+import { ACCESORIOS_BASE_EQUIPABLES } from '../sprites/accesorios/catalogoBase';
+
 const categoria = (datos) => Object.freeze(datos);
 const producto = (datos) => Object.freeze({
   origen: 'tienda',
@@ -123,3 +126,38 @@ export const CATALOGO_TIENDA = Object.freeze([
     preview: { variante: 'nocturno' },
   }),
 ]);
+
+// ── Estante del vestidor ────────────────────────────────────────────────────
+// Las piezas que la mascota SÍ puede llevar puestas hoy. No se compran: se ganan
+// subiendo de nivel de cariño, y el backend es quien decide cuándo. Van en la
+// misma pantalla que lo comprable porque la pregunta de la persona es una sola
+// —"¿qué le puedo poner?"—, pero se muestran con su nivel y sin botón de compra:
+// ofrecer "Comprar" algo que no se compra sería mentir sobre cómo funciona.
+const ESTANTE_BASE = {
+  'sombrero-fiesta': 'sombreros',
+  'sombrero-fiesta-b': 'sombreros',
+  'gorrito-noche': 'sombreros',
+  'gorrito-noche-b': 'sombreros',
+  'lentes-sol': 'accesorios',
+  'lentes-sol-b': 'accesorios',
+  lazo: 'accesorios',
+};
+
+const nivelDeAccesorio = (id) => CATALOGO_ACCESORIOS.find((a) => a.id === id)?.nivel ?? null;
+
+export const CATALOGO_VESTIDOR = Object.freeze(
+  ACCESORIOS_BASE_EQUIPABLES.map(({ id, nombre, descripcion }) => Object.freeze({
+    origen: 'vestidor',
+    id,
+    categoria: ESTANTE_BASE[id],
+    nombre,
+    descripcion,
+    nivel: nivelDeAccesorio(id),
+    // Ranura en la que se equipa; la tienda la usa para dibujar la vista previa.
+    ranura: 'cabeza',
+  })),
+);
+
+// Lo que la pantalla muestra por defecto: primero lo que de verdad se puede
+// llevar puesto, después lo aspiracional que espera al contrato de moneda.
+export const CATALOGO_COMPLETO = Object.freeze([...CATALOGO_VESTIDOR, ...CATALOGO_TIENDA]);

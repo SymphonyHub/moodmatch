@@ -8,15 +8,37 @@ import Tappable from '../../components/Tappable';
 import { makeThemedStyles, useTheme } from '../../theme/ThemeContext';
 import { isCompactWidth } from '../../utils/responsive';
 import MascotaSprite from '../MascotaSprite';
-import { CATALOGO_TIENDA, CATEGORIAS_TIENDA } from './catalogo';
+import { CATALOGO_COMPLETO, CATEGORIAS_TIENDA } from './catalogo';
 
 const tabs = CATEGORIAS_TIENDA.map(({ id, etiqueta }) => ({ id, label: etiqueta }));
 
 const textoSemillitas = (cantidad) =>
   `${cantidad} ${cantidad === 1 ? 'semillita' : 'semillitas'}`;
 
-function VistaProducto({ item }) {
+// Encuadre de la vista previa del vestidor: el sprite se dibuja grande y la
+// tarjeta lo recorta a la altura de la cabeza, que es donde va la pieza. Un
+// accesorio de cabeza dibujado de cuerpo entero en una miniatura no se
+// distingue de otro.
+const SPRITE_PREVIEW = 190;
+
+function VistaProducto({ item, especie, etapa }) {
   const styles = useStyles();
+
+  if (item.origen === 'vestidor') {
+    return (
+      <View style={styles.previewVestidor} testID={`vestidor-preview-${item.id}`}>
+        <View style={styles.previewVestidorRecorte}>
+          <MascotaSprite
+            especie={especie}
+            etapa={etapa}
+            size={SPRITE_PREVIEW}
+            accesorioCabeza={item.ranura === 'cabeza' ? item.id : null}
+            accesorioColor={item.ranura === 'color' ? item.id : null}
+          />
+        </View>
+      </View>
+    );
+  }
 
   if (item.categoria === 'habitat') {
     return (
@@ -52,7 +74,68 @@ function VistaProducto({ item }) {
   );
 }
 
-function TarjetaProducto({ item, monedas, comprado, onComprar }) {
+// Tarjeta de una pieza del vestidor: no se compra, se gana. Muestra el nivel que
+// pide y si ya está disponible, y nunca ofrece un botón de compra.
+function TarjetaVestidor({
+  item, desbloqueado, especie, etapa, onVerVestidor,
+}) {
+  const { theme } = useTheme();
+  const styles = useStyles();
+  const requisito = Number.isFinite(item.nivel) ? `Nivel ${item.nivel} de cariño` : 'Se gana jugando';
+
+  return (
+    <Tappable
+      style={[styles.tarjeta, desbloqueado && styles.tarjetaComprada]}
+      onPress={() => desbloqueado && onVerVestidor?.(item)}
+      disabled={!desbloqueado || !onVerVestidor}
+      haptic={false}
+      accessibilityLabel={desbloqueado
+        ? `${item.nombre}. Ya está disponible en el vestidor`
+        : `${item.nombre}, bloqueado. ${requisito}`}
+      accessibilityState={{ disabled: !desbloqueado }}
+      testID={`tienda-item-${item.id}`}
+    >
+      <View style={styles.previewProducto}>
+        <VistaProducto item={item} especie={especie} etapa={etapa} />
+        {!desbloqueado && (
+          <View style={styles.veloBloqueado}>
+            <Ionicons name="lock-closed" size={16} color={theme.colors.textMuted} />
+          </View>
+        )}
+      </View>
+
+      <View style={styles.infoProducto}>
+        <Text style={styles.nombreProducto}>{item.nombre}</Text>
+        <Text style={styles.descripcionProducto}>{item.descripcion}</Text>
+        <View style={styles.precioFila}>
+          <Ionicons
+            name={desbloqueado ? 'sparkles' : 'trending-up-outline'}
+            size={13}
+            color={desbloqueado ? theme.colors.accent : theme.colors.textMuted}
+          />
+          <Text style={[styles.precioTexto, !desbloqueado && styles.requisitoTexto]}>
+            {requisito}
+          </Text>
+        </View>
+      </View>
+
+      <View style={[styles.accionProducto, styles.accionVestidor]}>
+        <Ionicons
+          name={desbloqueado ? 'shirt-outline' : 'time-outline'}
+          size={15}
+          color={theme.colors.primary}
+        />
+        <Text style={[styles.accionTexto, styles.accionTextoVestidor]}>
+          {desbloqueado ? 'En el vestidor' : 'Aún no'}
+        </Text>
+      </View>
+    </Tappable>
+  );
+}
+
+function TarjetaProducto({
+  item, monedas, comprado, onComprar, especie, etapa,
+}) {
   const { theme } = useTheme();
   const styles = useStyles();
   const alcanza = monedas >= item.precio;
@@ -94,7 +177,7 @@ function TarjetaProducto({ item, monedas, comprado, onComprar }) {
       testID={`tienda-item-${item.id}`}
     >
       <View style={styles.previewProducto}>
-        <VistaProducto item={item} />
+        <VistaProducto item={item} especie={especie} etapa={etapa} />
       </View>
 
       <View style={styles.infoProducto}>
@@ -129,13 +212,15 @@ function TarjetaProducto({ item, monedas, comprado, onComprar }) {
 export default function TiendaScreen({
   monedas = 0,
   comprados = [],
-  items = CATALOGO_TIENDA,
+  desbloqueados = [],
+  items = CATALOGO_COMPLETO,
   categoriaInicial = CATEGORIAS_TIENDA[0].id,
   especie,
   etapa = 1,
   nombreMascota,
   varianteHabitat = 'sereno',
   onComprar,
+  onVerVestidor,
 }) {
   const { width } = useWindowDimensions();
   const compacta = isCompactWidth(width);
@@ -148,7 +233,8 @@ export default function TiendaScreen({
   );
   const saldo = Number.isFinite(monedas) && monedas >= 0 ? monedas : 0;
   const idsComprados = new Set(Array.isArray(comprados) ? comprados : []);
-  const catalogo = Array.isArray(items) ? items : CATALOGO_TIENDA;
+  const idsDesbloqueados = new Set(Array.isArray(desbloqueados) ? desbloqueados : []);
+  const catalogo = Array.isArray(items) ? items : CATALOGO_COMPLETO;
   const visibles = catalogo.filter((item) => item.categoria === categoriaActiva);
   const destinatario = nombreMascota ? ` para ${nombreMascota}` : '';
 
@@ -235,12 +321,24 @@ export default function TiendaScreen({
             index={Math.min(index + 1, 4)}
             style={compacta ? styles.columnaCompleta : styles.columnaDoble}
           >
-            <TarjetaProducto
-              item={item}
-              monedas={saldo}
-              comprado={idsComprados.has(item.id)}
-              onComprar={onComprar}
-            />
+            {item.origen === 'vestidor' ? (
+              <TarjetaVestidor
+                item={item}
+                desbloqueado={idsDesbloqueados.has(item.id)}
+                especie={especie}
+                etapa={etapa}
+                onVerVestidor={onVerVestidor}
+              />
+            ) : (
+              <TarjetaProducto
+                item={item}
+                monedas={saldo}
+                comprado={idsComprados.has(item.id)}
+                onComprar={onComprar}
+                especie={especie}
+                etapa={etapa}
+              />
+            )}
           </Entrance>
         ))}
       </View>
@@ -420,6 +518,36 @@ const useStyles = makeThemedStyles((t) => ({
     backgroundColor: t.colors.accentSoft,
   },
   habitatMiniatura: { borderRadius: t.shape.radiusMd },
+  previewVestidor: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    overflow: 'hidden',
+  },
+  // El sprite se dibuja a SPRITE_PREVIEW y sube para que la tarjeta lo recorte a
+  // la altura de la cabeza, donde va la pieza.
+  previewVestidorRecorte: { marginTop: -26 },
+  veloBloqueado: {
+    position: 'absolute',
+    right: 6,
+    bottom: 6,
+    width: 26,
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 13,
+    backgroundColor: t.colors.surface,
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.border,
+  },
+  requisitoTexto: { color: t.colors.textMuted },
+  accionVestidor: {
+    backgroundColor: t.colors.primarySoft,
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.primarySoftBorder,
+  },
+  accionTextoVestidor: { color: t.colors.primary },
   previewIlustrado: {
     width: '100%',
     height: '100%',

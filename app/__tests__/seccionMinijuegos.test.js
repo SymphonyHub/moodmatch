@@ -52,11 +52,20 @@ test('muestra saldo, disponibilidad independiente y abre solo el juego habilitad
   act(() => renderer.unmount());
 });
 
-test('no expone rutas rotas mientras el backend anterior no incluya cooldowns', async () => {
+test.each([
+  ['no incluye cooldowns', {}],
+  ['solo trae un tipo', { minijuegos: { ATRAPALA: { puedeJugar: true, disponibleEn: null } } }],
+  ['trae un estado incoherente', {
+    minijuegos: {
+      ATRAPALA: { puedeJugar: true, disponibleEn: '2026-07-28T12:00:00.000Z' },
+      RITMO_CARINO: { puedeJugar: false, disponibleEn: '2026-07-28T12:00:00.000Z' },
+    },
+  }],
+])('no expone rutas rotas si el backend %s', async (_, parche) => {
   let renderer;
   await act(async () => {
     renderer = create(
-      <ThemeProvider><SeccionMinijuegos mascota={{ amistadId: 7 }} /></ThemeProvider>,
+      <ThemeProvider><SeccionMinijuegos mascota={{ amistadId: 7, ...parche }} /></ThemeProvider>,
     );
     await Promise.resolve();
   });

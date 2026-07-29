@@ -46,17 +46,34 @@ ese contrato. Ninguno modifica archivos del otro sin coordinación del Agente E.
 
 | Agente | Rama | Worktree | Responsabilidad | Estado |
 | --- | --- | --- | --- | --- |
-| A | `feature/fase17-backend-energia` | `../MoodMatch-agenteA` | Energía, EXP, hitos de evolución y anti-spam | Integrado en `main` local mediante `61a229e` |
-| B | `feature/fase17-contratos-minijuegos` | `../MoodMatch-agenteB` | Atrápala, Ritmo de cariño y cooldown diario | Integrado en `main` local mediante `b07fa9c` |
-| C | `feature/mascota-pulido-visual` | `../MoodMatch-agenteC` | SVG, rig, jugosidad y catálogo visual de accesorios | Integrado en `main` local mediante `d0d43dc` |
+| A | `feature/fase17-backend-energia` | `../MoodMatch-agenteA` | Energía, EXP, hitos de evolución y anti-spam | Integrado en `main` local mediante `b9bdf85` |
+| B | `feature/fase17-contratos-minijuegos` | `../MoodMatch-agenteB` | Atrápala, Ritmo de cariño y cooldown diario | Integrado en `main` local mediante `f8b6caa` |
+| C | `feature/mascota-pulido-visual` | `../MoodMatch-agenteC` | SVG, rig, jugosidad y catálogo visual de accesorios | Integrado en `main` local mediante `bdafab8` |
 | D | `feature/fase17-tienda-habitat` | `../MoodMatch-agenteD` | Layout de tienda y fondo de hábitat | Integrado en `main` local mediante `2b094f5` |
-| E | `main` | checkout principal `MoodMatch` | Integración, QA, hardening y coordinación | Cierre técnico local validado; publicación bloqueada hasta confirmación del usuario |
+| D | `fix/ajustes-mis-paletas-compacto` | `../MoodMatch-agenteD` | Vista compacta de Mis Paletas | Integrado en `main` local mediante `3d56b57` |
+| E | `main` | checkout principal `MoodMatch` | Integración, QA, hardening y coordinación | Segunda ronda de integración cerrada; publicación bloqueada hasta confirmación del usuario |
 
 El reparto y el historial de gates viven en `PLAN-INTEGRACION-FASE17.md`.
-**Fase 17 está completada e integrada al 100% en `main` local.** El corte de
-código `2b094f5` pasó 78/78 suites y 1171/1171 tests en app, 33/33 suites y
-558/558 tests en backend, además de `git diff --check`. No publicar ni iniciar
-otra fase hasta la prueba final y confirmación explícita del usuario.
+**Fase 17 está completada e integrada al 100% en `main` local.**
+
+> **SEGUNDA RONDA (2026-07-28).** Las cuatro ramas siguieron recibiendo commits
+> después del primer cierre (`2b094f5`), así que se volvieron a mergear sobre
+> `main`: A, B y `fix/ajustes-mis-paletas-compacto` con un commit cada una, y C
+> con siete. **Ninguna dio conflicto.** El corte `bdafab8` pasa 83/83 suites y
+> 1282/1282 tests en app, 33/33 y 624/624 en backend.
+>
+> `feature/mascota-assets-locales` (accesorios importados, Lottie y vestidor)
+> **no se mergea por separado**: la rama de C ya la contiene entera y construyó
+> tres commits encima. Merjearla es un no-op.
+
+> **AVISO (2026-07-28) — el arte importado NO es el dibujo por defecto.** Los
+> accesorios del catálogo base se dibujan en código (`ORIGEN_POR_DEFECTO =
+> 'codigo'` en `sprites/accesorios/catalogoBase.js`). El arte de
+> `app/mascota/assets/accesorios/*.svg` está convertido, probado y disponible en
+> el camino `'trazo'`, pero sobre la silueta se lee como calcomanía pegada y dos
+> piezas traen defectos de origen (los lentes arrastran placas grises del fondo
+> de la ilustración; la segunda variante del gorro de noche es un frasco con
+> "Zz"). Si se recortan bien esas piezas, alcanza con cambiar la constante.
 
 > **AVISO (2026-07-28) — dependencia NATIVA nueva: `lottie-react-native`.** Se
 > agrega `lottie-react-native@~7.3.1` (versión que `expo install` fija para SDK

@@ -67,7 +67,7 @@ describe('POST /api/mascota/:amistadId/regalo', () => {
       }),
     }));
     expect(prisma.mascotaAmistad.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      update: { nivelCarino: { increment: CARINO_POR_REGALO } },
+      update: { nivelCarino: { increment: CARINO_POR_REGALO }, energia: 50 },
     }));
   });
 
@@ -130,7 +130,7 @@ describe('notificación social suave al cuidar', () => {
 
   test('no avisa si el cuidado está en cooldown', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
-    prisma.mascotaAmistad.upsert.mockResolvedValue({
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({
       ...mascota, ultimoCuidadoUsuario2: new Date(), retoCooperativo: null,
     });
 
@@ -147,7 +147,7 @@ describe('catálogo de retos en el cuidado', () => {
   test('completa el reto de ánimo el mismo día leyendo los registros de ambos', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
     const mismoDia = '2026-07-21T09:00:00.000Z';
-    prisma.mascotaAmistad.upsert.mockResolvedValue({
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({
       ...mascota,
       nivelCarino: 3,
       retoCooperativo: {
@@ -178,7 +178,7 @@ describe('catálogo de retos en el cuidado', () => {
 
   test('el reto de mensajes no se completa por debajo de la meta de pares', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
-    prisma.mascotaAmistad.upsert.mockResolvedValue({
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({
       ...mascota,
       retoCooperativo: {
         tipo: 'RACHA_MENSAJES', meta: 3,
@@ -205,7 +205,7 @@ describe('catálogo de retos en el cuidado', () => {
 
   test('POST /reto rota al siguiente tipo del catálogo', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
-    prisma.mascotaAmistad.upsert.mockResolvedValue({
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({
       ...mascota,
       retoCooperativo: {
         tipo: 'CUIDADO_DUO', expiraEn: '2000-01-01T00:00:00.000Z',

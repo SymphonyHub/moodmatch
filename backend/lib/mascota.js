@@ -17,8 +17,8 @@ const { derivarEspecie } = require('./especies');
 const { derivarDesbloqueados } = require('./accesorios');
 const {
   ENERGIA_INICIAL,
+  datosEnergia,
   presentarEnergia,
-  ultimoCuidadoMs,
 } = require('./energiaMascota');
 const {
   EXPERIENCIA_INICIAL,
@@ -53,23 +53,31 @@ const datosMascota = (amistadId, nivelCarino = 0) => ({
   experiencia: EXPERIENCIA_INICIAL,
 });
 
-const asegurarMascota = (db, amistadId) =>
-  db.mascotaAmistad.upsert({
-    where: { amistadId },
-    create: datosMascota(amistadId),
-    update: { nivelCarino: { increment: 0 } },
-  });
+// Devuelve la fila tal como está, creándola si falta. A diferencia del upsert
+// con `increment: 0` que hacía antes, no escribe cuando la mascota existe: esa
+// escritura vacía movía `updatedAt` —el ancla de la estamina— antes de que nadie
+// pudiera leerla, y se comía la recarga acumulada.
+// Devuelve la fila cruda a propósito: `energia` y `updatedAt` tienen que viajar
+// juntos para que quien derive la recarga (`datosEnergia`, `resolverConsumo`) la
+// cuente una sola vez.
+async function asegurarMascota(db, amistadId) {
+  const actual = await db.mascotaAmistad.findUnique({ where: { amistadId } });
+  return actual ?? db.mascotaAmistad.create({ data: datosMascota(amistadId) });
+}
 
-const sumarCarino = (db, amistadId, puntos) =>
+// `extra` viaja al lado del incremento de cariño para que quien ya leyó la fila
+// materialice también su energía en la misma escritura.
+const sumarCarino = (db, amistadId, puntos, extra = {}) =>
   db.mascotaAmistad.upsert({
     where: { amistadId },
     create: datosMascota(amistadId, puntos),
-    update: { nivelCarino: { increment: puntos } },
+    update: { nivelCarino: { increment: puntos }, ...extra },
   });
 
 // Un envío suma solamente cuando completa un nuevo par A→B + B→A. Así una
 // persona no puede subir el cariño enviando muchos mensajes sin respuesta.
-async function registrarMensajeReciproco(db, amistad, fromUserId) {
+// `ahora` fija el instante contra el que se calcula la recarga materializada.
+async function registrarMensajeReciproco(db, amistad, fromUserId, ahora = new Date()) {
   const toUserId = amistad.userId === fromUserId ? amistad.friendId : amistad.userId;
   const [enviados, recibidos] = await Promise.all([
     db.cheer.count({
@@ -80,10 +88,11 @@ async function registrarMensajeReciproco(db, amistad, fromUserId) {
     }),
   ]);
 
+  const actual = await asegurarMascota(db, amistad.id);
   if (enviados <= recibidos) {
-    return sumarCarino(db, amistad.id, CARINO_POR_PAR_DE_MENSAJES);
+    return sumarCarino(db, amistad.id, CARINO_POR_PAR_DE_MENSAJES, datosEnergia(actual, ahora));
   }
-  return asegurarMascota(db, amistad.id);
+  return actual;
 }
 
 const mensajeActividad = (completionId) => `${PREFIJO_ACTIVIDAD}${completionId}`;
@@ -106,6 +115,20 @@ const bonusReto = (nivelCarino) => Math.max(0, siguienteUmbral(nivelCarino) - ni
 
 const claveUsuarioReto = (amistad, userId) =>
   amistad.userId === userId ? 'progresoUsuario1' : 'progresoUsuario2';
+
+// Marca más reciente de cuidado del vínculo, mirando los dos lados. Vivía en
+// energiaMascota mientras la energía se desgastaba por abandono; con el modelo
+// de estamina la energía ya no depende del cuidado, solo "necesita atención".
+function ultimoCuidadoMs(mascota = {}) {
+  const marcas = [
+    mascota.createdAt,
+    mascota.ultimoCuidadoUsuario1,
+    mascota.ultimoCuidadoUsuario2,
+  ]
+    .map((valor) => (valor ? new Date(valor).getTime() : null))
+    .filter((ms) => ms !== null && Number.isFinite(ms));
+  return marcas.length ? Math.max(...marcas) : null;
+}
 
 function necesitaAtencion(mascota, ahora = new Date()) {
   const ultimo = ultimoCuidadoMs(mascota);

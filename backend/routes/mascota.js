@@ -35,9 +35,10 @@ const { diaUTC } = require('../lib/interaccionesSociales');
 const { derivarEspecie } = require('../lib/especies');
 const { CATEGORIAS, derivarDesbloqueados, puedeEquipar } = require('../lib/accesorios');
 const {
-  calcularEnergiaActual,
+  datosEnergia,
+  errorEnergiaInsuficiente,
   presentarEnergia,
-  recuperarEnergia,
+  resolverConsumo,
 } = require('../lib/energiaMascota');
 const {
   calcularProgresion,
@@ -231,26 +232,36 @@ async function responderRecompensaSimple(req, res, amistadIdRaw, tipo, minijuego
   const amistad = await buscarAmistadPropia(amistadId, req.user.userId);
   if (!amistad) return res.status(404).json({ error: 'Amistad no encontrada' });
 
+  const ahora = new Date();
   let resultado;
   try {
     resultado = await transaccionSerializable(async (tx) => {
       const actual = await tx.mascotaAmistad.findUnique({ where: { amistadId } });
       if (!mascotaAceptada(actual)) return { noDisponible: true };
 
+      // El saldo se valida antes de reclamar nada: si no alcanza, la
+      // transacción termina sin haber escrito el marcador de recompensa.
+      const consumo = resolverConsumo(actual, tipo, ahora);
+      if (!consumo.ok) return { energiaInsuficiente: consumo, mascota: actual };
+
       const recompensa = await reclamarRecompensaDiaria(tx, {
         amistad,
         userId: req.user.userId,
         tipo,
         minijuego,
+        ahora,
       });
       const avance = prepararActualizacionExperiencia(
         actual,
         recompensa.experienciaOtorgada,
+        ahora,
       );
-      const mascota = recompensa.experienciaOtorgada > 0
+      // Aunque el límite diario deje la experiencia en cero, el gasto de
+      // estamina ya ocurrió y tiene que quedar guardado.
+      const mascota = recompensa.experienciaOtorgada > 0 || consumo.energiaRequerida > 0
         ? await tx.mascotaAmistad.update({
           where: { amistadId, activa: true, invitacionEstado: 'aceptada' },
-          data: avance.data,
+          data: { ...avance.data, ...consumo.data },
         })
         : actual;
       return {
@@ -268,6 +279,12 @@ async function responderRecompensaSimple(req, res, amistadIdRaw, tipo, minijuego
 
   if (resultado.noDisponible) {
     return res.status(404).json({ error: 'No hay una mascota activa para esta amistad' });
+  }
+  if (resultado.energiaInsuficiente) {
+    return res.status(422).json({
+      ...errorEnergiaInsuficiente(resultado.energiaInsuficiente),
+      mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId),
+    });
   }
   return res.json({
     mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId, {
@@ -490,8 +507,9 @@ router.post('/:amistadId/invitacion/rechazar', requireAuth, async (req, res) => 
 router.get('/:amistadId', requireAuth, (req, res) => responderEstado(req, res, req.params.amistadId));
 
 // Alimentar y jugar comparten el cooldown de cuidado que ya existia por
-// persona. Alimentar suma carino; jugar recupera energia. Ambas acciones pueden
-// completar el progreso cooperativo porque las dos son momentos de cuidado.
+// persona. Alimentar suma carino y es gratis; jugar gasta estamina. Ambas
+// acciones pueden completar el progreso cooperativo porque las dos son momentos
+// de cuidado.
 async function responderCuidado(
   req,
   res,
@@ -522,6 +540,11 @@ async function responderCuidado(
         return { cooldown: true, legacy: true, mascota: actual };
       }
 
+      // Primero el saldo, después cualquier escritura: un rechazo por estamina
+      // deja la transacción exactamente como estaba.
+      const consumo = resolverConsumo(actual, accion === 'jugar' ? 'JUGAR' : 'ALIMENTAR', ahora);
+      if (!consumo.ok) return { energiaInsuficiente: consumo, mascota: actual };
+
       const recompensa = await reclamarRecompensaDiaria(tx, {
         amistad,
         userId: req.user.userId,
@@ -534,14 +557,14 @@ async function responderCuidado(
           recompensa.experienciaOtorgada,
           ahora,
         );
-        const mascota = recompensa.experienciaOtorgada > 0
+        const mascota = recompensa.experienciaOtorgada > 0 || consumo.energiaRequerida > 0
           ? await tx.mascotaAmistad.update({
             where: {
               amistadId: amistad.id,
               activa: true,
               invitacionEstado: 'aceptada',
             },
-            data: avance.data,
+            data: { ...avance.data, ...consumo.data },
           })
           : actual;
         return {
@@ -578,10 +601,9 @@ async function responderCuidado(
         ...actual,
         historialHitos: historial,
       }, recompensa.experienciaOtorgada, ahora);
-      const energiaActual = calcularEnergiaActual(actual, ahora);
       const data = {
         [campoCuidado]: ahora,
-        energia: accion === 'jugar' ? recuperarEnergia(energiaActual) : energiaActual,
+        ...consumo.data,
         retoCooperativo: reto,
         historialHitos: historial,
         ...avance.data,
@@ -612,6 +634,15 @@ async function responderCuidado(
 
   if (resultado.noDisponible) {
     return res.status(404).json({ error: 'No hay una mascota activa para esta amistad' });
+  }
+
+  // La mascota viaja en el rechazo para que el cliente pueda pintar la barra y
+  // el contador de recarga sin pedir el estado otra vez.
+  if (resultado.energiaInsuficiente) {
+    return res.status(422).json({
+      ...errorEnergiaInsuficiente(resultado.energiaInsuficiente),
+      mascota: await mascotaVisible(prisma, resultado.mascota, amistad, req.user.userId, { conRegalo: true }),
+    });
   }
 
   if (resultado.cooldown) {
@@ -662,6 +693,7 @@ router.post('/:amistadId/reto', requireAuth, async (req, res) => {
   if (!amistad) return res.status(404).json({ error: 'Amistad no encontrada' });
   if (!(await exigirAceptada(res, amistadId))) return undefined;
 
+  const ahora = new Date();
   const resultado = await prisma.$transaction(async (tx) => {
     const actual = await asegurarMascota(tx, amistad.id);
     if (actual.retoCooperativo && !actual.retoCooperativo.completado && !retoExpirado(actual.retoCooperativo)) {
@@ -670,7 +702,10 @@ router.post('/:amistadId/reto', requireAuth, async (req, res) => {
     // Rota al siguiente tipo del catálogo, distinto al anterior.
     const mascota = await tx.mascotaAmistad.update({
       where: { amistadId: amistad.id },
-      data: { retoCooperativo: crearReto(new Date(), actual.retoCooperativo?.tipo) },
+      data: {
+        retoCooperativo: crearReto(ahora, actual.retoCooperativo?.tipo),
+        ...datosEnergia(actual, ahora),
+      },
     });
     return { activo: false, mascota };
   });
@@ -704,7 +739,13 @@ router.post('/:amistadId/regalo', requireAuth, async (req, res) => {
         seen: true,
       },
     });
-    const mascota = await sumarCarino(tx, amistad.id, CARINO_POR_REGALO);
+    const actual = await asegurarMascota(tx, amistad.id);
+    const mascota = await sumarCarino(
+      tx,
+      amistad.id,
+      CARINO_POR_REGALO,
+      datosEnergia(actual, ahora),
+    );
     return { limitado: false, mascota };
   }, { isolationLevel: 'Serializable' });
 
@@ -730,6 +771,7 @@ router.patch('/:amistadId/nombre', requireAuth, async (req, res) => {
   if (!amistad) return res.status(404).json({ error: 'Amistad no encontrada' });
   if (!(await exigirAceptada(res, amistadId))) return undefined;
 
+  const ahora = new Date();
   const resultado = await prisma.$transaction(async (tx) => {
     const actual = await asegurarMascota(tx, amistad.id);
     const propuesta = leerPropuesta(actual.nombrePropuesto);
@@ -745,9 +787,11 @@ router.patch('/:amistadId/nombre', requireAuth, async (req, res) => {
       data: confirma ? {
         nombre,
         nombrePropuesto: null,
-        historialHitos: agregarHito(actual.historialHitos, `Ahora se llama ${nombre}`),
+        historialHitos: agregarHito(actual.historialHitos, `Ahora se llama ${nombre}`, ahora),
+        ...datosEnergia(actual, ahora),
       } : {
         nombrePropuesto: guardarPropuesta(nombre, req.user.userId),
+        ...datosEnergia(actual, ahora),
       },
     });
     return { pendientePropia: false, mascota, confirmado: Boolean(confirma) };
@@ -780,6 +824,9 @@ router.post('/:amistadId/archivar', requireAuth, async (req, res) => {
 
   const { count } = await archivarMascota(prisma, amistadId, {
     historialHitos: agregarHito(mascota.historialHitos, 'Pusieron su cuidado en pausa'),
+    // La pausa también deja la energía al día: al retomarla, la recarga arranca
+    // desde el saldo real y no desde el que había antes del último cuidado.
+    ...datosEnergia(mascota),
   });
   // Si los dos pausan a la vez, solo la llamada que ganó avisa: el otro ya
   // recibió (o es) el aviso, y repetirlo sonaría a reproche.
@@ -843,7 +890,9 @@ router.post('/:amistadId/actividad', requireAuth, async (req, res) => {
       },
     });
     return {
-      mascota: activa ? await sumarCarino(tx, amistad.id, CARINO_POR_ACTIVIDAD) : actual,
+      mascota: activa
+        ? await sumarCarino(tx, amistad.id, CARINO_POR_ACTIVIDAD, datosEnergia(actual))
+        : actual,
       activa,
       registrada: true,
     };
@@ -896,7 +945,21 @@ router.patch('/:amistadId/accesorios', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Nada que actualizar' });
   }
 
-  const actualizada = await prisma.mascotaAmistad.update({ where: { amistadId }, data });
+  // Equipar es una escritura más, y como tal mueve `updatedAt`. Va dentro de la
+  // transacción con una lectura fresca para materializar la energía sin pisar un
+  // gasto que esté ocurriendo en paralelo.
+  const ahora = new Date();
+  const actualizada = await transaccionSerializable(async (tx) => {
+    const actual = await tx.mascotaAmistad.findUnique({ where: { amistadId } });
+    if (!mascotaAceptada(actual)) return null;
+    return tx.mascotaAmistad.update({
+      where: { amistadId, activa: true, invitacionEstado: 'aceptada' },
+      data: { ...data, ...datosEnergia(actual, ahora) },
+    });
+  });
+  if (!actualizada) {
+    return res.status(404).json({ error: 'No hay una mascota activa para esta amistad' });
+  }
   return res.json({ mascota: await mascotaVisible(prisma, actualizada, amistad, req.user.userId) });
 });
 

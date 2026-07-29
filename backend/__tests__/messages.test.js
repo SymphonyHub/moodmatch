@@ -1,7 +1,7 @@
 jest.mock('../lib/prisma', () => {
   const db = {
     friendship: { findFirst: jest.fn() },
-    mascotaAmistad: { upsert: jest.fn() },
+    mascotaAmistad: { upsert: jest.fn(), findUnique: jest.fn(), create: jest.fn() },
     cheer: {
       count: jest.fn(),
       findMany: jest.fn(),
@@ -41,6 +41,9 @@ beforeEach(() => {
   prisma.cheer.count.mockResolvedValue(0);
   prisma.mascotaAmistad.upsert.mockResolvedValue({
     id: 'pet-1', amistadId: amistad.id, nombre: 'Lumi', nivelCarino: 0,
+  });
+  prisma.mascotaAmistad.findUnique.mockResolvedValue({
+    id: 'pet-1', amistadId: amistad.id, nombre: 'Lumi', nivelCarino: 0, energia: 50,
   });
 });
 
@@ -208,9 +211,12 @@ describe('POST /api/messages/:friendId', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ message: 'otro mensaje' });
 
-    expect(prisma.mascotaAmistad.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      update: { nivelCarino: { increment: 0 } },
-    }));
+    // Sin par recíproco no hay nada que escribir: leer la mascota alcanza, y así
+    // el mensaje no mueve `updatedAt`, el ancla de la recarga de energía.
+    expect(prisma.mascotaAmistad.upsert).not.toHaveBeenCalled();
+    expect(prisma.mascotaAmistad.findUnique).toHaveBeenCalledWith({
+      where: { amistadId: amistad.id },
+    });
   });
 
   test('una respuesta que completa un par recíproco suma 2 de cariño', async () => {
@@ -227,8 +233,10 @@ describe('POST /api/messages/:friendId', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ message: 'respuesta' });
 
+    // El cariño sube y, como esa escritura mueve `updatedAt`, arrastra la energía
+    // ya regenerada para no perder la recarga acumulada.
     expect(prisma.mascotaAmistad.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      update: { nivelCarino: { increment: 2 } },
+      update: { nivelCarino: { increment: 2 }, energia: 50 },
     }));
   });
 });

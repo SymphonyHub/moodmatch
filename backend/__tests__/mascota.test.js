@@ -21,6 +21,12 @@ const jwt = require('jsonwebtoken');
 const mascotaRouter = require('../routes/mascota');
 const prisma = require('../lib/prisma');
 const { notifySharedActivity } = require('../lib/notificationEvents');
+const {
+  COSTOS_ENERGIA,
+  ENERGIA_MAXIMA,
+  INTERVALO_REGEN_SEGUNDOS,
+  PUNTOS_POR_INTERVALO,
+} = require('../lib/energiaMascota');
 
 const MY_USER_ID = 1;
 const FRIEND_ID = 2;
@@ -101,9 +107,9 @@ describe('GET /api/mascota/:amistadId', () => {
 });
 
 describe('mecánicas avanzadas de mascota', () => {
-  test('alimentar suma cariño y conserva la energía actual', async () => {
+  test('alimentar suma cariño y no cuesta estamina', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
-    prisma.mascotaAmistad.upsert.mockResolvedValue({ ...mascota, retoCooperativo: null });
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({ ...mascota, retoCooperativo: null });
     prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, nivelCarino: 6 });
 
     const res = await request(app)
@@ -119,10 +125,10 @@ describe('mecánicas avanzadas de mascota', () => {
     }));
   });
 
-  test('jugar recupera energía sin sumar cariño base', async () => {
+  test('jugar descuenta el costo de estamina sin sumar cariño base', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
-    prisma.mascotaAmistad.upsert.mockResolvedValue({ ...mascota, retoCooperativo: null });
-    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, energia: 70 });
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({ ...mascota, retoCooperativo: null });
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, energia: 35 });
 
     const res = await request(app)
       .post(`/api/mascota/${AMISTAD_ID}/jugar`)
@@ -130,52 +136,155 @@ describe('mecánicas avanzadas de mascota', () => {
 
     expect(res.status).toBe(201);
     const data = prisma.mascotaAmistad.update.mock.calls[0][0].data;
-    expect(data.energia).toBe(70);
+    expect(data.energia).toBe(50 - COSTOS_ENERGIA.JUGAR);
     expect(data).not.toHaveProperty('nivelCarino');
     expect(data.ultimoCuidadoUsuario2).toEqual(expect.any(Date));
   });
 
-  test('jugar respeta el máximo de energía', async () => {
+  test('jugar cobra sobre la energía ya regenerada, no sobre la guardada', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
-    prisma.mascotaAmistad.upsert.mockResolvedValue({ ...mascota, energia: 95, retoCooperativo: null });
-    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, energia: 100 });
-
-    const res = await request(app)
-      .post(`/api/mascota/${AMISTAD_ID}/jugar`)
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(res.status).toBe(201);
-    expect(prisma.mascotaAmistad.update.mock.calls[0][0].data.energia).toBe(100);
-  });
-
-  test('jugar recupera energía después de materializar el desgaste diario', async () => {
-    prisma.friendship.findFirst.mockResolvedValue(amistad);
-    prisma.mascotaAmistad.upsert.mockResolvedValue({
+    // Cuatro intervalos de recarga acumulados desde la última escritura.
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({
       ...mascota,
-      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      energia: 20,
+      updatedAt: new Date(Date.now() - 4 * INTERVALO_REGEN_SEGUNDOS * 1000),
       retoCooperativo: null,
     });
-    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, energia: 40 });
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, energia: 13 });
 
     const res = await request(app)
       .post(`/api/mascota/${AMISTAD_ID}/jugar`)
       .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(201);
-    expect(prisma.mascotaAmistad.update.mock.calls[0][0].data.energia).toBe(40);
+    const regenerada = 20 + 4 * PUNTOS_POR_INTERVALO;
+    expect(prisma.mascotaAmistad.update.mock.calls[0][0].data.energia)
+      .toBe(regenerada - COSTOS_ENERGIA.JUGAR);
+  });
+
+  test('la recarga nunca deja el saldo por encima del máximo', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({
+      ...mascota,
+      energia: 95,
+      updatedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      retoCooperativo: null,
+    });
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, energia: 85 });
+
+    const res = await request(app)
+      .post(`/api/mascota/${AMISTAD_ID}/jugar`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(201);
+    expect(prisma.mascotaAmistad.update.mock.calls[0][0].data.energia)
+      .toBe(ENERGIA_MAXIMA - COSTOS_ENERGIA.JUGAR);
+  });
+
+  test('jugar con saldo insuficiente responde 422 y no escribe nada', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({
+      ...mascota,
+      energia: COSTOS_ENERGIA.JUGAR - 1,
+      updatedAt: new Date(),
+      retoCooperativo: null,
+    });
+
+    const res = await request(app)
+      .post(`/api/mascota/${AMISTAD_ID}/jugar`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(422);
+    expect(res.body).toEqual(expect.objectContaining({
+      error: 'ENERGIA_INSUFICIENTE',
+      energiaActual: COSTOS_ENERGIA.JUGAR - 1,
+      energiaRequerida: COSTOS_ENERGIA.JUGAR,
+    }));
+    // El rechazo corta antes de cualquier escritura: ni experiencia ni marcador.
+    expect(prisma.mascotaAmistad.update).not.toHaveBeenCalled();
+    expect(prisma.cheer.create).not.toHaveBeenCalled();
+    // Y lleva la mascota para que el cliente pinte el contador de recarga.
+    expect(res.body.mascota.segundosSiguienteRecarga).toBe(INTERVALO_REGEN_SEGUNDOS);
+  });
+
+  test('con la barra agotada tampoco se puede iniciar un minijuego', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({
+      ...mascota,
+      energia: 0,
+      updatedAt: new Date(),
+    });
+
+    const res = await request(app)
+      .post('/api/mascota/cuidar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amistadId: AMISTAD_ID, accion: 'MINIJUEGO', minijuego: 'ATRAPALA' });
+
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe('ENERGIA_INSUFICIENTE');
+    expect(res.body.energiaActual).toBe(0);
+    expect(res.body.mascota.estadoEnergia).toBe('AGOTADO');
+    expect(prisma.mascotaAmistad.update).not.toHaveBeenCalled();
+    expect(prisma.cheer.create).not.toHaveBeenCalled();
+  });
+
+  test('dos minijuegos seguidos: el segundo ve el saldo ya descontado y se corta', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    const saldoInicial = COSTOS_ENERGIA.MINIJUEGO + 1;
+    // Cada lectura ocurre dentro de su transacción: la segunda ya ve el gasto de
+    // la primera, que es lo que impide gastar dos veces la misma estamina.
+    prisma.mascotaAmistad.findUnique
+      .mockResolvedValueOnce({ ...mascota, energia: saldoInicial, updatedAt: new Date() })
+      .mockResolvedValue({ ...mascota, energia: 1, updatedAt: new Date() });
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, energia: 1 });
+
+    const cuerpo = { amistadId: AMISTAD_ID, accion: 'MINIJUEGO', minijuego: 'ATRAPALA' };
+    const primero = await request(app)
+      .post('/api/mascota/cuidar')
+      .set('Authorization', `Bearer ${token}`)
+      .send(cuerpo);
+    const segundo = await request(app)
+      .post('/api/mascota/cuidar')
+      .set('Authorization', `Bearer ${token}`)
+      .send(cuerpo);
+
+    expect(primero.status).toBe(200);
+    expect(segundo.status).toBe(422);
+    expect(segundo.body.energiaActual).toBe(1);
+    expect(prisma.mascotaAmistad.update).toHaveBeenCalledTimes(1);
+    expect(prisma.mascotaAmistad.update.mock.calls[0][0].data.energia)
+      .toBe(saldoInicial - COSTOS_ENERGIA.MINIJUEGO);
+  });
+
+  test('el minijuego cobra estamina aunque el límite diario ya no dé experiencia', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({ ...mascota, updatedAt: new Date() });
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, energia: 30 });
+    prisma.cheer.count.mockResolvedValue(5);
+
+    const res = await request(app)
+      .post('/api/mascota/cuidar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amistadId: AMISTAD_ID, accion: 'MINIJUEGO', minijuego: 'RITMO_CARINO' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.experienciaOtorgada).toBe(0);
+    expect(res.body.limiteDiarioAlcanzado).toBe(true);
+    expect(prisma.mascotaAmistad.update.mock.calls[0][0].data.energia)
+      .toBe(50 - COSTOS_ENERGIA.MINIJUEGO);
   });
 
   test('alimentar respeta el cooldown iniciado al jugar', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
-    prisma.mascotaAmistad.upsert.mockResolvedValue({ ...mascota, retoCooperativo: null });
-    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, energia: 70 });
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({ ...mascota, retoCooperativo: null });
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, energia: 35 });
 
     const juego = await request(app)
       .post(`/api/mascota/${AMISTAD_ID}/jugar`)
       .set('Authorization', `Bearer ${token}`);
     expect(juego.status).toBe(201);
 
-    prisma.mascotaAmistad.upsert.mockResolvedValue({
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({
       ...mascota,
       ultimoCuidadoUsuario2: new Date(),
       retoCooperativo: null,
@@ -190,8 +299,8 @@ describe('mecánicas avanzadas de mascota', () => {
 
   test('reintenta un conflicto serializable antes de responder', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
-    prisma.mascotaAmistad.upsert.mockResolvedValue({ ...mascota, retoCooperativo: null });
-    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, energia: 70 });
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({ ...mascota, retoCooperativo: null });
+    prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, energia: 35 });
     prisma.$transaction.mockRejectedValueOnce(Object.assign(new Error('write conflict'), { code: 'P2034' }));
 
     const res = await request(app)
@@ -200,15 +309,17 @@ describe('mecánicas avanzadas de mascota', () => {
 
     expect(res.status).toBe(201);
     expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    // El reintento vuelve a leer y cobra una sola vez.
+    expect(prisma.mascotaAmistad.update).toHaveBeenCalledTimes(1);
+    expect(prisma.mascotaAmistad.update.mock.calls[0][0].data.energia)
+      .toBe(50 - COSTOS_ENERGIA.JUGAR);
   });
 
   test('no cuida una mascota archivada mientras comenzaba la acción', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
-    prisma.mascotaAmistad.upsert.mockResolvedValue({
-      ...mascota,
-      activa: false,
-      retoCooperativo: null,
-    });
+    prisma.mascotaAmistad.findUnique
+      .mockResolvedValueOnce(mascota)
+      .mockResolvedValue({ ...mascota, activa: false, retoCooperativo: null });
 
     const res = await request(app)
       .post(`/api/mascota/${AMISTAD_ID}/jugar`)
@@ -218,26 +329,55 @@ describe('mecánicas avanzadas de mascota', () => {
     expect(prisma.mascotaAmistad.update).not.toHaveBeenCalled();
   });
 
-  test('expone el estado con sueño sin un mensaje culpabilizante', async () => {
+  test('expone el contrato de estamina sin un mensaje culpabilizante', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
-    prisma.mascotaAmistad.findUnique.mockResolvedValue({ ...mascota, energia: 20 });
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({
+      ...mascota,
+      energia: 20,
+      updatedAt: new Date(),
+    });
 
     const res = await request(app)
       .get(`/api/mascota/${AMISTAD_ID}`)
       .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.mascota.energia).toBe(20);
-    expect(res.body.mascota.estadoEnergia).toEqual({
-      estado: 'con_sueno',
+    expect(res.body.mascota).toEqual(expect.objectContaining({
+      energia: 20,
+      energiaActual: 20,
+      energiaMaxima: ENERGIA_MAXIMA,
+      segundosSiguienteRecarga: INTERVALO_REGEN_SEGUNDOS,
+      estadoEnergia: 'CRITICO',
       cansada: true,
-      pose: 'siesta',
+      // Poca energía se lee como siesta: jugó mucho, no la abandonaron.
+      poseEnergia: 'siesta',
+    }));
+    expect(res.body.mascota.segundosRecargaTotal)
+      .toBe((ENERGIA_MAXIMA - 20) / PUNTOS_POR_INTERVALO * INTERVALO_REGEN_SEGUNDOS);
+  });
+
+  test('el paso del tiempo recarga la barra sin necesidad de escribir', async () => {
+    prisma.friendship.findFirst.mockResolvedValue(amistad);
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({
+      ...mascota,
+      energia: 10,
+      updatedAt: new Date(Date.now() - 5 * INTERVALO_REGEN_SEGUNDOS * 1000),
     });
+
+    const res = await request(app)
+      .get(`/api/mascota/${AMISTAD_ID}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.mascota.energiaActual).toBe(10 + 5 * PUNTOS_POR_INTERVALO);
+    // Leer no escribe: la recarga se deriva, no se materializa hasta la próxima
+    // escritura real.
+    expect(prisma.mascotaAmistad.update).not.toHaveBeenCalled();
   });
 
   test('el cuidado suma más cariño que un par de mensajes y respeta 24 horas por usuario', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
-    prisma.mascotaAmistad.upsert.mockResolvedValue({ ...mascota, retoCooperativo: null });
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({ ...mascota, retoCooperativo: null });
     prisma.mascotaAmistad.update.mockResolvedValue({ ...mascota, nivelCarino: 6 });
 
     const res = await request(app)
@@ -252,7 +392,7 @@ describe('mecánicas avanzadas de mascota', () => {
       }),
     }));
 
-    prisma.mascotaAmistad.upsert.mockResolvedValue({
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({
       ...mascota, ultimoCuidadoUsuario2: new Date(), retoCooperativo: null,
     });
     const bloqueado = await request(app)
@@ -265,7 +405,7 @@ describe('mecánicas avanzadas de mascota', () => {
 
   test('el reto expira y no entrega su premio fuera de la ventana', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
-    prisma.mascotaAmistad.upsert.mockResolvedValue({
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({
       ...mascota,
       retoCooperativo: {
         tipo: 'CUIDADO_COMPARTIDO', expiraEn: '2000-01-01T00:00:00.000Z',
@@ -286,7 +426,7 @@ describe('mecánicas avanzadas de mascota', () => {
 
   test('no reemplaza un reto todavía vigente', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
-    prisma.mascotaAmistad.upsert.mockResolvedValue({
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({
       ...mascota,
       retoCooperativo: {
         tipo: 'CUIDADO_COMPARTIDO', expiraEn: '2099-01-01T00:00:00.000Z',
@@ -304,7 +444,7 @@ describe('mecánicas avanzadas de mascota', () => {
 
   test('al completar ambos cuidados antes de vencer avanza a la siguiente etapa y guarda un hito', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
-    prisma.mascotaAmistad.upsert.mockResolvedValue({
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({
       ...mascota,
       nivelCarino: 3,
       retoCooperativo: {
@@ -327,7 +467,7 @@ describe('mecánicas avanzadas de mascota', () => {
 
   test('negocia el nombre: una persona propone y la otra confirma el mismo nombre', async () => {
     prisma.friendship.findFirst.mockResolvedValue(amistad);
-    prisma.mascotaAmistad.upsert.mockResolvedValue(mascota);
+    prisma.mascotaAmistad.findUnique.mockResolvedValue(mascota);
     prisma.mascotaAmistad.update.mockResolvedValue({
       ...mascota,
       nombrePropuesto: JSON.stringify({ nombre: 'Nube', propuestoPor: MY_USER_ID }),
@@ -340,7 +480,7 @@ describe('mecánicas avanzadas de mascota', () => {
     expect(propuesta.status).toBe(200);
     expect(propuesta.body.confirmado).toBe(false);
 
-    prisma.mascotaAmistad.upsert.mockResolvedValue({
+    prisma.mascotaAmistad.findUnique.mockResolvedValue({
       ...mascota,
       nombrePropuesto: JSON.stringify({ nombre: 'Nube', propuestoPor: MY_USER_ID }),
     });
@@ -392,8 +532,10 @@ describe('POST /api/mascota/:amistadId/actividad', () => {
         seen: true,
       },
     });
+    // El cariño va acompañado de la energía regenerada: la escritura mueve
+    // `updatedAt` y sin materializar se perdería la recarga acumulada.
     expect(prisma.mascotaAmistad.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      update: { nivelCarino: { increment: 3 } },
+      update: { nivelCarino: { increment: 3 }, energia: 50 },
     }));
     expect(notifySharedActivity).toHaveBeenCalledWith({
       fromUserId: MY_USER_ID,
@@ -462,9 +604,10 @@ describe('PATCH /api/mascota/:amistadId/accesorios', () => {
       .send({ cabeza: 'gorrito' });
 
     expect(res.status).toBe(200);
-    expect(prisma.mascotaAmistad.update).toHaveBeenCalledWith(expect.objectContaining({
-      data: { accesorioCabeza: 'gorrito' },
-    }));
+    expect(prisma.mascotaAmistad.update).toHaveBeenCalledWith({
+      where: { amistadId: AMISTAD_ID, activa: true, invitacionEstado: 'aceptada' },
+      data: { accesorioCabeza: 'gorrito', energia: 50 },
+    });
     expect(res.body.mascota.accesorios.cabeza).toBe('gorrito');
   });
 
@@ -505,9 +648,10 @@ describe('PATCH /api/mascota/:amistadId/accesorios', () => {
       .send({ color: null });
 
     expect(res.status).toBe(200);
-    expect(prisma.mascotaAmistad.update).toHaveBeenCalledWith(expect.objectContaining({
-      data: { accesorioColor: null },
-    }));
+    expect(prisma.mascotaAmistad.update).toHaveBeenCalledWith({
+      where: { amistadId: AMISTAD_ID, activa: true, invitacionEstado: 'aceptada' },
+      data: { accesorioColor: null, energia: 50 },
+    });
   });
 
   test('404 si la mascota no está aceptada (opt-in)', async () => {

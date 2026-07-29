@@ -1,4 +1,6 @@
-import { useCallback, useState } from 'react';
+import {
+  useCallback, useEffect, useRef, useState,
+} from 'react';
 import {
   View, Text, ScrollView, ActivityIndicator, TextInput, Modal,
 } from 'react-native';
@@ -21,7 +23,8 @@ import Tappable from '../../components/Tappable';
 import MascotaAnimada from '../../mascota/animation/MascotaAnimada';
 import BarraProgresoCarino from '../../mascota/animation/BarraProgresoCarino';
 import { animoDeMascota } from '../../mascota/animation/animo';
-import { CATALOGO_ACCESORIOS } from '../../mascota/sprites/accesorios';
+import CelebracionLottie from '../../mascota/animation/CelebracionLottie';
+import VestidorAccesorios from '../../mascota/vestidor';
 import { estadoMascota } from '../../mascota/estadoMascota';
 import { nombreEspecie } from '../../mascota/especiesCatalogo';
 import SeccionSocial from '../../mascota/SeccionSocial';
@@ -37,61 +40,6 @@ function progresoEvolucion(nivelCarino = 0) {
   const base = nivel < 16 ? 0 : 16;
   const meta = nivel < 16 ? 16 : 36;
   return Math.min(1, (nivel - base) / (meta - base));
-}
-
-// Grid de accesorios por categoría. Los desbloqueados se pueden equipar/quitar;
-// los bloqueados muestran candado + pista de cómo se consiguen.
-function AccesoriosGrid({
-  accesorios, onEquipar, styles, theme,
-}) {
-  const desbloqueados = new Set(accesorios?.desbloqueados ?? []);
-  const equipado = { cabeza: accesorios?.cabeza ?? null, color: accesorios?.color ?? null };
-  const grupos = [
-    { categoria: 'cabeza', titulo: 'Cabeza' },
-    { categoria: 'color', titulo: 'Color y patrón' },
-  ];
-  return (
-    <View style={styles.accWrap}>
-      {grupos.map(({ categoria, titulo }) => (
-        <View key={categoria} style={styles.accGrupo}>
-          <Text style={styles.accGrupoTitulo}>{titulo}</Text>
-          <View style={styles.accFila}>
-            {CATALOGO_ACCESORIOS.filter((a) => a.categoria === categoria).map((a) => {
-              const desbloqueado = desbloqueados.has(a.id);
-              const on = equipado[categoria] === a.id;
-              return (
-                <Tappable
-                  key={a.id}
-                  style={[styles.accChip, on && styles.accChipOn, !desbloqueado && styles.accChipLock]}
-                  onPress={() => desbloqueado && onEquipar(categoria, a.id)}
-                  disabled={!desbloqueado}
-                  haptic={false}
-                  accessibilityLabel={desbloqueado
-                    ? `${on ? 'Quitar' : 'Equipar'} ${a.nombre}`
-                    : `${a.nombre} bloqueado: ${a.pista}`}
-                >
-                  <View style={styles.accChipFila}>
-                    {!desbloqueado && (
-                      <Ionicons name="lock-closed" size={11} color={theme.colors.textFaint} />
-                    )}
-                    <Text style={[
-                      styles.accChipTxt,
-                      on && styles.accChipTxtOn,
-                      !desbloqueado && styles.accChipTxtLock,
-                    ]}
-                    >
-                      {a.nombre}
-                    </Text>
-                  </View>
-                  {!desbloqueado && <Text style={styles.accPista}>{a.pista}</Text>}
-                </Tappable>
-              );
-            })}
-          </View>
-        </View>
-      ))}
-    </View>
-  );
 }
 
 export default function MascotaDetalleScreen() {
@@ -112,6 +60,23 @@ export default function MascotaDetalleScreen() {
   });
   const [saludo, setSaludo] = useState(0);
   const [confirmarPausa, setConfirmarPausa] = useState(false);
+  const [confeti, setConfeti] = useState(0);
+  const etapaPrevia = useRef(null);
+
+  // Evolucionar es lo único que se lleva la pantalla entera. El resto de las
+  // celebraciones viven sobre el sprite; esta no, porque subir de etapa pasa dos
+  // veces en toda la vida de la mascota y porque el confetti del catálogo está
+  // compuesto en vertical de teléfono: encogido a 132 px sería un puñado de
+  // puntitos. La primera carga no dispara nada — abrir la pantalla de una
+  // mascota que YA es adulta no es una evolución.
+  const etapaActual = mascota?.etapa?.numero;
+  useEffect(() => {
+    if (!Number.isFinite(etapaActual)) return;
+    if (etapaPrevia.current !== null && etapaActual > etapaPrevia.current) {
+      setConfeti((n) => n + 1);
+    }
+    etapaPrevia.current = etapaActual;
+  }, [etapaActual]);
 
   const cargar = useCallback(async () => {
     if (!amistadId) return;
@@ -396,19 +361,20 @@ export default function MascotaDetalleScreen() {
         </View>
       )}
 
-      {/* Slot del Agente C: accesorios cosméticos (cabeza y color/patrón). Se
-          desbloquean por nivel/hitos; visibles para ambos integrantes. */}
+      {/* Vestidor: accesorios cosméticos (cabeza/rostro y color/patrón). Se
+          desbloquean por nivel/hitos; visibles para ambos integrantes. Cada
+          casilla dibuja la mascota real con la pieza puesta. */}
       <View style={styles.bloque}>
-        <Text style={styles.bloqueTitulo}>Accesorios</Text>
+        <Text style={styles.bloqueTitulo}>Vestidor</Text>
         <Text style={styles.bloqueTexto}>
           Se desbloquean a medida que su vínculo crece. Toca uno para equiparlo.
         </Text>
         {/* __SLOT_ACCESORIOS__ */}
-        <AccesoriosGrid
+        <VestidorAccesorios
           accesorios={mascota.accesorios}
+          especie={mascota.especie}
+          etapa={mascota.etapa?.numero ?? 1}
           onEquipar={equipar}
-          styles={styles}
-          theme={theme}
         />
       </View>
 
@@ -499,6 +465,15 @@ export default function MascotaDetalleScreen() {
           </View>
         </View>
       </Modal>
+
+      {confeti > 0 && (
+        <CelebracionLottie
+          key={confeti}
+          tipo="confeti"
+          onFin={() => setConfeti(0)}
+          testID="confeti-evolucion"
+        />
+      )}
     </ScrollView>
   );
 }
@@ -598,33 +573,6 @@ const useStyles = makeThemedStyles((t) => ({
     paddingHorizontal: 14,
   },
   enviarNombreTxt: { color: t.colors.primary, fontSize: t.fontSize(13), ...t.typography.fonts.semibold },
-  accWrap: { marginTop: 12, gap: 14 },
-  accGrupo: { gap: 8 },
-  accGrupoTitulo: {
-    fontSize: t.fontSize(12),
-    color: t.colors.textFaint,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    ...t.typography.fonts.semibold,
-  },
-  accFila: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  accChip: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: t.shape.radiusMd,
-    backgroundColor: t.colors.primarySoft,
-    borderWidth: t.shape.borderThin,
-    borderColor: 'transparent',
-  },
-  accChipOn: { borderColor: t.colors.primary, backgroundColor: t.colors.accentSoft },
-  accChipLock: { backgroundColor: t.colors.surface, borderColor: t.colors.border },
-  accChipFila: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  accChipTxt: { fontSize: t.fontSize(13), color: t.colors.text, ...t.typography.fonts.semibold },
-  accChipTxtOn: { color: t.colors.primary },
-  accChipTxtLock: { color: t.colors.textFaint, ...t.typography.fonts.regular },
-  accPista: { fontSize: t.fontSize(10), color: t.colors.textFaint, marginTop: 2 },
   modalFondo: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',

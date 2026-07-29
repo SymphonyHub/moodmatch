@@ -10,6 +10,17 @@ const ACCESORIOS = [
   { id: 'corona', categoria: 'cabeza', nombre: 'Corona', nivel: 36 },
   // Se gana al completar el primer reto cooperativo (deja un hito con "Completaron").
   { id: 'flor', categoria: 'cabeza', nombre: 'Flor', hito: 'Completaron' },
+  // Catálogo base: piezas dibujadas a partir del arte de app/mascota/assets/.
+  // Cada variante de color es su propio id porque la ranura equipada es una sola
+  // columna (MascotaAmistad.accesorioCabeza) y un campo "variante" aparte pediría
+  // migración. El sufijo -b es la segunda variante del mismo diseño.
+  { id: 'lazo', categoria: 'cabeza', nombre: 'Lazo', nivel: 4 },
+  { id: 'lentes-sol', categoria: 'cabeza', nombre: 'Lentes redondos', nivel: 8 },
+  { id: 'sombrero-fiesta', categoria: 'cabeza', nombre: 'Gorro de fiesta', nivel: 12 },
+  { id: 'lentes-sol-b', categoria: 'cabeza', nombre: 'Lentes dorados', nivel: 18 },
+  { id: 'gorrito-noche', categoria: 'cabeza', nombre: 'Gorro de lana', nivel: 20 },
+  { id: 'sombrero-fiesta-b', categoria: 'cabeza', nombre: 'Gorro de confeti', nivel: 26 },
+  { id: 'gorrito-noche-b', categoria: 'cabeza', nombre: 'Gorro dormilón', nivel: 30 },
   { id: 'lunares', categoria: 'color', nombre: 'Lunares', nivel: 10 },
   { id: 'estrellas', categoria: 'color', nombre: 'Estrellas', nivel: 24 },
   { id: 'aura', categoria: 'color', nombre: 'Aura', nivel: 40 },

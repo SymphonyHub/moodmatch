@@ -59,7 +59,7 @@ beforeEach(() => {
   apiCuidarMascota.mockReset();
 });
 
-test('renderiza el detalle con sprite animado y grid de accesorios', async () => {
+test('renderiza el detalle con sprite animado y vestidor de accesorios', async () => {
   let renderer;
   await act(async () => {
     renderer = create(
@@ -70,11 +70,16 @@ test('renderiza el detalle con sprite animado y grid de accesorios', async () =>
     await Promise.resolve();
   });
 
-  // El grid de accesorios muestra las categorías y un accesorio bloqueado con pista.
-  expect(renderer.root.findByProps({ children: 'Cabeza' })).toBeTruthy();
+  // El vestidor muestra las dos categorías y un accesorio bloqueado con pista.
+  expect(renderer.root.findByProps({ testID: 'vestidor-accesorios' })).toBeTruthy();
+  expect(renderer.root.findByProps({ children: 'Cabeza y rostro' })).toBeTruthy();
   expect(renderer.root.findByProps({ children: 'Color y patrón' })).toBeTruthy();
   expect(renderer.root.findByProps({ children: 'Corona' })).toBeTruthy();
   expect(renderer.root.findByProps({ children: 'Momentos de juego' })).toBeTruthy();
+
+  // El catálogo base (arte importado) también se equipa desde acá.
+  expect(renderer.root.findByProps({ testID: 'accesorio-gorrito-noche' })).toBeTruthy();
+  expect(renderer.root.findByProps({ children: 'Gorro de fiesta' })).toBeTruthy();
   const volver = renderer.root.findByProps({ accessibilityLabel: 'Volver' });
   const volverStyle = StyleSheet.flatten(volver.props.style);
   expect(volverStyle.paddingTop).toBe(32);

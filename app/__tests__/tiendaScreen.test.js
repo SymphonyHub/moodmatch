@@ -19,7 +19,10 @@ import React from 'react';
 import { act, create } from 'react-test-renderer';
 import HabitatBg, { VARIANTES_HABITAT } from '../components/mascota/HabitatBg';
 import TiendaScreen from '../mascota/tienda/TiendaScreen';
-import { CATALOGO_TIENDA, CATEGORIAS_TIENDA } from '../mascota/tienda/catalogo';
+import {
+  CATALOGO_COMPLETO, CATALOGO_TIENDA, CATALOGO_VESTIDOR, CATEGORIAS_TIENDA,
+} from '../mascota/tienda/catalogo';
+import { CATALOGO_ACCESORIOS } from '../mascota/sprites/accesorios';
 import { ThemeProvider } from '../theme/ThemeContext';
 
 const montar = async (ui) => {
@@ -52,6 +55,58 @@ test('el catálogo mantiene tres estantes comprables separados de los desbloqueo
     expect(Number.isInteger(item.precio)).toBe(true);
     expect(item.precio).toBeGreaterThan(0);
   });
+});
+
+test('el estante del vestidor son piezas que se ganan, no que se compran', () => {
+  expect(CATALOGO_VESTIDOR.length).toBeGreaterThan(0);
+  for (const item of CATALOGO_VESTIDOR) {
+    expect(item.origen).toBe('vestidor');
+    // Nunca un precio: ofrecer "Comprar" algo que se gana por nivel sería
+    // mentir sobre cómo funciona.
+    expect(item.precio).toBeUndefined();
+    expect(item.ranura).toBe('cabeza');
+    expect(['sombreros', 'accesorios']).toContain(item.categoria);
+    // El nivel que muestra la tarjeta es el mismo que exige el desbloqueo real.
+    const real = CATALOGO_ACCESORIOS.find((a) => a.id === item.id);
+    expect(real).toBeDefined();
+    expect(item.nivel).toBe(real.nivel);
+  }
+});
+
+test('el catálogo completo suma los dos estantes sin ids repetidos', () => {
+  expect(CATALOGO_COMPLETO).toHaveLength(CATALOGO_VESTIDOR.length + CATALOGO_TIENDA.length);
+  const ids = CATALOGO_COMPLETO.map(({ id }) => id);
+  expect(new Set(ids).size).toBe(ids.length);
+  // Lo que ya se puede llevar puesto va primero; lo aspiracional, después.
+  expect(CATALOGO_COMPLETO[0].origen).toBe('vestidor');
+});
+
+test('una pieza del vestidor muestra su nivel y no un botón de compra', async () => {
+  const onComprar = jest.fn();
+  const renderer = await montar(
+    <TiendaScreen
+      monedas={99}
+      especie="pinguino"
+      etapa={2}
+      desbloqueados={['gorrito-noche']}
+      onComprar={onComprar}
+    />,
+  );
+
+  // Desbloqueada: se anuncia como disponible y con su vista previa dibujada.
+  const puesta = accionPorTestId(renderer, 'tienda-item-gorrito-noche');
+  expect(puesta.props.accessibilityLabel).toContain('Ya está disponible en el vestidor');
+  expect(renderer.root.findByProps({ testID: 'vestidor-preview-gorrito-noche' })).toBeTruthy();
+
+  // Bloqueada: dice qué falta, y con saldo de sobra sigue sin poder comprarse.
+  const bloqueada = accionPorTestId(renderer, 'tienda-item-gorrito-noche-b');
+  expect(bloqueada.props.accessibilityLabel).toContain('Nivel 30 de cariño');
+  expect(bloqueada.props.accessibilityState).toEqual({ disabled: true });
+  act(() => bloqueada.props.onPress());
+  expect(onComprar).not.toHaveBeenCalled();
+
+  expect(renderer.root.findAllByProps({ children: 'Comprar' }).length).toBeGreaterThan(0);
+  act(() => renderer.unmount());
 });
 
 test('HabitatBg ofrece tres paletas y separa ambiente, manta y planta', async () => {

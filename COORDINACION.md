@@ -58,6 +58,26 @@ código `2b094f5` pasó 78/78 suites y 1171/1171 tests en app, 33/33 suites y
 558/558 tests en backend, además de `git diff --check`. No publicar ni iniciar
 otra fase hasta la prueba final y confirmación explícita del usuario.
 
+> **AVISO (2026-07-28) — dependencia NATIVA nueva: `lottie-react-native`.** Se
+> agrega `lottie-react-native@~7.3.1` (versión que `expo install` fija para SDK
+> 54) para las celebraciones de la mascota. Es un módulo nativo: **el dev-client
+> actual no lo trae y hasta el próximo build no se va a ver.** Por eso nada lo
+> asume: `mascota/animation/CelebracionLottie.jsx` resuelve el módulo una vez,
+> vigila el montaje con un límite de error y, si no está, dibuja el respaldo
+> —`RecompensaCompletada` y `ParticulasCaricia`, las piezas que ya existían—.
+> Con el binario viejo la app se comporta exactamente como antes. Si tocas esta
+> área: la política de qué se monta vive en `animation/celebraciones.js`, que es
+> puro y testeable sin nativo, y el camino sin módulo está cubierto en
+> `celebracionRespaldo.test.js`.
+>
+> **AVISO (2026-07-28) — el catálogo de accesorios creció de 7 a 14 ids.**
+> `backend/lib/accesorios.js` sigue siendo la autoridad y suma siete piezas de
+> cabeza del catálogo base, desbloqueables por nivel de cariño (4, 8, 12, 18, 20,
+> 26, 30). **Sin migración:** cada variante de color es su propio id (sufijo `-b`)
+> justamente para no agregar una columna a `MascotaAmistad`. La paridad
+> front/back ya no se escribe a mano — `accesoriosSprites.test.js` lee el módulo
+> del backend y falla si los catálogos divergen.
+
 > **AVISO (Fase 17, 2026-07-27) — Prisma listo, despliegue pendiente:** las
 > migraciones de Energía y EXP están versionadas e integradas localmente, pero
 > el Agente E no las aplicó en Neon. Ejecutarlas sigue requiriendo autorización

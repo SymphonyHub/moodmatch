@@ -1,5 +1,5 @@
 import Svg, {
-  Circle, Ellipse, Path, Defs, RadialGradient, Stop,
+  Circle, Ellipse, G, Path, Defs, RadialGradient, Stop,
 } from 'react-native-svg';
 import { escenaPlana } from './sprites/disenoEtapas';
 import { ESPECIE_POR_DEFECTO } from './sprites/especies';
@@ -10,11 +10,20 @@ import { ESPECIE_POR_DEFECTO } from './sprites/especies';
 // silueta referencian por id (fill="url(#…)"), y debe ir dentro del <Svg>.
 // `rol` tampoco se dibuja: es la etiqueta con la que el rig encuentra el rubor
 // dentro de la cara (geometria.js), y no debe llegar al SVG como atributo.
+// `g` agrupa y transforma: sus `hijos` se materializan anidados, y por eso ese
+// campo tampoco viaja como atributo.
 export function renderNodo(nodo, key) {
-  const { t, rol, ...attrs } = nodo;
+  const { t, rol, hijos, ...attrs } = nodo;
   if (t === 'circle') return <Circle key={key} {...attrs} />;
   if (t === 'ellipse') return <Ellipse key={key} {...attrs} />;
   if (t === 'path') return <Path key={key} {...attrs} />;
+  if (t === 'g') {
+    return (
+      <G key={key} {...attrs}>
+        {renderNodos(hijos ?? [], `${key}h`)}
+      </G>
+    );
+  }
   if (t === 'grad') {
     return (
       <Defs key={key}>

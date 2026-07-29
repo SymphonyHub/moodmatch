@@ -22,3 +22,19 @@ jest.mock('react-native-reanimated', () => {
     cancelAnimation: mock.cancelAnimation ?? (() => {}),
   };
 });
+
+// lottie-react-native (celebraciones de la mascota). Es un módulo nativo: en
+// jest no hay vista que registrar, así que se sustituye por una View inerte.
+// Que el mock exista y monte es lo que hace que el camino "Lottie disponible"
+// de CelebracionLottie se pueda probar; el camino de respaldo se prueba
+// desactivando la resolución a mano (ver celebracionLottie.test.js).
+jest.mock('lottie-react-native', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  // `source` se descarta (son cientos de KB de animación que no aportan nada al
+  // árbol), pero `onAnimationFinish` sí viaja a la View: es la señal de "terminé"
+  // que las pruebas necesitan poder disparar a mano.
+  const LottieView = ({ source, ...props }) =>
+    React.createElement(View, { ...props, testID: props.testID ?? 'lottie-view' });
+  return { __esModule: true, default: LottieView };
+});

@@ -39,5 +39,14 @@ yarn-error.*
 /ios
 /android
 
-# Required by Firebase during EAS prebuild, while remaining ignored by Git.
-!google-services.json
+# google-services.json NO viaja en este archivo comprimido, y está bien así.
+# Re-incluirlo acá con "!" no sirve: EAS arma el archivo desde lo que está
+# versionado en git, y avisa explícitamente que un archivo no versionado
+# referenciado por android.googleServicesFile "won't be uploaded to the builder".
+#
+# Llega por otra vía: una variable de entorno de tipo `file` en EAS, que el
+# worker materializa y cuya ruta lee app.config.js. Ver el comentario de ese
+# archivo. Para recrearla:
+#   eas env:create --scope project --type file --visibility secret \
+#     --name GOOGLE_SERVICES_JSON --value ./google-services.json \
+#     --environment production --environment preview --environment development

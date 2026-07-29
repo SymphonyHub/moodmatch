@@ -4,7 +4,8 @@ node_modules/
 # Entorno (NUNCA commitear)
 .env
 .env.local
-.env.*.local
+.env.*
+!.env.example
 
 # Expo / Metro
 app/dist/

@@ -105,15 +105,27 @@ El reparto y el historial de gates viven en `PLAN-INTEGRACION-FASE17.md`.
 > aplicar hay que correr `npx prisma generate`: el cliente en `node_modules`
 > queda viejo y no conoce las columnas nuevas.
 
-> **AVISO (2026-07-29) — `google-services.json` NO llega al builder de EAS.**
-> `fix/eas-fcm-config` está mergeado y `app.json` ya declara
-> `android.googleServicesFile`, pero EAS avisa al subir: *"File specified via
-> android.googleServicesFile field in your app.json is not checked in to your
-> repository and won't be uploaded to the builder"*. El `!google-services.json`
-> del `.easignore` no alcanza para revertir eso en esta versión de eas-cli, así
-> que **las notificaciones push siguen sin funcionar en los APK de la nube**. La
-> salida documentada es una variable de entorno de tipo `file` en EAS
-> (`eas env:create --type file --visibility secret`), no versionar el archivo.
+> **RESUELTO (2026-07-29) — `google-services.json` ya llega al builder.** El
+> merge de `fix/eas-fcm-config` no bastaba: EAS arma el archivo comprimido desde
+> lo versionado en git y avisaba *"...is not checked in to your repository and
+> won't be uploaded to the builder"*; el `!google-services.json` del `.easignore`
+> no revierte eso. Ahora viaja como variable de entorno de tipo `file`
+> (`GOOGLE_SERVICES_JSON`, secreta, en los entornos production/preview/
+> development), que el worker materializa y cuya ruta queda en `process.env`.
+>
+> Eso obliga a **config dinámica**: en `app.json` estático no hay sustitución de
+> variables. `app/app.config.js` reexporta `app.json` y solo resuelve ese campo,
+> con `?? './google-services.json'` de respaldo para que prebuild y
+> `expo run:android` sigan funcionando en local sin variables de entorno. El
+> archivo sigue fuera de git. **No convertir `app.config.js` de vuelta a JSON.**
+>
+> Queda una verificación pendiente que solo se puede hacer con un build real:
+> los secretos no se materializan fuera del worker, así que la cadena está
+> probada hasta ese punto pero el push end-to-end no se validó todavía.
+
+> **AVISO (2026-07-29) — cuota de EAS agotada.** El plan Free consumió sus
+> builds de Android del mes; se renueva el **sábado 1 de agosto de 2026**. El
+> último APK publicado es de `89cc319`, ANTERIOR a FCM y a las migraciones.
 
 > **AVISO (2026-07-27) — configuración EAS/FCM aislada:** los cambios de
 > `.gitignore`, `app/.gitignore`, `app/app.json`, `app/.easignore` y

@@ -159,6 +159,7 @@ function SwatchRow({ colors, selected, onSelect, label }) {
       horizontal
       showsHorizontalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      style={styles.swatchScroll}
       contentContainerStyle={styles.swatchGrid}
     >
       {colors.map((color) => {
@@ -233,45 +234,63 @@ function HexInput({ value, onChange, label }) {
   );
 }
 
-// Un color libre (primario/acento/fondo): barras continuas + atajos + hex.
+// Los tres colores libres de una paleta comparten un solo juego de controles:
+// el segmentado elige cuál se está editando y cada segmento lleva su color al
+// día, así los tres siguen a la vista aunque solo uno se edite. Antes cada
+// color repetía cabecera + barras + atajos, y los tres bloques apilados no
+// cabían en una pantalla chica.
+const COLOR_TARGETS = [
+  { id: 'primary', label: 'Primario' },
+  { id: 'accent', label: 'Acento' },
+  { id: 'background', label: 'Fondo' },
+];
+
 // `fondo` amplía el rango de luminosidad y agrega saturación (sin ella, el
 // matiz de un fondo casi neutro no se notaría).
-function ColorField({ label, value, onChange, swatches, sliderId, fondo = false }) {
+function ColorEditor({ draft, onChange }) {
   const styles = useStyles();
+  const [targetId, setTargetId] = useState(COLOR_TARGETS[0].id);
+  const target = COLOR_TARGETS.find((c) => c.id === targetId) ?? COLOR_TARGETS[0];
+  const { id, label } = target;
+  const value = draft[id];
+  const fondo = id === 'background';
+  const setColor = (hex) => onChange({ [id]: hex });
+
   return (
     <View style={styles.colorField}>
-      <View style={styles.colorHead}>
-        <Text style={[styles.swatchLabel, styles.labelSinMargen]}>{label}</Text>
-        <View style={styles.hexWrap}>
-          <HexInput value={value} onChange={onChange} label={label} />
-          <View style={[styles.colorPreview, { backgroundColor: value }]} />
-        </View>
-      </View>
+      <SegmentedTabs
+        tabs={COLOR_TARGETS.map((c) => ({ id: c.id, label: c.label, dot: draft[c.id] }))}
+        activeId={targetId}
+        onChange={setTargetId}
+      />
 
       <View style={styles.sliderGrid}>
         <View style={styles.sliderCell}>
           <Text style={styles.sliderCap}>Matiz</Text>
-          <HueBar value={value} onChange={onChange} id={sliderId} label={`Matiz de ${label}`} />
+          <HueBar value={value} onChange={setColor} id={id} label={`Matiz de ${label}`} />
         </View>
         {fondo ? (
           <View style={styles.sliderCell}>
             <Text style={styles.sliderCap}>Saturación</Text>
-            <SatBar value={value} onChange={onChange} id={sliderId} label={`Saturación de ${label}`} />
+            <SatBar value={value} onChange={setColor} id={id} label={`Saturación de ${label}`} />
           </View>
         ) : null}
         <View style={styles.sliderCell}>
           <Text style={styles.sliderCap}>Luminosidad</Text>
           <LumBar
             value={value}
-            onChange={onChange}
-            id={sliderId}
+            onChange={setColor}
+            id={id}
             label={`Luminosidad de ${label}`}
             fondo={fondo}
           />
         </View>
       </View>
 
-      <SwatchRow colors={swatches} selected={value} onSelect={onChange} label={label} />
+      <View style={styles.pickRow}>
+        <HexInput value={value} onChange={setColor} label={label} />
+        <SwatchRow colors={SWATCHES[id]} selected={value} onSelect={setColor} label={label} />
+      </View>
     </View>
   );
 }
@@ -290,7 +309,7 @@ function FontPicker({ selected, onSelect }) {
   return (
     <View style={styles.fontBlock}>
       <View style={styles.fontHead}>
-        <Text style={[styles.swatchLabel, styles.labelSinMargen]}>Fuente</Text>
+        <Text style={styles.swatchLabel}>Fuente</Text>
         <Text style={styles.fontStageCount}>{idx + 1} / {total}</Text>
       </View>
       <View style={styles.fontCarousel}>
@@ -327,69 +346,68 @@ function FontPicker({ selected, onSelect }) {
   );
 }
 
-// Lista de paletas guardadas: cada tarjeta se puede seleccionar (editar +
-// previsualizar) o borrar; "＋ Nueva" hasta MAX_PALETAS.
-function PaletteList({ palettes, draftId, activeId, applied, onSelect, onDelete, onNew }) {
+// Paletas guardadas en rejilla: cada tarjeta muestra la combinación (primario ·
+// fondo · acento) y se selecciona al toque para editarla y previsualizarla.
+// Sin scroll propio a propósito — la rejilla fluye en las líneas que haga falta
+// y hereda el `keyboardShouldPersistTaps` de la pantalla, así el toque
+// selecciona a la primera aunque el teclado del nombre esté abierto.
+// La paleta en edición que todavía no se guardó entra como provisional para que
+// la selección nunca quede sin marcar. Borrar vive en la fila del nombre (junto
+// a lo que edita), no repetido en cada tarjeta.
+function PaletteGrid({ palettes, draft, guardada, activeId, applied, onSelect, onNew }) {
   const styles = useStyles();
+  const { theme } = useTheme();
+  const tarjetas = guardada ? palettes : [...palettes, draft];
+
   return (
     <View style={styles.paletteSection}>
       <View style={styles.paletteSectionHead}>
-        <Text style={[styles.swatchLabel, styles.labelSinMargen]}>Mis paletas</Text>
-        {palettes.length < MAX_PALETAS ? (
-          <Tappable style={styles.palNew} onPress={onNew} accessibilityLabel="Crear paleta nueva">
-            <Text style={styles.palNewTxt}>＋ Nueva</Text>
-          </Tappable>
-        ) : (
-          <Text style={styles.palLimit}>Máximo {MAX_PALETAS}</Text>
-        )}
+        <Text style={styles.swatchLabel}>Mis paletas</Text>
+        <Text style={styles.palCount}>
+          {palettes.length} / {MAX_PALETAS}
+        </Text>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.paletteStrip}
-        testID="lista-paletas-compacta"
-      >
-        {palettes.map((p) => {
-          const isDraft = p.id === draftId;
-          const enUso = applied && p.id === activeId;
+      <View style={styles.paletteGrid} testID="lista-paletas-compacta">
+        {tarjetas.map((p) => {
+          const isDraft = p.id === draft.id;
+          // Pie de la tarjeta: "sin guardar" mientras la paleta nueva no exista
+          // todavía en el contenedor, "en uso" si es la que la app tiene puesta.
+          const estado =
+            !guardada && isDraft ? 'sin guardar' : applied && p.id === activeId ? 'en uso' : null;
           return (
-            <View key={p.id} style={[styles.palRow, isDraft && styles.palRowSelected]}>
-              <Tappable
-                wrapperStyle={styles.palMainWrap}
-                style={styles.palMain}
-                onPress={() => onSelect(p)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: isDraft }}
-                accessibilityLabel={`Paleta ${p.name}${enUso ? ', en uso' : ''}`}
-              >
-                <View style={styles.palSwatches}>
-                  {[p.primary, p.background, p.accent].map((c, i) => (
-                    <View key={`${c}-${i}`} style={[styles.palSwatch, { backgroundColor: c }]} />
-                  ))}
-                </View>
-                <View style={styles.palInfo}>
-                  <Text style={styles.palName} numberOfLines={1}>{p.name}</Text>
-                  <Text style={styles.palFont} numberOfLines={1}>
-                    {BODY_FONTS[p.bodyFont]?.label ?? p.bodyFont}
-                    {enUso ? '  ·  en uso' : ''}
-                  </Text>
-                </View>
-              </Tappable>
-              {palettes.length > 1 ? (
-                <Tappable
-                  style={styles.palDelete}
-                  onPress={() => onDelete(p.id)}
-                  haptic={false}
-                  accessibilityLabel={`Borrar paleta ${p.name}`}
-                >
-                  <Text style={styles.palDeleteTxt}>Borrar</Text>
-                </Tappable>
-              ) : null}
-            </View>
+            <Tappable
+              key={p.id}
+              wrapperStyle={styles.palTileWrap}
+              style={[styles.palTile, isDraft && styles.palTileSelected]}
+              onPress={() => onSelect(p)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: isDraft }}
+              accessibilityLabel={`Paleta ${p.name}${estado ? `, ${estado}` : ''}`}
+            >
+              <View style={styles.palMuestra}>
+                {[p.primary, p.background, p.accent].map((c, i) => (
+                  <View key={`${c}-${i}`} style={[styles.palFranja, { backgroundColor: c }]} />
+                ))}
+              </View>
+              <Text style={styles.palName} numberOfLines={1}>{p.name}</Text>
+              {estado ? <Text style={styles.palEstado} numberOfLines={1}>{estado}</Text> : null}
+            </Tappable>
           );
         })}
-      </ScrollView>
+
+        {palettes.length < MAX_PALETAS ? (
+          <Tappable
+            wrapperStyle={styles.palTileWrap}
+            style={[styles.palTile, styles.palTileNueva]}
+            onPress={onNew}
+            accessibilityLabel="Crear paleta nueva"
+          >
+            <Ionicons name="add" size={20} color={theme.colors.primary} />
+            <Text style={styles.palNuevaTxt}>Nueva</Text>
+          </Tappable>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -425,21 +443,26 @@ function CustomThemeEditor({
   contrastIssues,
 }) {
   const styles = useStyles();
+  const { theme } = useTheme();
+  // Solo se borra lo que ya existe guardado, y nunca la última paleta.
+  const guardada = palettes.some((p) => p.id === draft.id);
+  const puedeBorrar = guardada && palettes.length > 1;
+
   return (
     <>
-      <PaletteList
+      <PaletteGrid
         palettes={palettes}
-        draftId={draft.id}
+        draft={draft}
+        guardada={guardada}
         activeId={activeId}
         applied={applied}
         onSelect={onSelectPalette}
-        onDelete={onDeletePalette}
         onNew={onNewPalette}
       />
 
       <View style={styles.paletteControlsCard} testID="controles-paleta-compactos">
         <View style={styles.nameRow}>
-          <Text style={[styles.swatchLabel, styles.labelSinMargen]}>Nombre</Text>
+          <Text style={styles.swatchLabel}>Nombre</Text>
           <TextInput
             style={styles.nameInput}
             value={draft.name}
@@ -449,33 +472,20 @@ function CustomThemeEditor({
             placeholderTextColor={styles.placeholder.color}
             accessibilityLabel="Nombre de la paleta"
           />
+          {puedeBorrar ? (
+            <Tappable
+              style={styles.btnBorrar}
+              onPress={() => onDeletePalette(draft.id)}
+              haptic={false}
+              accessibilityLabel={`Borrar paleta ${draft.name}`}
+            >
+              <Ionicons name="trash-outline" size={18} color={theme.colors.danger} />
+            </Tappable>
+          ) : null}
         </View>
 
         <View style={styles.controlDivider} />
-        <ColorField
-          label="Primario"
-          value={draft.primary}
-          onChange={(primary) => onChangeConfig({ primary })}
-          swatches={SWATCHES.primary}
-          sliderId="primary"
-        />
-        <View style={styles.controlDivider} />
-        <ColorField
-          label="Acento"
-          value={draft.accent}
-          onChange={(accent) => onChangeConfig({ accent })}
-          swatches={SWATCHES.accent}
-          sliderId="accent"
-        />
-        <View style={styles.controlDivider} />
-        <ColorField
-          label="Fondo"
-          value={draft.background}
-          onChange={(background) => onChangeConfig({ background })}
-          swatches={SWATCHES.background}
-          sliderId="background"
-          fondo
-        />
+        <ColorEditor draft={draft} onChange={onChangeConfig} />
         <View style={styles.controlDivider} />
         <FontPicker
           selected={draft.bodyFont}
@@ -799,7 +809,7 @@ const useStyles = makeThemedStyles((t) => ({
   },
   seccion: { ...t.typography.type.section, color: t.colors.text, marginBottom: 6 },
   seccionHint: { ...t.typography.type.caption, color: t.colors.textMuted, marginBottom: 14 },
-  opciones: { marginTop: 16, marginBottom: 4 },
+  opciones: { marginTop: 14, marginBottom: 2 },
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -807,8 +817,8 @@ const useStyles = makeThemedStyles((t) => ({
     borderRadius: t.shape.radiusLg,
     borderWidth: t.shape.borderThin,
     borderColor: t.colors.border,
-    padding: 14,
-    marginBottom: 8,
+    padding: 12,
+    marginBottom: 6,
   },
   optionRowSelected: {
     borderColor: t.colors.primary,
@@ -837,36 +847,84 @@ const useStyles = makeThemedStyles((t) => ({
   optionTagline: { fontSize: t.fontSize(12), color: t.colors.textMuted },
   swatches: { flexDirection: 'row', gap: 4, marginLeft: 10 },
   swatch: { width: 18, height: 18, borderRadius: 9, borderWidth: 1, borderColor: swatchStroke(t) },
-  paletteSection: { marginTop: 16, marginBottom: 12 },
+  paletteSection: { marginTop: 14, marginBottom: 12 },
   paletteSectionHead: {
-    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
+    marginBottom: 8,
   },
-  paletteStrip: { gap: 8, paddingVertical: 4, paddingRight: 4 },
+  palCount: { fontSize: t.fontSize(11), color: t.colors.textMuted },
+  // Rejilla que fluye: 3 tarjetas por línea en un teléfono chico, más en
+  // pantallas anchas. Sin scroll propio — todas las paletas se ven de una.
+  paletteGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  palTileWrap: { width: 88 },
+  palTile: {
+    flex: 1,
+    minHeight: 64,
+    gap: 3,
+    padding: 8,
+    backgroundColor: t.colors.surface,
+    borderRadius: t.shape.radiusMd,
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.border,
+  },
+  palTileSelected: {
+    borderColor: t.colors.primary,
+    borderWidth: t.shape.borderThick,
+    backgroundColor: t.colors.primarySoft,
+  },
+  palTileNueva: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.colors.background,
+    borderColor: t.colors.primarySoftBorder,
+    borderWidth: t.shape.borderMedium,
+  },
+  // Las tres franjas de la paleta (primario · fondo · acento): la combinación
+  // se lee de un vistazo sin tener que abrirla.
+  palMuestra: {
+    flexDirection: 'row',
+    height: 26,
+    borderRadius: t.shape.radiusSm,
+    overflow: 'hidden',
+    borderWidth: t.shape.borderThin,
+    borderColor: swatchStroke(t),
+  },
+  palFranja: { flex: 1 },
+  palName: { fontSize: t.fontSize(12), ...t.typography.fonts.semibold, color: t.colors.text },
+  palEstado: { fontSize: t.fontSize(10), color: t.colors.primary },
+  palNuevaTxt: { fontSize: t.fontSize(11), ...t.typography.fonts.semibold, color: t.colors.primary },
   paletteControlsCard: {
     borderRadius: t.shape.radiusLg,
     borderWidth: t.shape.borderThin,
     borderColor: t.colors.border,
     backgroundColor: t.colors.surfaceElevated,
     padding: 12,
-    marginBottom: 16,
+    marginBottom: 14,
     ...t.shadows.card,
   },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  controlDivider: { height: t.shape.borderThin, backgroundColor: t.colors.border, marginVertical: 12 },
-  colorField: { minWidth: 0 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  btnBorrar: {
+    width: 42,
+    height: 42,
+    borderRadius: t.shape.radiusMd,
+    borderWidth: t.shape.borderThin,
+    borderColor: t.colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  controlDivider: { height: t.shape.borderThin, backgroundColor: t.colors.border, marginVertical: 10 },
+  colorField: { minWidth: 0, gap: 8 },
   swatchLabel: {
     fontSize: t.fontSize(13),
     ...t.typography.fonts.semibold,
     color: t.colors.text,
-    marginBottom: 8,
   },
-  labelSinMargen: { marginBottom: 0 },
-  colorHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  hexWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  // El valor exacto y los atajos comparten línea: el segmentado ya dice qué
+  // color se está editando, así que ninguno necesita cabecera propia.
+  pickRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   hexInput: {
     minWidth: 82,
     fontSize: t.fontSize(12),
@@ -879,20 +937,14 @@ const useStyles = makeThemedStyles((t) => ({
     paddingVertical: 6,
     textAlign: 'center',
   },
-  colorPreview: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: t.shape.borderThin,
-    borderColor: swatchStroke(t),
-  },
   sliderCap: {
     fontSize: t.fontSize(11),
     color: t.colors.textMuted,
     marginBottom: 2,
   },
-  sliderGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+  sliderGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   sliderCell: { flexGrow: 1, flexBasis: 132, minWidth: 124 },
+  swatchScroll: { flex: 1 },
   swatchGrid: { flexDirection: 'row', gap: 4, paddingRight: 4 },
   swatchOuter: {
     width: 44,
@@ -919,17 +971,16 @@ const useStyles = makeThemedStyles((t) => ({
     borderWidth: t.shape.borderThin,
     borderColor: t.colors.border,
     borderRadius: t.shape.radiusMd,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
   },
   placeholder: { color: t.colors.textFaint },
   fontBlock: { minWidth: 0 },
   fontHead: {
-    minHeight: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   fontCarousel: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   fontArrow: {
@@ -944,76 +995,28 @@ const useStyles = makeThemedStyles((t) => ({
   },
   fontStage: {
     flex: 1,
-    minHeight: 72,
+    minHeight: 56,
     borderRadius: t.shape.radiusLg,
     borderWidth: t.shape.borderMedium,
     borderColor: t.colors.primary,
     backgroundColor: t.colors.surface,
     justifyContent: 'center',
-    paddingVertical: 9,
+    paddingVertical: 7,
     paddingHorizontal: 11,
   },
-  fontStageName: { fontSize: t.fontSize(18), color: t.colors.text },
-  fontStageSample: { fontSize: t.fontSize(13), color: t.colors.textMuted, marginTop: 5 },
+  fontStageName: { fontSize: t.fontSize(17), color: t.colors.text },
+  fontStageSample: { fontSize: t.fontSize(12), color: t.colors.textMuted, marginTop: 3 },
   fontStageCount: {
     fontSize: t.fontSize(11),
     ...t.typography.fonts.semibold,
     color: t.colors.primary,
   },
-  palRow: {
-    width: 252,
-    minHeight: 76,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: t.colors.surface,
-    borderRadius: t.shape.radiusMd,
-    borderWidth: t.shape.borderThin,
-    borderColor: t.colors.border,
-  },
-  palRowSelected: { borderColor: t.colors.primary, borderWidth: t.shape.borderThick },
-  palMainWrap: { flex: 1 },
-  palMain: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 9,
-    paddingHorizontal: 10,
-  },
-  palSwatches: { flexDirection: 'row', gap: 3, marginRight: 9 },
-  palSwatch: { width: 18, height: 18, borderRadius: 9, borderWidth: 1, borderColor: swatchStroke(t) },
-  palInfo: { flex: 1, minWidth: 0 },
-  palName: {
-    fontSize: t.fontSize(14),
-    ...t.typography.fonts.semibold,
-    color: t.colors.text,
-  },
-  palFont: { fontSize: t.fontSize(11), color: t.colors.textMuted, marginTop: 1 },
-  palDelete: {
-    alignSelf: 'stretch',
-    minWidth: 58,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderLeftWidth: t.shape.borderThin,
-    borderLeftColor: t.colors.border,
-  },
-  palDeleteTxt: { fontSize: t.fontSize(11), color: t.colors.danger },
-  palNew: {
-    borderWidth: t.shape.borderMedium,
-    borderColor: t.colors.primarySoftBorder,
-    borderRadius: t.shape.radiusMd,
-    minHeight: 44,
-    paddingHorizontal: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  palNewTxt: { fontSize: t.fontSize(12), ...t.typography.fonts.semibold, color: t.colors.primary },
-  palLimit: { fontSize: t.fontSize(11), color: t.colors.textMuted },
   btnGuardar: {
     backgroundColor: t.colors.accent,
     borderRadius: t.shape.radiusMd,
     paddingVertical: 13,
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 10,
   },
   btnGuardarDisabled: { backgroundColor: t.colors.primaryDisabled },
   btnGuardarTxt: {
@@ -1041,7 +1044,7 @@ const useStyles = makeThemedStyles((t) => ({
     marginBottom: 8,
   },
   a11yGap: { height: 6 },
-  contrastHint: { ...t.typography.type.caption, color: t.colors.textMuted, marginTop: 12 },
+  contrastHint: { ...t.typography.type.caption, color: t.colors.textMuted, marginTop: 10 },
   aboutRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   aboutLabel: { ...t.typography.type.body, color: t.colors.text },
   aboutValue: { ...t.typography.type.caption, color: t.colors.textMuted },

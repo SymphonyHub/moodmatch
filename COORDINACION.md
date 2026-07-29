@@ -95,10 +95,25 @@ El reparto y el historial de gates viven en `PLAN-INTEGRACION-FASE17.md`.
 > front/back ya no se escribe a mano — `accesoriosSprites.test.js` lee el módulo
 > del backend y falla si los catálogos divergen.
 
-> **AVISO (Fase 17, 2026-07-27) — Prisma listo, despliegue pendiente:** las
-> migraciones de Energía y EXP están versionadas e integradas localmente, pero
-> el Agente E no las aplicó en Neon. Ejecutarlas sigue requiriendo autorización
-> explícita del usuario y revisión previa del SQL.
+> **RESUELTO (2026-07-29) — migraciones de Energía y EXP APLICADAS en Neon.**
+> `prisma migrate deploy` corrió contra `neondb` tras revisión del SQL y
+> autorización explícita del usuario. Las dos columnas son aditivas con
+> `DEFAULT`; la de experiencia además trae un `UPDATE` de respaldo que rellena
+> la EXP de las mascotas existentes según su etapa, para que ninguna retroceda
+> de evolución al introducirse la métrica. Verificado sobre las 3 mascotas
+> reales: cariño 6 → exp 0, cariño 51 → exp 9800, cariño 0 → exp 0. Después de
+> aplicar hay que correr `npx prisma generate`: el cliente en `node_modules`
+> queda viejo y no conoce las columnas nuevas.
+
+> **AVISO (2026-07-29) — `google-services.json` NO llega al builder de EAS.**
+> `fix/eas-fcm-config` está mergeado y `app.json` ya declara
+> `android.googleServicesFile`, pero EAS avisa al subir: *"File specified via
+> android.googleServicesFile field in your app.json is not checked in to your
+> repository and won't be uploaded to the builder"*. El `!google-services.json`
+> del `.easignore` no alcanza para revertir eso en esta versión de eas-cli, así
+> que **las notificaciones push siguen sin funcionar en los APK de la nube**. La
+> salida documentada es una variable de entorno de tipo `file` en EAS
+> (`eas env:create --type file --visibility secret`), no versionar el archivo.
 
 > **AVISO (2026-07-27) — configuración EAS/FCM aislada:** los cambios de
 > `.gitignore`, `app/.gitignore`, `app/app.json`, `app/.easignore` y

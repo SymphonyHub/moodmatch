@@ -123,9 +123,27 @@ El reparto y el historial de gates viven en `PLAN-INTEGRACION-FASE17.md`.
 > los secretos no se materializan fuera del worker, así que la cadena está
 > probada hasta ese punto pero el push end-to-end no se validó todavía.
 
-> **AVISO (2026-07-29) — cuota de EAS agotada.** El plan Free consumió sus
-> builds de Android del mes; se renueva el **sábado 1 de agosto de 2026**. El
-> último APK publicado es de `89cc319`, ANTERIOR a FCM y a las migraciones.
+> **DECISIÓN (2026-07-29) — los builds se hacen SOLO en la nube de EAS.** No
+> compilar en la máquina local ni tocar el SDK/CMake para intentarlo. Queda
+> documentado el porqué para que nadie lo reintente: `assembleRelease` muere en
+> `react_codegen_reactnativekeyboardcontroller` con *"Filename longer than 260
+> characters"*. La ruta mide 366; `LongPathsEnabled` ya está en 1, pero el ninja
+> 1.10.2 que trae CMake 3.22.1 del SDK no declara `longPathAware` en su
+> manifiesto. Acortar rutas NO alcanza: el tramo irreducible —el espejo
+> `react_codegen_...dir/` más `node_modules`— suma ~290 caracteres él solo, así
+> que ni mover `.cxx` ni `subst` bajan de 260. El único arreglo sería un ninja
+> ≥1.12, y se decidió no mantener toolchain local a mano.
+>
+> Consecuencia práctica: **`app/android/` no es fuente de verdad de nada.** Está
+> gitignoreado y se regenera con `expo prebuild`. Si alguien lo compila a mano,
+> que sepa que un `assembleRelease` a secas NO recoge cambios de `app.json` /
+> `app.config.js` sin correr `expo prebuild` antes — de ahí salió un APK sin FCM.
+>
+> **Cuota de EAS agotada.** El plan Free consumió sus builds de Android del mes;
+> se renueva el **sábado 1 de agosto de 2026**. El último APK publicado es de
+> `89cc319`, ANTERIOR a FCM y a las migraciones, así que no sirve para probar
+> notificaciones ni Energía/EXP. El primer build después de la renovación es el
+> que valida la cadena de FCM de punta a punta.
 
 > **AVISO (2026-07-27) — configuración EAS/FCM aislada:** los cambios de
 > `.gitignore`, `app/.gitignore`, `app/app.json`, `app/.easignore` y
